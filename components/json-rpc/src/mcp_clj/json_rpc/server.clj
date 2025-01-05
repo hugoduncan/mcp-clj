@@ -1,8 +1,8 @@
-(ns poly.json-rpc.server
+(ns mcp-clj.json-rpc.server
   "JSON-RPC 2.0 server implementation with EDN/JSON conversion"
   (:require [aleph.http :as http]
             [clojure.data.json :as json]
-            [poly.json-rpc.protocol :as protocol]))
+            [mcp-clj.json-rpc.protocol :as protocol]))
 
 ;;; Server creation and lifecycle
 

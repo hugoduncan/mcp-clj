@@ -1,7 +1,7 @@
-(ns poly.json-rpc.server-test
+(ns mcp-clj.json-rpc.server-test
   (:require [clojure.test :refer :all]
-            [poly.json-rpc.server :as server]
-            [poly.json-rpc.protocol :as protocol]))
+            [mcp-clj.json-rpc.server :as server]
+            [mcp-clj.json-rpc.protocol :as protocol]))
 
 (deftest server-creation
   (testing "Server creation validation"
