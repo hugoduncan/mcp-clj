@@ -6,16 +6,23 @@
    {poly/json-rpc                 {:local/root "components/json-rpc"}
     lambdaisland/kaocha           {:mvn/version "1.87.1366"}
     lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}
-    org.clojure/clojure           {:mvn/version "1.12.1"}}}
-  :test {:extra-paths ["components/json-rpc/test"]
-         :extra-deps
-         {lambdaisland/kaocha           {:mvn/version "1.91.1392"}
-          lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}
-          org.clojure/test.check        {:mvn/version "1.1.1"}}
-         :exec-fn     kaocha.runner/exec-fn
-         :exec-args   {}
-         :jvm-opts    ["-XX:-OmitStackTraceInFastThrow"
-                       "-Dclojure.main.report=stderr"]
-         :main-opts   ["-m" "kaocha.runner"]}
+    org.clojure/clojure           {:mvn/version "1.12.0"}}}
+  :test   {:extra-paths ["components/json-rpc/test"]
+           :extra-deps
+           {org.clojure/test.check {:mvn/version "1.1.1"}}
+           :exec-fn     kaocha.runner/exec-fn
+           :exec-args   {}
+           :jvm-opts    ["-XX:-OmitStackTraceInFastThrow"
+                         "-Dclojure.main.report=stderr"]           }
+  :kaocha {:extra-paths ["components/json-rpc/test"]
+           :extra-deps
+           {lambdaisland/kaocha           {:mvn/version "1.91.1392"}
+            lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}
+            org.clojure/test.check        {:mvn/version "1.1.1"}}
+           :exec-fn     kaocha.runner/exec-fn
+           :exec-args   {}
+           :jvm-opts    ["-XX:-OmitStackTraceInFastThrow"
+                         "-Dclojure.main.report=stderr"]
+           :main-opts   ["-m" "kaocha.runner"]}
   }
  }
