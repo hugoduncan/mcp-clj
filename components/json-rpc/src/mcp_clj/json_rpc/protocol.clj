@@ -1,6 +1,7 @@
 (ns mcp-clj.json-rpc.protocol
   "JSON-RPC 2.0 protocol constants and utilities"
-  (:require [clojure.data.json :as json]))
+  (:require
+   [clojure.data.json :as json]))
 
 ;;; Protocol version
 (def ^:const version "2.0")
@@ -45,11 +46,11 @@
     (not= jsonrpc version)
     (error-response (:invalid-request error-codes)
                    "Invalid JSON-RPC version")
-    
+
     (not (string? method))
     (error-response (:invalid-request error-codes)
                    "Method must be a string")
-    
+
     :else nil))
 
 ;;; JSON conversion
