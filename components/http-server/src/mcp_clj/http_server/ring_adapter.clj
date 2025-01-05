@@ -63,7 +63,8 @@
 
 
 (defn run-server
-  "Start an HttpServer instance with the given Ring handler"
+  "Start an HttpServer instance with the given Ring handler.
+   Returns a server map containing :server and :stop fn."
   [handler {:keys [port join?]
             :or   {port  8080
                    join? false}}]
@@ -86,4 +87,5 @@
     (.start server)
     (when join?
       (.awaitTermination (.getExecutor server) Long/MAX_VALUE java.util.concurrent.TimeUnit/SECONDS))
-    server))
+    {:server server
+     :stop   (fn [] (.stop server 0))}))

@@ -4,68 +4,76 @@
    [mcp-clj.json-rpc.server :as server]
    [mcp-clj.json-rpc.protocol :as protocol])
   (:import
-   [java.net HttpURLConnection URL]))
+   [java.net HttpURLConnection URL]
+   [java.io BufferedReader InputStreamReader]))
 
-(defn- send-request
-  "Helper function to send a JSON-RPC request to the server"
-  [url request-data]
-  (let [conn      (.openConnection (URL. url))
-        json-data (first (protocol/write-json request-data))]
-    (doto conn
-      (.setRequestMethod "POST")
-      (.setRequestProperty "Content-Type" "application/json")
-      (.setRequestProperty "Content-Length" (str (count (.getBytes json-data))))
-      (.setDoOutput true))
-
-    (with-open [os (.getOutputStream conn)]
-      (.write os (.getBytes json-data))
-      (.flush os))
-
-    (let [response-code (.getResponseCode conn)
-          response-body (slurp (.getInputStream conn))]
-      {:status response-code
-       :body   (first (protocol/parse-json response-body))})))
+(defn- read-sse-events
+  "Read SSE events from connection until it receives an event or times out"
+  [^HttpURLConnection conn timeout-ms]
+  (with-open [reader (-> conn
+                         .getInputStream
+                         InputStreamReader.
+                         BufferedReader.)]
+    (.setReadTimeout conn timeout-ms)
+    (loop [events []]
+      (let [line (.readLine reader)]
+        (if (and line (.startsWith line "data: "))
+          (let [event      (subs line 6)
+                [parsed _] (protocol/parse-json event)]
+            (conj events parsed))
+          events)))))
 
 (deftest server-creation
   (testing "Server creation validation"
     (is (thrown-with-msg? clojure.lang.ExceptionInfo
-                          #"Port is required"
+                          #"Handlers must be a map"
                           (server/create-server {})))
 
     (is (thrown-with-msg? clojure.lang.ExceptionInfo
-                          #"Handlers must be a map"
-                          (server/create-server {:port 8080}))))
+                          #"Message stream must be an atom"
+                          (server/create-server {:handlers {}}))))
 
   (testing "Successful server creation"
-    (let [handlers              {"echo" (fn [params] params)}
-          {:keys [server stop]} (server/create-server
-                                 {:port     8080
-                                  :handlers handlers})]
+    (let [{:keys [server port stop]} (server/create-server
+                                      {:handlers       {"echo" (fn [params] params)}
+                                       :message-stream (atom nil)})]
       (try
         (is (some? server))
+        (is (pos-int? port))
         (is (fn? stop))
         (finally
           (stop))))))
 
 (deftest server-functionality
-  (testing "Echo method response"
-    (let [test-port      8081
-          test-data      {:message "Hello" :number 42}
-          handlers       {"echo" (fn [params] params)}
-          {:keys [stop]} (server/create-server
-                          {:port     test-port
-                           :handlers handlers})]
+  (testing "Echo method response over SSE"
+    (let [test-data           {:message "Hello" :number 42}
+          message-queue       (atom nil)
+          {:keys [port stop]} (server/create-server
+                               {:handlers       {"echo" (fn [params] params)}
+                                :message-stream message-queue})]
       (try
-        (let [request               {:jsonrpc "2.0"
-                                     :method  "echo"
-                                     :params  test-data
-                                     :id      1}
-              {:keys [status body]} (send-request
-                                     (str "http://localhost:" test-port)
-                                     request)]
-          (is (= 200 status))
-          (is (= "2.0" (:jsonrpc body)))
-          (is (= 1 (:id body)))
-          (is (= test-data (:result body))))
+        (let [conn (doto (.openConnection (URL. (str "http://localhost:" port)))
+                     (.setRequestMethod "GET")
+                     (.setRequestProperty "Accept" "text/event-stream")
+                     (.setReadTimeout 2000)
+                     (.setDoInput true)
+                     (.connect))]
+
+          (Thread/sleep 100)  ; Wait for connection
+
+                                        ; Send request via message queue
+          (let [request      {:jsonrpc "2.0"
+                              :method  "echo"
+                              :params  test-data
+                              :id      1}
+                json-request (first (protocol/write-json request))]
+            (reset! message-queue json-request)
+
+                                        ; Read and verify response
+            (let [events   (read-sse-events conn 2000)
+                  response (first events)]
+              (is (= "2.0" (:jsonrpc response)) "Should have correct jsonrpc version")
+              (is (= 1 (:id response)) "Should have correct id")
+              (is (= test-data (:result response)) "Should echo test data"))))
         (finally
           (stop))))))

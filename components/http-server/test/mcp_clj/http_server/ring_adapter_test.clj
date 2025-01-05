@@ -30,12 +30,12 @@
 (def test-port 8899)
 
 (defn server-fixture [f]
-  (let [server (adapter/run-server test-handler {:port test-port})]
+  (let [server-map (adapter/run-server test-handler {:port test-port})]
     (try
-      (binding [*server* server]
+      (binding [*server* server-map]
         (f))
       (finally
-        (.stop server 0)))))
+        ((:stop server-map))))))
 
 (use-fixtures :each server-fixture)
 
