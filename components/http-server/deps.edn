@@ -1,0 +1,2 @@
+{:deps {ring/ring-core                          {:mvn/version "1.13.0"}
+        ring-sse-middleware/ring-sse-middleware {:mvn/version "0.1.3"}}}

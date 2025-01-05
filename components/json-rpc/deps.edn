@@ -1,7 +1,6 @@
 {:paths ["src"]
- :deps {org.clojure/clojure {:mvn/version "1.12.0"}
-        org.clojure/data.json {:mvn/version "2.5.0"}
-        aleph/aleph {:mvn/version "0.7.0"}}  ; HTTP/TCP server
+ :deps  {org.clojure/clojure   {:mvn/version "1.12.0"}
+         org.clojure/data.json {:mvn/version "2.5.0"}}
  :aliases
  {:test {:extra-paths ["test"]
-         :extra-deps {}}}}
+         :extra-deps  {}}}}

@@ -3,11 +3,15 @@
  {:dev
   {:extra-paths ["development/src" "components/json-rpc/test"]
    :extra-deps
-   {poly/json-rpc                 {:local/root "components/json-rpc"}
+   {poly/http-server              {:local/root "components/http-server"}
+    poly/json-rpc                 {:local/root "components/json-rpc"}
+    poly/mcp-server               {:local/root "components/mcp-server"}
     lambdaisland/kaocha           {:mvn/version "1.87.1366"}
     lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}
     org.clojure/clojure           {:mvn/version "1.12.0"}}}
-  :test   {:extra-paths ["components/json-rpc/test"]
+  :test   {:extra-paths ["components/http-server/test"
+                         "components/json-rpc/test"
+                         "components/mcp-server/test"]
            :extra-deps
            {org.clojure/test.check {:mvn/version "1.1.1"}}
            :exec-fn     kaocha.runner/exec-fn
