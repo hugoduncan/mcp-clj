@@ -35,9 +35,14 @@
     (.sendResponseHeaders exchange status 0)
     (with-open [os (.getResponseBody exchange)]
       (try
-        (body os)
-        (.flush os)
+        (try
+          (body os)
+          (.flush os)
+          (catch sun.net.httpserver.StreamClosedException _
+            ;; Client disconnected - normal for SSE
+            nil))
         (catch Exception e
+          ;; Log other exceptions
           (.printStackTrace e))))))
 
 (defn- send-ring-response

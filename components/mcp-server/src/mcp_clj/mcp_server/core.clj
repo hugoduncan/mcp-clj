@@ -12,6 +12,7 @@
   "Handle initialize request from client.
    Returns server info, protocol version and capabilities."
   [server {:keys [capabilities clientInfo protocolVersion] :as params}]
+  (binding [*out* *err*] (prn "handle-initialize"))
   (when-not (= protocolVersion required-client-version)
     (throw (ex-info (str "Unsupported protocol version. Required " required-client-version)
                     {:code -32001
@@ -36,16 +37,23 @@
 (defn handle-initialized
   "Handle initialized notification from client."
   [server _params]
+  (println "handle-initialized server:" server)
+  (println "handle-initialized state:" @(:state server))
   (swap! (:state server) assoc :initialized? true)
+  (println "handle-initialized state after:" @(:state server))
   nil)
 
 (defn ping
   "Handle ping request."
   [server _params]
+  (println "ping server:" server)
+  (println "ping state:" @(:state server))
   (when-not (:initialized? @(:state server))
+    (println "ping throwing not initialized")
     (throw (ex-info "Server not initialized"
                     {:code -32002
                      :data {:state "uninitialized"}})))
+  (println "ping returning empty map")
   {})
 
 (defn create-handlers
@@ -63,11 +71,14 @@
    - :tools    Optional. Map of tool implementations"
   [{:keys [port tools] :as options}]
   (let [state           (atom {:initialized? false})
-        handlers        (create-handlers {:state state})
+        message-stream  (atom nil)
+        server         (->MCPServer nil state)
+        handlers       (create-handlers server)
         json-rpc-server (json-rpc/create-server
-                         {:port     port
-                          :handlers handlers})
-        server          (->MCPServer json-rpc-server state)]
-    (assoc server
+                         {:port           port
+                          :handlers       handlers
+                          :message-stream message-stream})]
+    (assoc (assoc server :json-rpc-server json-rpc-server)
+           :message-stream message-stream
            :stop #(do (reset! state {:initialized? false})
                       ((:stop json-rpc-server))))))
