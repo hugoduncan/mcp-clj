@@ -5,6 +5,7 @@
    :extra-deps
    {poly/http-server              {:local/root "components/http-server"}
     poly/json-rpc                 {:local/root "components/json-rpc"}
+    poly/log                      {:local/root "components/log"}
     poly/mcp-server               {:local/root "components/mcp-server"}
     lambdaisland/kaocha           {:mvn/version "1.87.1366"}
     lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}

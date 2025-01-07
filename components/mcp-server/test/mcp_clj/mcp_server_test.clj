@@ -1,109 +1,134 @@
 (ns mcp-clj.mcp-server-test
   (:require
-   [clojure.test :refer [deftest testing is use-fixtures]]
    [clojure.data.json :as json]
+   [clojure.test :refer [deftest is testing use-fixtures]]
    [hato.client :as hato]
-   [mcp-clj.mcp-server.core :as mcp]))
+   [mcp-clj.mcp-server.core :as mcp])
+  (:import
+   [java.util.concurrent
+    CountDownLatch
+    CyclicBarrier
+    TimeUnit]))
 
 (def valid-client-info
   {:clientInfo      {:name "test-client" :version "1.0"}
    :protocolVersion "0.1"
    :capabilities    {:tools {}}})
 
-(deftest lifecycle-test
-  (let [state  (atom {:initialized? false})
-        server {:state state}]
+(def ^:private ^:dynamic  *server*)
 
-    (testing "initialize request"
-      (let [response (mcp/handle-initialize server valid-client-info)]
-        (is (= "mcp-clj" (get-in response [:serverInfo :name]))
-            "Returns server info")
-        (is (= "0.1" (:protocolVersion response))
-            "Returns protocol version")
-        (is (map? (:capabilities response))
-            "Returns capabilities")
-        (is (false? (get-in response [:capabilities :tools :listChanged]))
-            "Tools capability configured correctly")
-        (is (= (:clientInfo valid-client-info)
-               (:client-info @state))
-            "Client info stored in state")))
+(defn with-server
+  "Test fixture for server lifecycle"
+  [f]
+  (let [server (mcp/create-server {:port 0 :threads 2 :queue-size 10})]
+    (try
+      (binding [*server* server]
+        (f))
+      (finally
+        ((:stop server))))))
 
-    (testing "initialize with invalid version"
-      (is (thrown-with-msg?
-           clojure.lang.ExceptionInfo
-           #"Unsupported protocol version"
-           (mcp/handle-initialize
-            server
-            (assoc valid-client-info :protocolVersion "0.2")))
-          "Throws on version mismatch"))
-
-    (testing "initialized notification"
-      (is (nil? (mcp/handle-initialized server nil))
-          "Returns nil for notification")
-      (is (:initialized? @state)
-          "Server marked as initialized"))
-
-    (testing "ping after initialization"
-      (is (= {} (mcp/ping server nil))
-          "Ping returns empty map when initialized"))
-
-    (testing "ping before initialization"
-      (swap! state assoc :initialized? false)
-      (is (thrown-with-msg?
-           clojure.lang.ExceptionInfo
-           #"Server not initialized"
-           (mcp/ping server nil))
-          "Ping throws when not initialized"))))
-
-(def valid-client-info
-  {:clientInfo      {:name "test-client" :version "1.0"}
-   :protocolVersion "0.1"
-   :capabilities    {:tools {}}})
+(use-fixtures :each with-server)
 
 (defn send-request
-  "Send a JSON-RPC request and get response"
+  "Send JSON-RPC request"
   [url request]
-  (let [response (hato/post (str url "/message")
-                            {:headers {"Content-Type" "application/json"}
-                             :body    (json/write-str request)})
-        body     (json/read-str (:body response))]
-    (println "sent:" request)
-    (println "received:" body)
-    body))
+  (prn :send-request url)
+  (-> (hato/post url
+                 {:headers {"Content-Type" "application/json"}
+                  :body    (json/write-str request)})
+      :body
+      (json/read-str :key-fn keyword)))
 
-(deftest integration-test
-  (testing "server request handling"
-    (let [server   (mcp/create-server {:port 0})
-          port     (get-in server [:json-rpc-server :port])
-          base-url (format "http://localhost:%d" port)
+(defn make-request
+  "Create JSON-RPC request"
+  [method params id]
+  {:jsonrpc "2.0"
+   :method  method
+   :params  params
+   :id      id})
 
-          initialize-request {:jsonrpc "2.0"
-                              :method  "initialize"
-                              :id      1
-                              :params  valid-client-info}
+(deftest lifecycle-test
+  (testing "server lifecycle"
+    (let [port          (get-in *server* [:json-rpc-server :port])
+          url           (format "http://localhost:%d" port)
+          init-response (send-request url (make-request "initialize" valid-client-info 1))]
 
-          initialized-notification {:jsonrpc "2.0"
-                                    :method  "notifications/initialized"}  ; No id for notification
+      (testing "initialization"
+        (is (= 1 (get-in init-response [:id])))
+        (is (get-in init-response [:result :serverInfo])))
 
-          ping-request {:jsonrpc "2.0"
-                        :method  "ping"
-                        :id      2}]
+      (testing "initialized notification"
+        (let [response (send-request url
+                                     {:jsonrpc "2.0"
+                                      :method  "notifications/initialized"})]
+          (is (nil? response))))
 
-      (try
-        (let [init-response (send-request base-url initialize-request)]
-          (is (= 1 (get init-response "id"))
-              "Initialize response has correct id")
-          (is (get-in init-response ["result" "serverInfo"])
-              "Initialize response contains server info"))
+      (testing "ping after initialization"
+        (let [response (send-request url (make-request "ping" {} 2))]
+          (is (= 2 (:id response)))
+          (is (= {} (:result response))))))))
 
-        ;; Send initialized notification
-        (send-request base-url initialized-notification)
+(deftest error-handling-test
+  (testing "error handling"
+    (let [port (get-in *server* [:json-rpc-server :port])
+          url  (format "http://localhost:%d" port)]
 
-        (let [ping-response (send-request base-url ping-request)]
-          (is (= 2 (get ping-response "id"))
-              "Ping response has correct id")
-          (is (= {} (get ping-response "result"))
-              "Ping response result is empty map"))
+      (testing "invalid protocol version"
+        (let [response (send-request
+                        url
+                        (make-request "initialize"
+                                      (assoc valid-client-info
+                                             :protocolVersion "0.2")
+                                      1))]
+          (is (= -32001 (get-in response [:error :code])))))
 
-        (finally
-          ((:stop server)))))))
+      (testing "uninitialized ping"
+        (let [response (send-request url (make-request "ping" {} 1))]
+          (is (= -32002 (get-in response [:error :code]))))))))
+
+(deftest sse-test
+  (testing "sse handling"
+    (let [port     (get-in *server* [:json-rpc-server :port])
+          _        (assert (pos-int? port))
+          url      (format "http://localhost:%d" port)
+          events   (atom [])
+          barrier  (CountDownLatch. 1)
+          response (hato/get (str url "/sse")
+                             {:headers {"Accept" "text/event-stream"}
+                              :as      :stream})]
+
+      (testing "sse connection"
+        (with-open [reader (clojure.java.io/reader (:body response))]
+          (let [done (volatile! nil)
+
+                f
+                (future
+                  (try
+                    (loop []
+                      (when-let [line (.readLine reader)]
+                        (prn :read-line line)
+                        (when-not (or (empty? line)
+                                      (.startsWith line ":"))
+                          (when-let [data (second (re-find #"^data: (.+)$" line))]
+                            (prn :data data)
+                            (prn :data' (json/read-str data :key-fn keyword))
+                            (swap! events conj (json/read-str data :key-fn keyword))
+                            (.countDown barrier)))
+                        (when-not @done
+                          (recur))))
+                    (catch Exception _)))]
+
+            (is (.await barrier 2 TimeUnit/SECONDS))
+            (let [uri (first @events)]
+
+              (prn :events @events)
+              (send-request
+               (str url uri)
+               (make-request "initialize" valid-client-info 1)))
+
+            (prn :events @events)
+            (let [init-response (second @events)]
+              (is (= "2.0" (:jsonrpc init-response)))
+              (is (get-in init-response [:result :serverInfo])))
+
+            (future-cancel f)))))))

@@ -2,48 +2,71 @@
   "Ring adapter for Java's com.sun.net.httpserver.HttpServer with SSE support"
   (:require
    [clojure.string :as str]
-   [ring.util.response :as response])
+   [mcp-clj.log :as log])
   (:import
-   [com.sun.net.httpserver HttpServer HttpHandler HttpExchange]
-   [java.net InetSocketAddress]
-   [java.io InputStream]))
+   [com.sun.net.httpserver HttpExchange
+    HttpHandler
+    HttpServer]
+   [java.net InetSocketAddress
+    URLDecoder]))
 
-(defn- exchange->ring-request
+(defn- set-response-header!
+  [^HttpExchange exchange k v]
+  (.add (.getResponseHeaders exchange) (name k) (str v)))
+
+(defn- set-response-headers!
+  [^HttpExchange exchange headers]
+  (doseq [[k v] headers]
+    (set-response-header! exchange k v)))
+
+(defn- send-response-headers!
+  [^HttpExchange exchange status num-bytes]
+  (.sendResponseHeaders exchange status num-bytes))
+
+(defn- close-response-body!
+  [^HttpExchange exchange]
+  (.close (.getResponseBody exchange)))
+
+(defn- parse-query
+  [raw-query]
+  (let [decode #(URLDecoder/decode % "UTF-8")]
+    (if (str/blank? raw-query)
+      {}
+      (into {}
+            (map (fn [pair]
+                   (let [[key value] (str/split pair #"=" 2)]
+                     [(decode key) (decode (or value ""))]))
+                 (str/split raw-query #"&"))))))
+
+(defn- exchange->request-map
   "Convert HttpExchange to Ring request map"
   [^HttpExchange exchange]
-  {:server-port    (.getPort (.getLocalAddress exchange))
-   :server-name    (.getHostName (.getLocalAddress exchange))
-   :remote-addr    (-> exchange .getRemoteAddress .getAddress .getHostAddress)
-   :uri            (.getPath (.getRequestURI exchange))
-   :query-string   (.getRawQuery (.getRequestURI exchange))
-   :scheme         :http
-   :request-method (-> exchange .getRequestMethod .toLowerCase keyword)
-   :headers        (into {}
-                         (for [k (.keySet (.getRequestHeaders exchange))
-                               :let [vs (.get (.getRequestHeaders exchange) k)]]
-                           [(str/lower-case k) (str (first vs))]))
-   :body           (.getRequestBody exchange)})
+  {:server-port           (.getPort (.getLocalAddress exchange))
+   :server-name           (.getHostName (.getLocalAddress exchange))
+   :remote-addr           (-> exchange .getRemoteAddress .getAddress .getHostAddress)
+   :uri                   (.getPath (.getRequestURI exchange))
+   :query-string          (.getRawQuery (.getRequestURI exchange))
+   :query-params          (fn query-params []
+                            (parse-query
+                             (.getRawQuery (.getRequestURI exchange))))
+   :scheme                :http
+   :request-method        (-> exchange .getRequestMethod .toLowerCase keyword)
+   :headers               (into {}
+                                (for [k    (.keySet (.getRequestHeaders exchange))
+                                      :let [vs (.get (.getRequestHeaders exchange) k)]]
+                                  [(str/lower-case k) (str (first vs))]))
+   :body                  (.getRequestBody exchange)
+   :set-response-header   (partial set-response-header! exchange)
+   :set-response-headers  (partial set-response-headers! exchange)
+   :send-response-headers (partial send-response-headers! exchange)
+   :on-response-done      (fn [] (close-response-body! exchange))
+   :on-response-error     (fn [] (close-response-body! exchange))
+   :response-body         (.getResponseBody exchange)})
 
 (defn- send-streaming-response
   "Handle streaming response for SSE"
   [^HttpExchange exchange response]
-  (let [{:keys [status headers body]} response]
-    (doseq [[k v] headers]
-      (.add (.getResponseHeaders exchange)
-            (name k)
-            (str v)))
-    (.sendResponseHeaders exchange status 0)
-    (with-open [os (.getResponseBody exchange)]
-      (try
-        (try
-          (body os)
-          (.flush os)
-          (catch sun.net.httpserver.StreamClosedException _
-            ;; Client disconnected - normal for SSE
-            nil))
-        (catch Exception e
-          ;; Log other exceptions
-          (.printStackTrace e))))))
+  (let [{:keys [status headers]} response]))
 
 (defn- send-ring-response
   "Send Ring response, detecting streaming vs normal response"
@@ -52,45 +75,54 @@
     (send-streaming-response exchange response)
     (let [{:keys [status headers body]}
           response
-          body-bytes (cond
-                       (string? body)               (.getBytes body)
-                       (instance? InputStream body) (with-open [is body]
-                                                      (.readAllBytes is))
-                       :else                        body)]
-      (doseq [[k v] headers]
-        (.add (.getResponseHeaders exchange)
-              (name k)
-              (str v)))
-      (.sendResponseHeaders exchange status (count body-bytes))
-      (with-open [os (.getResponseBody exchange)]
-        (.write os body-bytes)
-        (.flush os)))))
-
+          body-bytes (if (string? body)
+                       (.getBytes body)
+                       body)
+          n          (if body-bytes
+                       (alength body-bytes)
+                       0)]
+      (set-response-headers! exchange headers)
+      (send-response-headers! exchange status (if (pos? n) n -1))
+      (if (pos? n)
+        (with-open [os (.getResponseBody exchange)]
+          (.write os body-bytes)
+          (.flush os))
+        (close-response-body! exchange)))))
 
 (defn run-server
   "Start an HttpServer instance with the given Ring handler.
    Returns a server map containing :server and :stop fn."
-  [handler {:keys [port join?]
+  [handler {:keys [executor port join?]
             :or   {port  8080
                    join? false}}]
   (let [server     (HttpServer/create (InetSocketAddress. port) 0)
         handler-fn (reify HttpHandler
                      (handle [_ exchange]
                        (try
-                         (let [request  (exchange->ring-request exchange)
+                         (let [request  (exchange->request-map exchange)
                                response (handler request)]
+                           (log/info
+                               :http/request
+                             {:request
+                              (select-keys
+                               request
+                               [:uri :method :headers])
+                              :response response})
                            (if (fn? (:body response))
                              (send-streaming-response exchange response)
                              (send-ring-response exchange response)))
                          (catch Exception e
                            (.printStackTrace e)
-                           (.sendResponseHeaders exchange 500 0))
+                           (send-response-headers! exchange 500 0))
                          ;; Removed exchange close from finally block
                          )))]
     (.createContext server "/" handler-fn)
-    (.setExecutor server nil)
+    (.setExecutor server executor)
     (.start server)
     (when join?
-      (.awaitTermination (.getExecutor server) Long/MAX_VALUE java.util.concurrent.TimeUnit/SECONDS))
+      (.awaitTermination
+       (.getExecutor server)
+       Long/MAX_VALUE
+       java.util.concurrent.TimeUnit/SECONDS))
     {:server server
      :stop   (fn [] (.stop server 0))}))
