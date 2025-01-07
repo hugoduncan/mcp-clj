@@ -2,7 +2,8 @@
   "MCP server implementation supporting the Anthropic Model Context Protocol"
   (:require
    [mcp-clj.json-rpc.server :as json-rpc]
-   [mcp-clj.log :as log])
+   [mcp-clj.log :as log]
+   [mcp-clj.mcp-server.tools :as tools])
   (:import
    [java.util.concurrent Executors
     ThreadPoolExecutor
@@ -102,15 +103,7 @@
   [server request id _params]
   (let [session (request-session server request)]
     (log/info :server/initialized {:session-id (:session-id session)})
-    "Accepted"
-    #_(if session
-        (do
-          (swap! (:session-id->session server)
-                 update (:session-id session)
-                 assoc :initialized? true)
-          ((:reply!-fn session) (json-sse-response id nil nil))
-          nil)
-        (session-not-found))))
+    "Accepted"))
 
 (defn- ping
   "Handle ping request"
@@ -124,14 +117,48 @@
                assoc :initialized? true)
         ((:reply!-fn session) (json-sse-response id :result {}))
         nil)
-      (session-not-found)))  )
+      (session-not-found))))
+
+(defn- handle-list-tools
+  "Handle tools/list request from client"
+  [server request id params]
+  (let [session (request-session server request)]
+    (log/info :server/tools-list {:session-id (:session-id session)})
+    (if session
+      (do
+        (future
+          ((:reply!-fn session)
+           (json-sse-response
+            id
+            :result
+            (tools/list-tools params))))
+        "Accepted")
+      (session-not-found))))
+
+(defn- handle-call-tool
+  "Handle tools/call request from client"
+  [server request id params]
+  (let [session (request-session server request)]
+    (log/info :server/tools-call {:session-id (:session-id session)})
+    (if session
+      (do
+        (future
+          ((:reply!-fn session)
+           (json-sse-response
+            id
+            :result
+            (tools/call-tool params))))
+        "Accepted")
+      (session-not-found))))
 
 (defn create-handlers
   "Create request handlers with server reference"
   [server]
   {"initialize"                (partial handle-initialize server)
    "notifications/initialized" (partial handle-initialized server)
-   "ping"                      (partial ping server)})
+   "ping"                      (partial ping server)
+   "tools/list"               (partial handle-list-tools server)
+   "tools/call"               (partial handle-call-tool server)})
 
 (defn- shutdown-executor
   "Shutdown executor service gracefully"
