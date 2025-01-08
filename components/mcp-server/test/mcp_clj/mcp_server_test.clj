@@ -91,7 +91,7 @@
                      (cond-> state
                        apply-fn (apply-fn msg)
                        true     (update :plan rest)))
-                   (assoc state :failed true)))
+                   (assoc state :failed {:missing-response data})))
       :send    (do
                  (prn :send msg)
                  (let [url  (str (:url state) (:uri state))
@@ -254,7 +254,8 @@
                                                :required   ["code"]}}]})}}])
                       [state' result] (run-plan state)
                       _               (testing "tools/list"
-                                        (is (= :passed result)))
+                                        (is (= :passed result) (pr-str state))
+                                        (is (not (:failed state'))))
                       state           (assoc
                                        state'
                                        :plan
@@ -338,65 +339,170 @@
                                         (is (= :passed result)))]))))
           (future-cancel f))))))
 
-(deftest resource-test
-  (testing "server lifecycle with SSE"
-    (let [port     (get-in *server* [:json-rpc-server :port])
-          url      (format "http://localhost:%d" port)
-          queue    (LinkedBlockingQueue.)
-          state    {:url    url
-                    :queue  queue
-                    :failed false}
-          response (hato/get (str url "/sse")
-                             {:headers {"Accept" "text/event-stream"}
-                              :as      :stream})]
-      (with-open [reader (io/reader (:body response))]
-        (let [done (volatile! nil)
-              f    (future
-                     (try
-                       (wait-for-sse-events reader queue done)
-                       (catch Throwable e
-                         (prn :error e)
-                         (flush))))]
-          (testing "initialisation"
-            (let [state (assoc
-                         state
-                         :plan
-                         [{:action   :receive
-                           :data     {:event "endpoint"}
-                           :apply-fn (update-state-apply-key :uri :data)}
-                          {:action :send
-                           :msg    (json-request
-                                    "initialize"
-                                    {:protocolVersion "2024-11-05"
-                                     :capabilities    {:roots
-                                                       {:listChanged true}
-                                                       :tools
-                                                       {:listChanged true}}
-                                     :clientInfo      {:name    "mcp"
-                                                       :version "0.1.0"}})}
-                          {:action :receive
-                           :data   {:event "message"}}
-                          {:action :send
-                           :msg    (json-request
-                                    "notifications/initialized"
-                                    {})}])
 
-                  [state' result] (run-plan state)]
-              (is (= :passed result))
-              (testing "resource interactions"
-                (let [state           (assoc
-                                       state'
-                                       :plan
-                                       [{:action :send
-                                         :msg    (json-request "resources/list" {})}
-                                        {:action :receive
-                                         :data
-                                         {:event "message"
-                                          :data  (json-result {:resources []})}}])
-                      [state' result] (run-plan state)
-                      _               (testing "resources/list"
-                                        (is (= :passed result)))]))))
-          (future-cancel f))))))
+(deftest tool-management-test
+  (testing "tool management"
+    (let [test-tool {:name           "test-tool"
+                     :description    "A test tool"
+                     :inputSchema    {:type       "object"
+                                      :properties {"value" {:type "string"}}
+                                      :required   ["value"]}
+                     :implementation (fn [{:keys [value]}]
+                                       {:content [{:type "text"
+                                                   :text (str "Got: " value)}]})}
+          server    (mcp/create-server {:port 0 :threads 2})]
+      (try
+        ;; Test adding a tool
+        (mcp/add-tool! server test-tool)
+        (is (= test-tool (get @(:tool-registry server) "test-tool")))
+
+        ;; Test updating a tool
+        (let [updated-tool (assoc test-tool
+                                  :description "Updated description")]
+          (mcp/add-tool! server updated-tool)
+          (is (= updated-tool (get @(:tool-registry server) "test-tool"))))
+
+        ;; Test removing a tool
+        (mcp/remove-tool! server "test-tool")
+        (is (nil? (get @(:tool-registry server) "test-tool")))
+
+        ;; Test adding invalid tool
+        (is (thrown? clojure.lang.ExceptionInfo
+                     (mcp/add-tool! server (dissoc test-tool :implementation))))
+
+        (finally
+          ((:stop server)))))))
+
+(deftest custom-tools-test
+  (testing "server with custom tools"
+    (let [custom-tool {:name           "echo"
+                       :description    "Echo the input"
+                       :inputSchema    {:type       "object"
+                                        :properties {"text" {:type "string"}}
+                                        :required   ["text"]}
+                       :implementation (fn [{:keys [text]}]
+                                         {:content [{:type "text"
+                                                     :text text}]})}
+          port        (get-in *server* [:json-rpc-server :port])
+          url         (format "http://localhost:%d" port)
+          queue       (LinkedBlockingQueue.)
+          state       {:url    url
+                       :queue  queue
+                       :failed false}]
+      ;; Add custom tool to server
+      (mcp/add-tool! *server* custom-tool)
+
+      (let [response (hato/get (str url "/sse")
+                               {:headers {"Accept" "text/event-stream"}
+                                :as      :stream})]
+        (with-open [reader (io/reader (:body response))]
+          (let [done (volatile! nil)
+                f    (future
+                       (try
+                         (wait-for-sse-events reader queue done)
+                         (catch Throwable e
+                           (prn :error e)
+                           (flush))))]
+            (testing "using custom tool"
+              (let [state           (assoc
+                                     state
+                                     :plan
+                                     [{:action   :receive
+                                       :data     {:event "endpoint"}
+                                       :apply-fn (update-state-apply-key :uri :data)}
+                                      {:action :send
+                                       :msg    (json-request
+                                                "initialize"
+                                                {:protocolVersion "2024-11-05"
+                                                 :capabilities    {:tools {:listChanged true}}
+                                                 :clientInfo      {:name    "mcp"
+                                                                   :version "0.1.0"}})}
+                                      {:action :receive
+                                       :data   {:event "message"}}
+                                      {:action :send
+                                       :msg    (json-request
+                                                "notifications/initialized"
+                                                {})}])
+                    [state' result] (run-plan state)]
+                (is (= :passed result))
+                (testing "tool interactions"
+                  (let [state           (assoc
+                                         state'
+                                         :plan
+                                         [{:action :send
+                                           :msg    (json-request "tools/call"
+                                                                 {:name      "echo"
+                                                                  :arguments {:text "hello"}})}
+                                          {:action :receive
+                                           :data
+                                           {:event "message"
+                                            :data  (json-result
+                                                    {:content
+                                                     [{:type "text"
+                                                       :text "hello"}]})}}])
+                        [state' result] (run-plan state)]
+                    (is (= :passed result))))))
+            (future-cancel f)))))))
+
+(deftest resource-test
+(testing "server lifecycle with SSE"
+  (let [port     (get-in *server* [:json-rpc-server :port])
+        url      (format "http://localhost:%d" port)
+        queue    (LinkedBlockingQueue.)
+        state    {:url    url
+                  :queue  queue
+                  :failed false}
+        response (hato/get (str url "/sse")
+                           {:headers {"Accept" "text/event-stream"}
+                            :as      :stream})]
+    (with-open [reader (io/reader (:body response))]
+      (let [done (volatile! nil)
+            f    (future
+                   (try
+                     (wait-for-sse-events reader queue done)
+                     (catch Throwable e
+                       (prn :error e)
+                       (flush))))]
+        (testing "initialisation"
+          (let [state (assoc
+                       state
+                       :plan
+                       [{:action   :receive
+                         :data     {:event "endpoint"}
+                         :apply-fn (update-state-apply-key :uri :data)}
+                        {:action :send
+                         :msg    (json-request
+                                  "initialize"
+                                  {:protocolVersion "2024-11-05"
+                                   :capabilities    {:roots
+                                                     {:listChanged true}
+                                                     :tools
+                                                     {:listChanged true}}
+                                   :clientInfo      {:name    "mcp"
+                                                     :version "0.1.0"}})}
+                        {:action :receive
+                         :data   {:event "message"}}
+                        {:action :send
+                         :msg    (json-request
+                                  "notifications/initialized"
+                                  {})}])
+
+                [state' result] (run-plan state)]
+            (is (= :passed result))
+            (testing "resource interactions"
+              (let [state           (assoc
+                                     state'
+                                     :plan
+                                     [{:action :send
+                                       :msg    (json-request "resources/list" {})}
+                                      {:action :receive
+                                       :data
+                                       {:event "message"
+                                        :data  (json-result {:resources []})}}])
+                    [state' result] (run-plan state)
+                    _               (testing "resources/list"
+                                      (is (= :passed result)))]))))
+        (future-cancel f))))))
 
 (deftest prompt-test
   (testing "server lifecycle with SSE"

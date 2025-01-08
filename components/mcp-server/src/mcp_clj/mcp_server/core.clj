@@ -25,7 +25,8 @@
 (defrecord MCPServer
     [json-rpc-server
      executor
-     session-id->session])
+     session-id->session
+     tool-registry])
 
 (defn- create-executor
   "Create bounded executor service"
@@ -124,6 +125,7 @@
         nil)
       (session-not-found))))
 
+
 (defn- handle-list-tools
   "Handle tools/list request from client"
   [server request id params]
@@ -136,23 +138,35 @@
            (json-sse-response
             id
             :result
-            (tools/list-tools params))))
+            {:tools (mapv
+                     tools/tool-definition
+                     (vals @(:tool-registry server)))})))
         "Accepted")
       (session-not-found))))
 
 (defn- handle-call-tool
   "Handle tools/call request from client"
-  [server request id params]
+  [server request id {:keys [name arguments] :as params}]
   (let [session (request-session server request)]
     (log/info :server/tools-call {:session-id (:session-id session)})
     (if session
       (do
         (future
           ((:reply!-fn session)
-           (json-sse-response
-            id
-            :result
-            (tools/call-tool params))))
+           (if-let [{:keys [implementation]} (get @(:tool-registry server) name)]
+             (let [result (try
+                            (implementation arguments)
+                            (catch Exception e
+                              {:content [{:type "text"
+                                          :text (str "Error: " (.getMessage e))}]
+                               :isError true}))]
+               (json-sse-response id :result result))
+             (json-sse-response
+              id
+              :result
+              {:content [{:type "text"
+                          :text (str "Tool not found: " name)}]
+               :isError true}))))
         "Accepted")
       (session-not-found))))
 
@@ -194,10 +208,24 @@
   {"initialize"                (partial handle-initialize server)
    "notifications/initialized" (partial handle-initialized server)
    "ping"                      (partial ping server)
-   "tools/list"               (partial handle-list-tools server)
-   "tools/call"               (partial handle-call-tool server)
-   "resources/list"           (partial handle-list-resources server)
-   "prompts/list"            (partial handle-list-prompts server)})
+   "tools/list"                (partial handle-list-tools server)
+   "tools/call"                (partial handle-call-tool server)
+   "resources/list"            (partial handle-list-resources server)
+   "prompts/list"              (partial handle-list-prompts server)})
+
+(defn add-tool!
+  "Add or update a tool in a running server"
+  [server tool]
+  (when-not (tools/valid-tool? tool)
+    (throw (ex-info "Invalid tool definition" {:tool tool})))
+  (swap! (:tool-registry server) assoc (:name tool) tool)
+  server)
+
+(defn remove-tool!
+  "Remove a tool from a running server"
+  [server tool-name]
+  (swap! (:tool-registry server) dissoc tool-name)
+  server)
 
 (defn- shutdown-executor
   "Shutdown executor service gracefully"
@@ -229,10 +257,15 @@
 (defn create-server
   "Create MCP server instance"
   [{:keys [port tools threads]
-    :or   {threads (* 2 (.availableProcessors (Runtime/getRuntime)))}}]
+    :or   {threads (* 2 (.availableProcessors (Runtime/getRuntime)))
+           tools   tools/default-tools}}]
+  (doseq [tool (vals tools)]
+    (when-not (tools/valid-tool? tool)
+      (throw (ex-info "Invalid tool in constructor" {:tool tool}))))
   (let [session-id->session (atom {})
+        tool-registry       (atom tools)
         executor            (create-executor threads)
-        server              (->MCPServer nil executor session-id->session)
+        server              (->MCPServer nil executor session-id->session tool-registry)
         handlers            (create-handlers server)
         json-rpc-server     (json-rpc/create-server
                              {:port           port
