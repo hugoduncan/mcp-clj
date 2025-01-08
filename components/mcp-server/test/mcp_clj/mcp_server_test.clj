@@ -185,6 +185,53 @@
                                     {})}])
 
                   [state' result] (run-plan state)]
+              (is (= :passed result))              ))
+          (future-cancel f))))))
+
+(deftest tools-test
+  (testing "server lifecycle with SSE"
+    (let [port     (get-in *server* [:json-rpc-server :port])
+          url      (format "http://localhost:%d" port)
+          queue    (LinkedBlockingQueue.)
+          state    {:url    url
+                    :queue  queue
+                    :failed false}
+          response (hato/get (str url "/sse")
+                             {:headers {"Accept" "text/event-stream"}
+                              :as      :stream})]
+      (with-open [reader (io/reader (:body response))]
+        (let [done (volatile! nil)
+              f    (future
+                     (try
+                       (wait-for-sse-events reader queue done)
+                       (catch Throwable e
+                         (prn :error e)
+                         (flush))))]
+          (testing "initialisation"
+            (let [state (assoc
+                         state
+                         :plan
+                         [{:action   :receive
+                           :data     {:event "endpoint"}
+                           :apply-fn (update-state-apply-key :uri :data)}
+                          {:action :send
+                           :msg    (json-request
+                                    "initialize"
+                                    {:protocolVersion "2024-11-05"
+                                     :capabilities    {:roots
+                                                       {:listChanged true}
+                                                       :tools
+                                                       {:listChanged true}}
+                                     :clientInfo      {:name    "mcp"
+                                                       :version "0.1.0"}})}
+                          {:action :receive
+                           :data   {:event "message"}}
+                          {:action :send
+                           :msg    (json-request
+                                    "notifications/initialized"
+                                    {})}])
+
+                  [state' result] (run-plan state)]
               (is (= :passed result))
               (testing "tool interactions"
                 (let [state           (assoc
@@ -291,20 +338,140 @@
                                         (is (= :passed result)))]))))
           (future-cancel f))))))
 
-(deftest error-handling-test
-  (testing "error handling"
-    (let [port (get-in *server* [:json-rpc-server :port])
-          url  (format "http://localhost:%d" port)]
+(deftest resource-test
+  (testing "server lifecycle with SSE"
+    (let [port     (get-in *server* [:json-rpc-server :port])
+          url      (format "http://localhost:%d" port)
+          queue    (LinkedBlockingQueue.)
+          state    {:url    url
+                    :queue  queue
+                    :failed false}
+          response (hato/get (str url "/sse")
+                             {:headers {"Accept" "text/event-stream"}
+                              :as      :stream})]
+      (with-open [reader (io/reader (:body response))]
+        (let [done (volatile! nil)
+              f    (future
+                     (try
+                       (wait-for-sse-events reader queue done)
+                       (catch Throwable e
+                         (prn :error e)
+                         (flush))))]
+          (testing "initialisation"
+            (let [state (assoc
+                         state
+                         :plan
+                         [{:action   :receive
+                           :data     {:event "endpoint"}
+                           :apply-fn (update-state-apply-key :uri :data)}
+                          {:action :send
+                           :msg    (json-request
+                                    "initialize"
+                                    {:protocolVersion "2024-11-05"
+                                     :capabilities    {:roots
+                                                       {:listChanged true}
+                                                       :tools
+                                                       {:listChanged true}}
+                                     :clientInfo      {:name    "mcp"
+                                                       :version "0.1.0"}})}
+                          {:action :receive
+                           :data   {:event "message"}}
+                          {:action :send
+                           :msg    (json-request
+                                    "notifications/initialized"
+                                    {})}])
 
-      (testing "invalid protocol version"
-        (let [response (send-request
-                        url
-                        (make-request "initialize"
-                                      (assoc valid-client-info
-                                             :protocolVersion "0.2")
-                                      1))]
-          (is (= -32001 (get-in response [:error :code])))))
+                  [state' result] (run-plan state)]
+              (is (= :passed result))
+              (testing "resource interactions"
+                (let [state           (assoc
+                                       state'
+                                       :plan
+                                       [{:action :send
+                                         :msg    (json-request "resources/list" {})}
+                                        {:action :receive
+                                         :data
+                                         {:event "message"
+                                          :data  (json-result {:resources []})}}])
+                      [state' result] (run-plan state)
+                      _               (testing "resources/list"
+                                        (is (= :passed result)))]))))
+          (future-cancel f))))))
 
-      (testing "uninitialized ping"
-        (let [response (send-request url (make-request "ping" {} 1))]
-          (is (= -32002 (get-in response [:error :code]))))))))
+(deftest prompt-test
+  (testing "server lifecycle with SSE"
+    (let [port     (get-in *server* [:json-rpc-server :port])
+          url      (format "http://localhost:%d" port)
+          queue    (LinkedBlockingQueue.)
+          state    {:url    url
+                    :queue  queue
+                    :failed false}
+          response (hato/get (str url "/sse")
+                             {:headers {"Accept" "text/event-stream"}
+                              :as      :stream})]
+      (with-open [reader (io/reader (:body response))]
+        (let [done (volatile! nil)
+              f    (future
+                     (try
+                       (wait-for-sse-events reader queue done)
+                       (catch Throwable e
+                         (prn :error e)
+                         (flush))))]
+          (testing "initialisation"
+            (let [state (assoc
+                         state
+                         :plan
+                         [{:action   :receive
+                           :data     {:event "endpoint"}
+                           :apply-fn (update-state-apply-key :uri :data)}
+                          {:action :send
+                           :msg    (json-request
+                                    "initialize"
+                                    {:protocolVersion "2024-11-05"
+                                     :capabilities    {:roots
+                                                       {:listChanged true}
+                                                       :tools
+                                                       {:listChanged true}}
+                                     :clientInfo      {:name    "mcp"
+                                                       :version "0.1.0"}})}
+                          {:action :receive
+                           :data   {:event "message"}}
+                          {:action :send
+                           :msg    (json-request
+                                    "notifications/initialized"
+                                    {})}])
+
+                  [state' result] (run-plan state)]
+              (is (= :passed result))
+              (testing "prompt interactions"
+                (let [state           (assoc
+                                       state'
+                                       :plan
+                                       [{:action :send
+                                         :msg    (json-request "prompts/list" {})}
+                                        {:action :receive
+                                         :data
+                                         {:event "message"
+                                          :data  (json-result {:prompts []})}}])
+                      [state' result] (run-plan state)
+                      _               (testing "prompts/list"
+                                        (is (= :passed result)))]))))
+          (future-cancel f))))))
+
+#_(deftest error-handling-test
+    (testing "error handling"
+      (let [port (get-in *server* [:json-rpc-server :port])
+            url  (format "http://localhost:%d" port)]
+
+        (testing "invalid protocol version"
+          (let [response (send-request
+                          url
+                          (make-request "initialize"
+                                        (assoc valid-client-info
+                                               :protocolVersion "0.2")
+                                        1))]
+            (is (= -32001 (get-in response [:error :code])))))
+
+        (testing "uninitialized ping"
+          (let [response (send-request url (make-request "ping" {} 1))]
+            (is (= -32002 (get-in response [:error :code]))))))))

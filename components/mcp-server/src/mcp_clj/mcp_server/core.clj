@@ -3,7 +3,9 @@
   (:require
    [mcp-clj.json-rpc.server :as json-rpc]
    [mcp-clj.log :as log]
-   [mcp-clj.mcp-server.tools :as tools])
+   [mcp-clj.mcp-server.tools :as tools]
+   [mcp-clj.mcp-server.resources :as resources]
+   [mcp-clj.mcp-server.prompts :as prompts])
   (:import
    [java.util.concurrent Executors
     ThreadPoolExecutor
@@ -93,7 +95,10 @@
             {:serverInfo      {:name    "mcp-clj"
                                :version "0.1.0"}
              :protocolVersion protocol-version
-             :capabilities    {:tools {:listChanged false}}
+             :capabilities    {:tools     {:listChanged false}
+                              :resources {:listChanged false
+                                          :subscribe false}
+                              :prompts   {:listChanged false}}
              :instructions    "mcp-clj is used to interact with a clojure REPL."})))
         "Accepted")
       (session-not-found))))
@@ -151,6 +156,38 @@
         "Accepted")
       (session-not-found))))
 
+(defn- handle-list-resources
+  "Handle resources/list request from client"
+  [server request id params]
+  (let [session (request-session server request)]
+    (log/info :server/resources-list {:session-id (:session-id session)})
+    (if session
+      (do
+        (future
+          ((:reply!-fn session)
+           (json-sse-response
+            id
+            :result
+            (resources/list-resources params))))
+        "Accepted")
+      (session-not-found))))
+
+(defn- handle-list-prompts
+  "Handle prompts/list request from client"
+  [server request id params]
+  (let [session (request-session server request)]
+    (log/info :server/prompts-list {:session-id (:session-id session)})
+    (if session
+      (do
+        (future
+          ((:reply!-fn session)
+           (json-sse-response
+            id
+            :result
+            (prompts/list-prompts params))))
+        "Accepted")
+      (session-not-found))))
+
 (defn create-handlers
   "Create request handlers with server reference"
   [server]
@@ -158,7 +195,9 @@
    "notifications/initialized" (partial handle-initialized server)
    "ping"                      (partial ping server)
    "tools/list"               (partial handle-list-tools server)
-   "tools/call"               (partial handle-call-tool server)})
+   "tools/call"               (partial handle-call-tool server)
+   "resources/list"           (partial handle-list-resources server)
+   "prompts/list"            (partial handle-list-prompts server)})
 
 (defn- shutdown-executor
   "Shutdown executor service gracefully"
