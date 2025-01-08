@@ -253,6 +253,27 @@
                                        [{:action :send
                                          :msg    (json-request
                                                   "tools/call"
+                                                  {:name "clj-eval"
+                                                   :arguments
+                                                   {:code "(/ 1 0"}})}
+                                        {:action :receive
+                                         :data
+                                         {:event "message"
+                                          :data
+                                          (json-result
+                                           {:content
+                                            [{:type "text"
+                                              :text "Error: EOF while reading"}]
+                                            :isError true})}}])
+                      [state' result] (run-plan state)
+                      _               (testing "tools/call with invalid clojure"
+                                        (is (= :passed result)))
+                      state           (assoc
+                                       state'
+                                       :plan
+                                       [{:action :send
+                                         :msg    (json-request
+                                                  "tools/call"
                                                   {:name "unkown"
                                                    :arguments
                                                    {:code "(/ 1 0)"}})}

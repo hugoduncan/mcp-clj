@@ -23,13 +23,13 @@
 
 (defn- safe-eval
   [code-str]
-  (let [form (edn/read-string code-str)]
-    (try
+  (try
+    (let [form (edn/read-string code-str)]
       {:success true
-       :result  (eval form)}
-      (catch Exception e
-        {:success false
-         :error   (.getMessage e)}))))
+       :result  (eval form)})
+    (catch Throwable e
+      {:success false
+       :error   (.getMessage e)})))
 
 (defn call-tool
   "Execute a tool with the given arguments"
