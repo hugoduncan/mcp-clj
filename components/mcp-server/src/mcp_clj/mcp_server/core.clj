@@ -33,34 +33,18 @@
   [threads]
   (Executors/newScheduledThreadPool threads))
 
-(defn- validate-initialization!
-  "Validate initialization request"
-  [{:keys [protocolVersion capabilities]}]
-  (log/info :server/client
-    {:protocolVersion protocolVersion
-     :capabilities    capabilities})
-  (when-not (= protocolVersion required-client-version)
-    (throw (ex-info "Unsupported protocol version"
-                    {:code -32001
-                     :data {:supported required-client-version
-                            :received  protocolVersion}})))
-  #_(when-not (get-in capabilities [:tools])
-      (throw (ex-info "Client must support tools capability"
-                      {:code -32001
-                       :data {:missing [:tools]}}))))
-
 (defn- request-session-id [request]
   (get ((:query-params request)) "session_id"))
 
 (defn- json-sse-response
-  [id response-type data]
+  [id data]
   {:event "message"
    :data
    (cond->       {:jsonrpc "2.0"}
      id
      (assoc :id id)
-     response-type
-     (assoc response-type data))})
+     data
+     (merge data))})
 
 (defn- json-response
   [request-params response-type data]
@@ -80,6 +64,39 @@
   {:status 400
    :body   "session_id missing from query parameters"})
 
+(defn- notify-all-sessions!
+  "Send a notification to all active sessions"
+  [server method params]
+  (doseq [{:keys [reply!-fn]} (vals @(:session-id->session server))]
+    (reply!-fn
+     (json-sse-response
+      nil  ; notifications don't have an id
+      (merge
+       {:method method}
+       (when params
+         {:params params}))))))
+
+(defn- notify-tools-changed!
+  "Notify all sessions that the tool list has changed"
+  [server]
+  (notify-all-sessions! server "notifications/tools/list_changed" nil))
+
+(defn- validate-initialization!
+  "Validate initialization request"
+  [{:keys [protocolVersion capabilities]}]
+  (log/info :server/client
+    {:protocolVersion protocolVersion
+     :capabilities    capabilities})
+  (when-not (= protocolVersion required-client-version)
+    (throw (ex-info "Unsupported protocol version"
+                    {:code -32001
+                     :data {:supported required-client-version
+                            :received  protocolVersion}})))
+  #_(when-not (get-in capabilities [:tools])
+      (throw (ex-info "Client must support tools capability"
+                      {:code -32001
+                       :data {:missing [:tools]}}))))
+
 (defn- handle-initialize
   "Handle initialize request from client"
   [server request id params]
@@ -92,15 +109,15 @@
           ((:reply!-fn session)
            (json-sse-response
             id
-            :result
-            {:serverInfo      {:name    "mcp-clj"
-                               :version "0.1.0"}
-             :protocolVersion protocol-version
-             :capabilities    {:tools     {:listChanged false}
-                              :resources {:listChanged false
-                                          :subscribe false}
-                              :prompts   {:listChanged false}}
-             :instructions    "mcp-clj is used to interact with a clojure REPL."})))
+            {:result
+             {:serverInfo      {:name    "mcp-clj"
+                                :version "0.1.0"}
+              :protocolVersion protocol-version
+              :capabilities    {:tools     {:listChanged false}
+                                :resources {:listChanged false
+                                            :subscribe   false}
+                                :prompts   {:listChanged false}}
+              :instructions    "mcp-clj is used to interact with a clojure REPL."}})))
         "Accepted")
       (session-not-found))))
 
@@ -121,7 +138,7 @@
         (swap! (:session-id->session server)
                update (:session-id session)
                assoc :initialized? true)
-        ((:reply!-fn session) (json-sse-response id :result {}))
+        ((:reply!-fn session) (json-sse-response id {:result {}}))
         nil)
       (session-not-found))))
 
@@ -137,10 +154,10 @@
           ((:reply!-fn session)
            (json-sse-response
             id
-            :result
-            {:tools (mapv
-                     tools/tool-definition
-                     (vals @(:tool-registry server)))})))
+            {:result
+             {:tools (mapv
+                      tools/tool-definition
+                      (vals @(:tool-registry server)))}})))
         "Accepted")
       (session-not-found))))
 
@@ -160,13 +177,13 @@
                               {:content [{:type "text"
                                           :text (str "Error: " (.getMessage e))}]
                                :isError true}))]
-               (json-sse-response id :result result))
+               (json-sse-response id {:result result}))
              (json-sse-response
               id
-              :result
-              {:content [{:type "text"
-                          :text (str "Tool not found: " name)}]
-               :isError true}))))
+              {:result
+               {:content [{:type "text"
+                           :text (str "Tool not found: " name)}]
+                :isError true}}))))
         "Accepted")
       (session-not-found))))
 
@@ -181,8 +198,8 @@
           ((:reply!-fn session)
            (json-sse-response
             id
-            :result
-            (resources/list-resources params))))
+            {:result
+             (resources/list-resources params)})))
         "Accepted")
       (session-not-found))))
 
@@ -197,8 +214,8 @@
           ((:reply!-fn session)
            (json-sse-response
             id
-            :result
-            (prompts/list-prompts params))))
+            {:result
+             (prompts/list-prompts params)})))
         "Accepted")
       (session-not-found))))
 
@@ -219,12 +236,14 @@
   (when-not (tools/valid-tool? tool)
     (throw (ex-info "Invalid tool definition" {:tool tool})))
   (swap! (:tool-registry server) assoc (:name tool) tool)
+  (notify-tools-changed! server)
   server)
 
 (defn remove-tool!
   "Remove a tool from a running server"
   [server tool-name]
   (swap! (:tool-registry server) dissoc tool-name)
+  (notify-tools-changed! server)
   server)
 
 (defn- shutdown-executor

@@ -79,7 +79,7 @@
 
 (defn step-plan
   [state]
-  (let [{:keys [action data msg apply-fn]} (first (:plan state))]
+  (let [{:keys [action data fn msg apply-fn]} (first (:plan state))]
     (condp = action
       :receive (let [msg (poll (:queue state))]
                  (prn :receive msg)
@@ -100,8 +100,11 @@
                    (if (< (:status resp) 300)
                      (update state :plan rest)
                      (assoc state :failed resp))))
+      :clj     (do
+                 (fn)  ; Execute the provided function
+                 (update state :plan rest))
 
-      (assoc state :failed :unknown-action))))
+      (assoc state :failed {:unknown-action action}))))
 
 (defn run-plan [state]
   (loop [state state]
@@ -339,6 +342,72 @@
                                         (is (= :passed result)))]))))
           (future-cancel f))))))
 
+(deftest tool-change-notifications-test
+  (testing "tool change notifications"
+    (let [port      (get-in *server* [:json-rpc-server :port])
+          url       (format "http://localhost:%d" port)
+          queue     (LinkedBlockingQueue.)
+          state     {:url    url
+                     :queue  queue
+                     :failed false}
+          test-tool {:name           "test-tool"
+                     :description    "A test tool"
+                     :inputSchema    {:type       "object"
+                                      :properties {"value" {:type "string"}}
+                                      :required   ["value"]}
+                     :implementation (fn [{:keys [value]}]
+                                       {:content [{:type "text"
+                                                   :text (str "Got: " value)}]})}
+          response  (hato/get (str url "/sse")
+                              {:headers {"Accept" "text/event-stream"}
+                               :as      :stream})]
+      (with-open [reader (io/reader (:body response))]
+        (let [done (volatile! nil)
+              f    (future
+                     (try
+                       (wait-for-sse-events reader queue done)
+                       (catch Throwable e
+                         (prn :error e)
+                         (flush))))]
+          (testing "initialisation and tool changes"
+            (let [state           (assoc
+                                   state
+                                   :plan
+                                   [{:action   :receive
+                                     :data     {:event "endpoint"}
+                                     :apply-fn (update-state-apply-key :uri :data)}
+                                    {:action :send
+                                     :msg    (json-request
+                                              "initialize"
+                                              {:protocolVersion "2024-11-05"
+                                               :capabilities    {:roots {:listChanged true}
+                                                                 :tools {:listChanged true}}
+                                               :clientInfo      {:name    "mcp"
+                                                                 :version "0.1.0"}})}
+                                    {:action :receive
+                                     :data   {:event "message"}}
+                                    {:action :send
+                                     :msg    (json-request
+                                              "notifications/initialized"
+                                              {})}
+                                    ;; Add tool and check for notification
+                                    {:action :clj
+                                     :fn     #(mcp/add-tool! *server* test-tool)}
+                                    {:action :receive
+                                     :data   {:event "message"
+                                              :data  {:jsonrpc "2.0"
+                                                      :method  "notifications/tools/list_changed"}}}
+                                    ;; Remove tool and check for notification
+                                    {:action :clj
+                                     :fn     #(mcp/remove-tool! *server* "test-tool")}
+                                    {:action :receive
+                                     :data   {:event "message"
+                                              :data  {:jsonrpc "2.0"
+                                                      :method  "notifications/tools/list_changed"}}}])
+                  [state' result] (run-plan state)]
+              (is (= :passed result))
+              (is (not (:failed state')))))
+          (future-cancel f))))))
 
 (deftest tool-management-test
   (testing "tool management"
