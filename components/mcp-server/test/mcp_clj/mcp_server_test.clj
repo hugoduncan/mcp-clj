@@ -13,9 +13,10 @@
 
 (def valid-client-info
   {:clientInfo      {:name "test-client" :version "1.0"}
-   :protocolVersion mcp/protocol-version
+   :protocolVersion @#'mcp/server-protocol-version
    :capabilities    {:tools {:listChanged false}}})
 
+#_{:clj-kondo/ignore [:uninitialized-var]}
 (def ^:private ^:dynamic  *server*)
 
 (defn with-server
@@ -66,6 +67,7 @@
           (or (empty? line)
               (.startsWith line ":"))
           (do
+            (prn :enqueue resp)
             (offer queue resp)
             (recur {}))
           :else
@@ -95,10 +97,21 @@
       :send    (do
                  (prn :send msg)
                  (let [url  (str (:url state) (:uri state))
+                       resp (send-request url (assoc msg :id (:id state)))]
+                   (prn :resp resp)
+                   (if (< (:status resp) 300)
+                     (-> state
+                         (update :plan rest)
+                         (update :id inc))
+                     (assoc state :failed resp))))
+      :notify  (do
+                 (prn :notify msg)
+                 (let [url  (str (:url state) (:uri state))
                        resp (send-request url msg)]
                    (prn :resp resp)
                    (if (< (:status resp) 300)
-                     (update state :plan rest)
+                     (-> state
+                         (update :plan rest))
                      (assoc state :failed resp))))
       :clj     (do
                  (fn)  ; Execute the provided function
@@ -107,7 +120,7 @@
       (assoc state :failed {:unknown-action action}))))
 
 (defn run-plan [state]
-  (loop [state state]
+  (loop [state (assoc  state :id 0)]
     (let [state' (step-plan state)]
       (prn :run-plan :state' state')
       (cond
@@ -133,20 +146,47 @@
     (assoc state state-key data)))
 
 (defn- json-request
-  [method params]
-  {:jsonrpc "2.0"
-   :method  method
-   :params  params})
+  [method params & [id]]
+  (cond->
+      {:jsonrpc "2.0"
+       :method  method
+       :params  params}
+    id (assoc :id id)))
 
 (defn- json-result
-  [result & [options]]
-  (merge {:jsonrpc "2.0"
-          :result  result}
-         options))
+  [result & [options id]]
+  (cond-> (merge {:jsonrpc "2.0"
+                  :result  result}
+                 options)
+    id (assoc :id id)))
+
+(defn- initialisation-plan []
+  [{:action   :receive
+    :data     {:event "endpoint"}
+    :apply-fn (update-state-apply-key :uri :data)}
+   {:action :send
+    :msg    (json-request
+             "initialize"
+             {:protocolVersion "2024-11-05"
+              :capabilities    {:roots
+                                {:listChanged true}
+                                :tools
+                                {:listChanged true}}
+              :clientInfo      {:name    "mcp"
+                                :version "0.1.0"}})}
+   {:action :receive
+    :data   {:event "message"}}
+   {:action :notify
+    :msg    (json-request
+             "notifications/initialized"
+             {})}])
+
+(defn port []
+  (:port @(:json-rpc-server *server*)))
 
 (deftest lifecycle-test
   (testing "server lifecycle with SSE"
-    (let [port     (get-in *server* [:json-rpc-server :port])
+    (let [port     (port)
           url      (format "http://localhost:%d" port)
           queue    (LinkedBlockingQueue.)
           state    {:url    url
@@ -164,36 +204,15 @@
                          (prn :error e)
                          (flush))))]
           (testing "initialisation"
-            (let [state (assoc
-                         state
-                         :plan
-                         [{:action   :receive
-                           :data     {:event "endpoint"}
-                           :apply-fn (update-state-apply-key :uri :data)}
-                          {:action :send
-                           :msg    (json-request
-                                    "initialize"
-                                    {:protocolVersion "2024-11-05"
-                                     :capabilities    {:roots
-                                                       {:listChanged true}
-                                                       :tools
-                                                       {:listChanged true}}
-                                     :clientInfo      {:name    "mcp"
-                                                       :version "0.1.0"}})}
-                          {:action :receive
-                           :data   {:event "message"}}
-                          {:action :send
-                           :msg    (json-request
-                                    "notifications/initialized"
-                                    {})}])
-
+            (let [state           (assoc state :plan (initialisation-plan))
                   [state' result] (run-plan state)]
-              (is (= :passed result))              ))
+              (is (= :passed result))
+              (is (not (:failed state')))))
           (future-cancel f))))))
 
 (deftest tools-test
   (testing "server lifecycle with SSE"
-    (let [port     (get-in *server* [:json-rpc-server :port])
+    (let [port     (port)
           url      (format "http://localhost:%d" port)
           queue    (LinkedBlockingQueue.)
           state    {:url    url
@@ -211,29 +230,7 @@
                          (prn :error e)
                          (flush))))]
           (testing "initialisation"
-            (let [state (assoc
-                         state
-                         :plan
-                         [{:action   :receive
-                           :data     {:event "endpoint"}
-                           :apply-fn (update-state-apply-key :uri :data)}
-                          {:action :send
-                           :msg    (json-request
-                                    "initialize"
-                                    {:protocolVersion "2024-11-05"
-                                     :capabilities    {:roots
-                                                       {:listChanged true}
-                                                       :tools
-                                                       {:listChanged true}}
-                                     :clientInfo      {:name    "mcp"
-                                                       :version "0.1.0"}})}
-                          {:action :receive
-                           :data   {:event "message"}}
-                          {:action :send
-                           :msg    (json-request
-                                    "notifications/initialized"
-                                    {})}])
-
+            (let [state           (assoc state :plan (initialisation-plan))
                   [state' result] (run-plan state)]
               (is (= :passed result))
               (testing "tool interactions"
@@ -241,7 +238,10 @@
                                        state'
                                        :plan
                                        [{:action :send
-                                         :msg    (json-request "tools/list" {})}
+                                         :msg    (json-request
+                                                  "tools/list"
+                                                  {}
+                                                  0)}
                                         {:action :receive
                                          :data
                                          {:event "message"
@@ -254,7 +254,9 @@
                                               :inputSchema
                                               {:type       "object",
                                                :properties {:code {:type "string"}},
-                                               :required   ["code"]}}]})}}])
+                                               :required   ["code"]}}]}
+                                           {}
+                                           0)}}])
                       [state' result] (run-plan state)
                       _               (testing "tools/list"
                                         (is (= :passed result) (pr-str state))
@@ -266,17 +268,21 @@
                                          :msg    (json-request
                                                   "tools/call"
                                                   {:name      "clj-eval"
-                                                   :arguments {:code "(+ 1 2)"}})}
+                                                   :arguments {:code "(+ 1 2)"}}
+                                                  0)}
                                         {:action :receive
                                          :data   {:event "message"
                                                   :data
                                                   (json-result
                                                    {:content
                                                     [{:type "text"
-                                                      :text "3"}]})}}])
+                                                      :text "3"}]}
+                                                   nil
+                                                   0)}}])
                       [state' result] (run-plan state)
                       _               (testing "successful tools/call"
-                                        (is (= :passed result)))
+                                        (is (= :passed result))
+                                        (is (not (:failed state'))))
                       state           (assoc
                                        state'
                                        :plan
@@ -285,7 +291,8 @@
                                                   "tools/call"
                                                   {:name "clj-eval"
                                                    :arguments
-                                                   {:code "(/ 1 0)"}})}
+                                                   {:code "(/ 1 0)"}}
+                                                  0)}
                                         {:action :receive
                                          :data
                                          {:event "message"
@@ -294,10 +301,13 @@
                                            {:content
                                             [{:type "text"
                                               :text "Error: Divide by zero"}]
-                                            :isError true})}}])
+                                            :isError true}
+                                           nil
+                                           0)}}])
                       [state' result] (run-plan state)
                       _               (testing "tools/call with eval error"
-                                        (is (= :passed result)))
+                                        (is (= :passed result))
+                                        (is (not (:failed state'))))
                       state           (assoc
                                        state'
                                        :plan
@@ -315,10 +325,13 @@
                                            {:content
                                             [{:type "text"
                                               :text "Error: EOF while reading"}]
-                                            :isError true})}}])
+                                            :isError true}
+                                           nil
+                                           0)}}])
                       [state' result] (run-plan state)
                       _               (testing "tools/call with invalid clojure"
-                                        (is (= :passed result)))
+                                        (is (= :passed result))
+                                        (is (not (:failed state'))))
                       state           (assoc
                                        state'
                                        :plan
@@ -327,7 +340,8 @@
                                                   "tools/call"
                                                   {:name "unkown"
                                                    :arguments
-                                                   {:code "(/ 1 0)"}})}
+                                                   {:code "(/ 1 0)"}}
+                                                  0)}
                                         {:action :receive
                                          :data
                                          {:event "message"
@@ -336,15 +350,18 @@
                                            {:content
                                             [{:type "text"
                                               :text "Tool not found: unkown"}]
-                                            :isError true})}}])
+                                            :isError true}
+                                           nil
+                                           0)}}])
                       [state' result] (run-plan state)
                       _               (testing "tools/call with unknown tool"
-                                        (is (= :passed result)))]))))
+                                        (is (= :passed result))
+                                        (is (not (:failed state'))))]))))
           (future-cancel f))))))
 
 (deftest tool-change-notifications-test
   (testing "tool change notifications"
-    (let [port      (get-in *server* [:json-rpc-server :port])
+    (let [port      (port)
           url       (format "http://localhost:%d" port)
           queue     (LinkedBlockingQueue.)
           state     {:url    url
@@ -373,37 +390,22 @@
             (let [state           (assoc
                                    state
                                    :plan
-                                   [{:action   :receive
-                                     :data     {:event "endpoint"}
-                                     :apply-fn (update-state-apply-key :uri :data)}
-                                    {:action :send
-                                     :msg    (json-request
-                                              "initialize"
-                                              {:protocolVersion "2024-11-05"
-                                               :capabilities    {:roots {:listChanged true}
-                                                                 :tools {:listChanged true}}
-                                               :clientInfo      {:name    "mcp"
-                                                                 :version "0.1.0"}})}
-                                    {:action :receive
-                                     :data   {:event "message"}}
-                                    {:action :send
-                                     :msg    (json-request
-                                              "notifications/initialized"
-                                              {})}
-                                    ;; Add tool and check for notification
-                                    {:action :clj
-                                     :fn     #(mcp/add-tool! *server* test-tool)}
-                                    {:action :receive
-                                     :data   {:event "message"
-                                              :data  {:jsonrpc "2.0"
-                                                      :method  "notifications/tools/list_changed"}}}
-                                    ;; Remove tool and check for notification
-                                    {:action :clj
-                                     :fn     #(mcp/remove-tool! *server* "test-tool")}
-                                    {:action :receive
-                                     :data   {:event "message"
-                                              :data  {:jsonrpc "2.0"
-                                                      :method  "notifications/tools/list_changed"}}}])
+                                   (into
+                                    (initialisation-plan)
+                                    [;; Add tool and check for notification
+                                     {:action :clj
+                                      :fn     #(mcp/add-tool! *server* test-tool)}
+                                     {:action :receive
+                                      :data   {:event "message"
+                                               :data  {:jsonrpc "2.0"
+                                                       :method  "notifications/tools/list_changed"}}}
+                                     ;; Remove tool and check for notification
+                                     {:action :clj
+                                      :fn     #(mcp/remove-tool! *server* "test-tool")}
+                                     {:action :receive
+                                      :data   {:event "message"
+                                               :data  {:jsonrpc "2.0"
+                                                       :method  "notifications/tools/list_changed"}}}]))
                   [state' result] (run-plan state)]
               (is (= :passed result))
               (is (not (:failed state')))))
@@ -452,7 +454,7 @@
                        :implementation (fn [{:keys [text]}]
                                          {:content [{:type "text"
                                                      :text text}]})}
-          port        (get-in *server* [:json-rpc-server :port])
+          port        (port)
           url         (format "http://localhost:%d" port)
           queue       (LinkedBlockingQueue.)
           state       {:url    url
@@ -473,25 +475,7 @@
                            (prn :error e)
                            (flush))))]
             (testing "using custom tool"
-              (let [state           (assoc
-                                     state
-                                     :plan
-                                     [{:action   :receive
-                                       :data     {:event "endpoint"}
-                                       :apply-fn (update-state-apply-key :uri :data)}
-                                      {:action :send
-                                       :msg    (json-request
-                                                "initialize"
-                                                {:protocolVersion "2024-11-05"
-                                                 :capabilities    {:tools {:listChanged true}}
-                                                 :clientInfo      {:name    "mcp"
-                                                                   :version "0.1.0"}})}
-                                      {:action :receive
-                                       :data   {:event "message"}}
-                                      {:action :send
-                                       :msg    (json-request
-                                                "notifications/initialized"
-                                                {})}])
+              (let [state           (assoc state :plan (initialisation-plan))
                     [state' result] (run-plan state)]
                 (is (= :passed result))
                 (testing "tool interactions"
@@ -499,83 +483,27 @@
                                          state'
                                          :plan
                                          [{:action :send
-                                           :msg    (json-request "tools/call"
-                                                                 {:name      "echo"
-                                                                  :arguments {:text "hello"}})}
+                                           :msg    (json-request
+                                                    "tools/call"
+                                                    {:name      "echo"
+                                                     :arguments {:text "hello"}}
+                                                    0)}
                                           {:action :receive
                                            :data
                                            {:event "message"
                                             :data  (json-result
                                                     {:content
                                                      [{:type "text"
-                                                       :text "hello"}]})}}])
+                                                       :text "hello"}]}
+                                                    nil
+                                                    0)}}])
                         [state' result] (run-plan state)]
                     (is (= :passed result))))))
             (future-cancel f)))))))
 
 (deftest resource-test
-(testing "server lifecycle with SSE"
-  (let [port     (get-in *server* [:json-rpc-server :port])
-        url      (format "http://localhost:%d" port)
-        queue    (LinkedBlockingQueue.)
-        state    {:url    url
-                  :queue  queue
-                  :failed false}
-        response (hato/get (str url "/sse")
-                           {:headers {"Accept" "text/event-stream"}
-                            :as      :stream})]
-    (with-open [reader (io/reader (:body response))]
-      (let [done (volatile! nil)
-            f    (future
-                   (try
-                     (wait-for-sse-events reader queue done)
-                     (catch Throwable e
-                       (prn :error e)
-                       (flush))))]
-        (testing "initialisation"
-          (let [state (assoc
-                       state
-                       :plan
-                       [{:action   :receive
-                         :data     {:event "endpoint"}
-                         :apply-fn (update-state-apply-key :uri :data)}
-                        {:action :send
-                         :msg    (json-request
-                                  "initialize"
-                                  {:protocolVersion "2024-11-05"
-                                   :capabilities    {:roots
-                                                     {:listChanged true}
-                                                     :tools
-                                                     {:listChanged true}}
-                                   :clientInfo      {:name    "mcp"
-                                                     :version "0.1.0"}})}
-                        {:action :receive
-                         :data   {:event "message"}}
-                        {:action :send
-                         :msg    (json-request
-                                  "notifications/initialized"
-                                  {})}])
-
-                [state' result] (run-plan state)]
-            (is (= :passed result))
-            (testing "resource interactions"
-              (let [state           (assoc
-                                     state'
-                                     :plan
-                                     [{:action :send
-                                       :msg    (json-request "resources/list" {})}
-                                      {:action :receive
-                                       :data
-                                       {:event "message"
-                                        :data  (json-result {:resources []})}}])
-                    [state' result] (run-plan state)
-                    _               (testing "resources/list"
-                                      (is (= :passed result)))]))))
-        (future-cancel f))))))
-
-(deftest prompt-test
   (testing "server lifecycle with SSE"
-    (let [port     (get-in *server* [:json-rpc-server :port])
+    (let [port     (port)
           url      (format "http://localhost:%d" port)
           queue    (LinkedBlockingQueue.)
           state    {:url    url
@@ -593,29 +521,49 @@
                          (prn :error e)
                          (flush))))]
           (testing "initialisation"
-            (let [state (assoc
-                         state
-                         :plan
-                         [{:action   :receive
-                           :data     {:event "endpoint"}
-                           :apply-fn (update-state-apply-key :uri :data)}
-                          {:action :send
-                           :msg    (json-request
-                                    "initialize"
-                                    {:protocolVersion "2024-11-05"
-                                     :capabilities    {:roots
-                                                       {:listChanged true}
-                                                       :tools
-                                                       {:listChanged true}}
-                                     :clientInfo      {:name    "mcp"
-                                                       :version "0.1.0"}})}
-                          {:action :receive
-                           :data   {:event "message"}}
-                          {:action :send
-                           :msg    (json-request
-                                    "notifications/initialized"
-                                    {})}])
+            (let [state           (assoc state :plan (initialisation-plan))
+                  [state' result] (run-plan state)]
+              (is (= :passed result))
+              (testing "resource interactions"
+                (let [state           (assoc
+                                       state'
+                                       :plan
+                                       [{:action :send
+                                         :msg    (json-request
+                                                  "resources/list" {} 0)}
+                                        {:action :receive
+                                         :data
+                                         {:event "message"
+                                          :data  (json-result
+                                                  {:resources []}
+                                                  nil
+                                                  0)}}])
+                      [state' result] (run-plan state)
+                      _               (testing "resources/list"
+                                        (is (= :passed result)))]))))
+          (future-cancel f))))))
 
+(deftest prompt-test
+  (testing "server lifecycle with SSE"
+    (let [port     (port)
+          url      (format "http://localhost:%d" port)
+          queue    (LinkedBlockingQueue.)
+          state    {:url    url
+                    :queue  queue
+                    :failed false}
+          response (hato/get (str url "/sse")
+                             {:headers {"Accept" "text/event-stream"}
+                              :as      :stream})]
+      (with-open [reader (io/reader (:body response))]
+        (let [done (volatile! nil)
+              f    (future
+                     (try
+                       (wait-for-sse-events reader queue done)
+                       (catch Throwable e
+                         (prn :error e)
+                         (flush))))]
+          (testing "initialisation"
+            (let [state           (assoc state :plan (initialisation-plan))
                   [state' result] (run-plan state)]
               (is (= :passed result))
               (testing "prompt interactions"
@@ -623,11 +571,17 @@
                                        state'
                                        :plan
                                        [{:action :send
-                                         :msg    (json-request "prompts/list" {})}
+                                         :msg    (json-request
+                                                  "prompts/list"
+                                                  {}
+                                                  0)}
                                         {:action :receive
                                          :data
                                          {:event "message"
-                                          :data  (json-result {:prompts []})}}])
+                                          :data  (json-result
+                                                  {:prompts []}
+                                                  nil
+                                                  0)}}])
                       [state' result] (run-plan state)
                       _               (testing "prompts/list"
                                         (is (= :passed result)))]))))
@@ -635,7 +589,7 @@
 
 #_(deftest error-handling-test
     (testing "error handling"
-      (let [port (get-in *server* [:json-rpc-server :port])
+      (let [port (port)
             url  (format "http://localhost:%d" port)]
 
         (testing "invalid protocol version"

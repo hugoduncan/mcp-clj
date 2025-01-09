@@ -41,32 +41,32 @@
 (defn- exchange->request-map
   "Convert HttpExchange to Ring request map"
   [^HttpExchange exchange]
-  {:server-port           (.getPort (.getLocalAddress exchange))
-   :server-name           (.getHostName (.getLocalAddress exchange))
-   :remote-addr           (-> exchange .getRemoteAddress .getAddress .getHostAddress)
-   :uri                   (.getPath (.getRequestURI exchange))
-   :query-string          (.getRawQuery (.getRequestURI exchange))
-   :query-params          (fn query-params []
+  {:server-port       (.getPort (.getLocalAddress exchange))
+   :server-name       (.getHostName (.getLocalAddress exchange))
+   :remote-addr       (-> exchange .getRemoteAddress .getAddress .getHostAddress)
+   :uri               (.getPath (.getRequestURI exchange))
+   :query-string      (.getRawQuery (.getRequestURI exchange))
+   :query-params      (fn query-params []
                             (parse-query
                              (.getRawQuery (.getRequestURI exchange))))
-   :scheme                :http
-   :request-method        (-> exchange .getRequestMethod .toLowerCase keyword)
-   :headers               (into {}
-                                (for [k    (.keySet (.getRequestHeaders exchange))
-                                      :let [vs (.get (.getRequestHeaders exchange) k)]]
+   :scheme            :http
+   :request-method    (-> exchange .getRequestMethod .toLowerCase keyword)
+   :headers           (into {}
+                            (for [k    (.keySet (.getRequestHeaders exchange))
+                                  :let [vs (.get (.getRequestHeaders exchange) k)]]
                                   [(str/lower-case k) (str (first vs))]))
-   :body                  (.getRequestBody exchange)
-   :set-response-header   (partial set-response-header! exchange)
-   :set-response-headers  (partial set-response-headers! exchange)
-   :send-response-headers (partial send-response-headers! exchange)
-   :on-response-done      (fn [] (close-response-body! exchange))
-   :on-response-error     (fn [] (close-response-body! exchange))
-   :response-body         (.getResponseBody exchange)})
+   :body              (.getRequestBody exchange)
+   :on-response-done  (fn [] (close-response-body! exchange))
+   :on-response-error (fn [] (close-response-body! exchange))
+   :response-body     (.getResponseBody exchange)})
 
 (defn- send-streaming-response
   "Handle streaming response for SSE"
   [^HttpExchange exchange response]
-  (let [{:keys [status headers]} response]))
+  (let [{:keys [body status headers]} response]
+    (set-response-headers! exchange headers)
+    (send-response-headers! exchange status 0)
+    (body)))
 
 (defn- send-ring-response
   "Send Ring response, detecting streaming vs normal response"
@@ -75,6 +75,7 @@
     (send-streaming-response exchange response)
     (let [{:keys [status headers body]}
           response
+          _          (log/info :http/response {:body-type (type body)})
           body-bytes (if (string? body)
                        (.getBytes body)
                        body)

@@ -3,55 +3,26 @@
   (:require
    [mcp-clj.json-rpc.server :as json-rpc]
    [mcp-clj.log :as log]
-   [mcp-clj.mcp-server.tools :as tools]
+   [mcp-clj.mcp-server.prompts :as prompts]
    [mcp-clj.mcp-server.resources :as resources]
-   [mcp-clj.mcp-server.prompts :as prompts])
-  (:import
-   [java.util.concurrent Executors
-    ThreadPoolExecutor
-    TimeUnit]))
+   [mcp-clj.mcp-server.tools :as tools]))
 
-(def protocol-version "2024-11-05")
-(def required-client-version "2024-11-05")
+(def ^:private server-protocol-version "2024-11-05")
+(def ^:private required-client-version "2024-11-05")
 
-(defrecord Session
+(defrecord ^:private Session
     [^String session-id
      initialized?
      client-info
-     client-capabilities
-     reply!-fn
-     close!-fn])
+     client-capabilities])
 
-(defrecord MCPServer
+(defrecord ^:private MCPServer
     [json-rpc-server
-     executor
      session-id->session
      tool-registry])
 
-(defn- create-executor
-  "Create bounded executor service"
-  [threads]
-  (Executors/newScheduledThreadPool threads))
-
 (defn- request-session-id [request]
   (get ((:query-params request)) "session_id"))
-
-(defn- json-sse-response
-  [id data]
-  {:event "message"
-   :data
-   (cond->       {:jsonrpc "2.0"}
-     id
-     (assoc :id id)
-     data
-     (merge data))})
-
-(defn- json-response
-  [request-params response-type data]
-  (cond->       {:jsonrpc "2.0"
-                 :id      (:id request-params)}
-    response-type
-    (assoc response-type data)))
 
 (defn- request-session
   [server request]
@@ -59,39 +30,26 @@
         session-id->session (:session-id->session server)]
     (get @session-id->session session-id)))
 
-(defn- session-not-found
-  []
-  {:status 400
-   :body   "session_id missing from query parameters"})
-
-(defn- notify-all-sessions!
-  "Send a notification to all active sessions"
-  [server method params]
-  (doseq [{:keys [reply!-fn]} (vals @(:session-id->session server))]
-    (reply!-fn
-     (json-sse-response
-      nil  ; notifications don't have an id
-      (merge
-       {:method method}
-       (when params
-         {:params params}))))))
-
 (defn- notify-tools-changed!
   "Notify all sessions that the tool list has changed"
   [server]
-  (notify-all-sessions! server "notifications/tools/list_changed" nil))
+  (log/info :server/notify-tools-changed {:server server})
+  (json-rpc/notify-all!
+   @(:json-rpc-server server)
+   "notifications/tools/list_changed"
+   nil))
+
+(defn- text-map [msg]
+  {:type "text" :text msg})
 
 (defn- validate-initialization!
   "Validate initialization request"
   [{:keys [protocolVersion capabilities]}]
-  (log/info :server/client
-    {:protocolVersion protocolVersion
-     :capabilities    capabilities})
-  (when-not (= protocolVersion required-client-version)
-    (throw (ex-info "Unsupported protocol version"
-                    {:code -32001
-                     :data {:supported required-client-version
-                            :received  protocolVersion}})))
+  (when (not= protocolVersion required-client-version)
+    {:isError true
+     :content [(text-map "Unsupported MCP protocol version")
+               (text-map (str "Expected: " required-client-version))
+               (text-map (str "Client: " protocolVersion))] })
   #_(when-not (get-in capabilities [:tools])
       (throw (ex-info "Client must support tools capability"
                       {:code -32001
@@ -99,140 +57,95 @@
 
 (defn- handle-initialize
   "Handle initialize request from client"
-  [server request id params]
-  (validate-initialization! params)
-  (let [session (request-session server request)]
-    (log/info :server/initialize {:session-id (:session-id session)})
-    (if session
-      (do
-        (future
-          ((:reply!-fn session)
-           (json-sse-response
-            id
-            {:result
-             {:serverInfo      {:name    "mcp-clj"
-                                :version "0.1.0"}
-              :protocolVersion protocol-version
-              :capabilities    {:tools     {:listChanged false}
-                                :resources {:listChanged false
-                                            :subscribe   false}
-                                :prompts   {:listChanged false}}
-              :instructions    "mcp-clj is used to interact with a clojure REPL."}})))
-        "Accepted")
-      (session-not-found))))
+  [_server params]
+  (log/info :server/initialize)
+  (or (validate-initialization! params)
+      {:serverInfo      {:name    "mcp-clj"
+                         :version "0.1.0"}
+       :protocolVersion server-protocol-version
+       :capabilities    {:tools     {:listChanged true}
+                         :resources {:listChanged false
+                                     :subscribe   false}
+                         :prompts   {:listChanged false}}
+       :instructions    "mcp-clj is used to interact with a clojure REPL."}))
 
 (defn- handle-initialized
   "Handle initialized notification"
-  [server request id _params]
-  (let [session (request-session server request)]
-    (log/info :server/initialized {:session-id (:session-id session)})
-    "Accepted"))
+  [server _params]
+  (log/info :server/initialized)
+  (fn [session]
+    (swap! (:session-id->session server)
+           update (:session-id session)
+           assoc :initialized? true)))
 
-(defn- ping
+(defn- handle-ping
   "Handle ping request"
-  [server request id _]
-  (let [session (request-session server request)]
-    (log/info :server/initialized {:session-id (:session-id session)})
-    (if session
-      (do
-        (swap! (:session-id->session server)
-               update (:session-id session)
-               assoc :initialized? true)
-        ((:reply!-fn session) (json-sse-response id {:result {}}))
-        nil)
-      (session-not-found))))
-
+  [_server _params]
+  (log/info :server/ping)
+  {})
 
 (defn- handle-list-tools
   "Handle tools/list request from client"
-  [server request id params]
-  (let [session (request-session server request)]
-    (log/info :server/tools-list {:session-id (:session-id session)})
-    (if session
-      (do
-        (future
-          ((:reply!-fn session)
-           (json-sse-response
-            id
-            {:result
-             {:tools (mapv
-                      tools/tool-definition
-                      (vals @(:tool-registry server)))}})))
-        "Accepted")
-      (session-not-found))))
+  [server _params]
+  (log/info :server/tools-list)
+  {:tools (mapv tools/tool-definition (vals @(:tool-registry server)))})
 
 (defn- handle-call-tool
   "Handle tools/call request from client"
-  [server request id {:keys [name arguments] :as params}]
-  (let [session (request-session server request)]
-    (log/info :server/tools-call {:session-id (:session-id session)})
-    (if session
-      (do
-        (future
-          ((:reply!-fn session)
-           (if-let [{:keys [implementation]} (get @(:tool-registry server) name)]
-             (let [result (try
-                            (implementation arguments)
-                            (catch Exception e
-                              {:content [{:type "text"
-                                          :text (str "Error: " (.getMessage e))}]
-                               :isError true}))]
-               (json-sse-response id {:result result}))
-             (json-sse-response
-              id
-              {:result
-               {:content [{:type "text"
-                           :text (str "Tool not found: " name)}]
-                :isError true}}))))
-        "Accepted")
-      (session-not-found))))
+  [server {:keys [name arguments] :as _params}]
+  (log/info :server/tools-call)
+  (if-let [{:keys [implementation]} (get @(:tool-registry server) name)]
+    (try
+      (implementation arguments)
+      (catch Throwable e
+        {:content [(text-map (str "Error: " (.getMessage e)))]
+         :isError true}))
+    {:content [(text-map (str "Tool not found: " name))]
+     :isError true})  )
 
 (defn- handle-list-resources
   "Handle resources/list request from client"
-  [server request id params]
-  (let [session (request-session server request)]
-    (log/info :server/resources-list {:session-id (:session-id session)})
-    (if session
-      (do
-        (future
-          ((:reply!-fn session)
-           (json-sse-response
-            id
-            {:result
-             (resources/list-resources params)})))
-        "Accepted")
-      (session-not-found))))
+  [_server params]
+  (log/info :server/resources-list)
+  (resources/list-resources params))
 
 (defn- handle-list-prompts
   "Handle prompts/list request from client"
-  [server request id params]
-  (let [session (request-session server request)]
-    (log/info :server/prompts-list {:session-id (:session-id session)})
-    (if session
-      (do
-        (future
-          ((:reply!-fn session)
-           (json-sse-response
-            id
-            {:result
-             (prompts/list-prompts params)})))
-        "Accepted")
-      (session-not-found))))
+  [_server params]
+  (log/info :server/prompts-list)
+  (prompts/list-prompts params))
 
-(defn create-handlers
+(defn- request-handler
+  "Wrap a handler to support async responses"
+  [server handler request params]
+  (let [response (handler server params)]
+    (if (fn? response)
+      (let [session (request-session server request)]
+        (if session
+          (do
+            (response session)
+            nil)
+          (log/error "missing mcp session")))
+      response)))
+
+(defn- create-handlers
   "Create request handlers with server reference"
   [server]
-  {"initialize"                (partial handle-initialize server)
-   "notifications/initialized" (partial handle-initialized server)
-   "ping"                      (partial ping server)
-   "tools/list"                (partial handle-list-tools server)
-   "tools/call"                (partial handle-call-tool server)
-   "resources/list"            (partial handle-list-resources server)
-   "prompts/list"              (partial handle-list-prompts server)})
+  (update-vals
+   {"initialize"                handle-initialize
+    "notifications/initialized" handle-initialized
+    "ping"                      handle-ping
+    "tools/list"                handle-list-tools
+    "tools/call"                handle-call-tool
+    "resources/list"            handle-list-resources
+    "prompts/list"              handle-list-prompts}
+   (fn [handler]
+     #(request-handler server handler %1 %2))))
 
 (defn add-tool!
   "Add or update a tool in a running server"
   [server tool]
+  (log/info :server/add-tool!)
   (when-not (tools/valid-tool? tool)
     (throw (ex-info "Invalid tool definition" {:tool tool})))
   (swap! (:tool-registry server) assoc (:name tool) tool)
@@ -242,58 +155,50 @@
 (defn remove-tool!
   "Remove a tool from a running server"
   [server tool-name]
+  (log/info :server/remove-tool!)
   (swap! (:tool-registry server) dissoc tool-name)
   (notify-tools-changed! server)
   server)
 
-(defn- shutdown-executor
-  "Shutdown executor service gracefully"
-  [^ThreadPoolExecutor executor]
-  (.shutdown executor)
-  (try
-    (when-not (.awaitTermination executor 5 TimeUnit/SECONDS)
-      (.shutdownNow executor))
-    (catch InterruptedException _
-      (.shutdownNow executor))))
-
-(defn on-sse-connect
-  [server request id reply!-fn close!-fn]
-  (let [session (->Session id false nil nil reply!-fn close!-fn)
-        uri     (str "/messages?session_id=" id)]
+(defn- on-sse-connect
+  [server id]
+  (let [session (->Session id false nil nil)]
     (log/info :server/sse-connect {:session-id id})
-    (swap! (:session-id->session server) assoc id session)
-    (reply!-fn {:event "endpoint" :data uri} {:json-encode false})))
+    (swap! (:session-id->session server) assoc id session)))
 
-(defn on-sse-close
+(defn- on-sse-close
   [server id]
   (swap! (:session-id->session server) dissoc id))
 
-(defn stop!
+(defn- stop!
   [server]
   (doseq [session (vals @(:session-id->session server))]
-    ((:close!-fn session))))
+    (json-rpc/close!
+     @(:json-rpc-server server)
+     (:session-id session))))
 
 (defn create-server
   "Create MCP server instance"
-  [{:keys [port tools threads]
-    :or   {threads (* 2 (.availableProcessors (Runtime/getRuntime)))
-           tools   tools/default-tools}}]
+  [{:keys [port tools]
+    :or   {tools tools/default-tools}}]
   (doseq [tool (vals tools)]
     (when-not (tools/valid-tool? tool)
       (throw (ex-info "Invalid tool in constructor" {:tool tool}))))
   (let [session-id->session (atom {})
         tool-registry       (atom tools)
-        executor            (create-executor threads)
-        server              (->MCPServer nil executor session-id->session tool-registry)
-        handlers            (create-handlers server)
+        rpc-server-prom     (promise)
+        server              (->MCPServer
+                             rpc-server-prom
+                             session-id->session
+                             tool-registry)
         json-rpc-server     (json-rpc/create-server
                              {:port           port
-                              :handlers       handlers
-                              :executor       executor
                               :on-sse-connect (partial on-sse-connect server)
-                              :on-sse-close   (partial on-sse-close server)})]
-    (assoc server
-           :json-rpc-server json-rpc-server
-           :stop #(do (stop! server)
-                      ((:stop json-rpc-server))
-                      (shutdown-executor executor)))))
+                              :on-sse-close   (partial on-sse-close server)})
+        server              (assoc server
+                                   :stop #(do (stop! server)
+                                              ((:stop json-rpc-server))))
+        handlers            (create-handlers server)]
+    (json-rpc/set-handlers! json-rpc-server handlers)
+    (deliver rpc-server-prom json-rpc-server)
+    server))

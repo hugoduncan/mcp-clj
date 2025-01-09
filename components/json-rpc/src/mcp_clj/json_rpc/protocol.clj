@@ -8,13 +8,14 @@
 
 ;;; Standard error codes
 (def error-codes
-  {:parse-error           -32700
-   :invalid-request       -32600
-   :method-not-found     -32601
-   :invalid-params       -32602
-   :internal-error       -32603
-   :server-error-start   -32000
-   :server-error-end     -32099})
+  {:parse-error        -32700
+   :invalid-request    -32600
+   :method-not-found   -32601
+   :invalid-params     -32602
+   :internal-error     -32603
+   :overloaded         -32000           ; non-standard
+   :server-error-start -32000
+   :server-error-end   -32099})
 
 ;;; Response construction
 
