@@ -173,7 +173,7 @@
         handlers            (atom {})
         handler             (fn [{:keys [request-method uri] :as request}]
                               (log/info :rpc/http-request
-                                        {:method request-method :uri uri})
+                                {:method request-method :uri uri})
                               (case [request-method uri]
                                 [:post "/messages"]
                                 (handle-request
@@ -209,15 +209,15 @@
                                               (on-sse-connect id)))))
                                 (do
                                   (log/warn :rpc/invalid
-                                            {:method request-method :uri uri})
+                                    {:method request-method :uri uri})
                                   (http/text-response
                                    "Not Found"
                                    http/NotFound))))
 
-        {:keys [server stop]}
+        {:keys [server port stop]}
         (http-server/run-server handler {:executor executor :port port})
         server {:server              server
-                :port                (.getPort (.getAddress server))
+                :port                port
                 :handlers            handlers
                 :stop                (fn []
                                        (stop)

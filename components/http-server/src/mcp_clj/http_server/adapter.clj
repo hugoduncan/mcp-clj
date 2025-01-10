@@ -126,4 +126,5 @@
        Long/MAX_VALUE
        java.util.concurrent.TimeUnit/SECONDS))
     {:server server
+     :port   (.getPort (.getAddress server))
      :stop   (fn [] (.stop server 0))}))
