@@ -7,7 +7,13 @@
   (try
     (let [form (read-string code-str)]
       {:success true
-       :result  (with-out-str (println (eval form)))})
+       :result  (with-out-str
+                  (binding [*err* *out*]
+                    (try
+                      (println (eval form))
+                      (catch Throwable e
+                        (println (ex-message e) (pr-str (ex-data e)))
+                        (.printStackTrace e)))))})
     (catch Throwable e
       {:success false
        :error   (str (.getMessage e) "\n"
