@@ -3,7 +3,8 @@
  {:dev
   {:extra-paths ["development/src" "components/json-rpc/test"]
    :extra-deps
-   {poly/http-server              {:local/root "components/http-server"}
+   {poly/http                     {:local/root "components/http"}
+    poly/http-server              {:local/root "components/http-server"}
     poly/json-rpc                 {:local/root "components/json-rpc"}
     poly/log                      {:local/root "components/log"}
     poly/mcp-server               {:local/root "components/mcp-server"}

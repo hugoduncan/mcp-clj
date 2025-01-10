@@ -2,25 +2,25 @@
   "Tests for adapter for Java's HttpServer"
   (:require
    [clojure.test :refer [deftest testing is use-fixtures]]
-   [mcp-clj.http-server.adapter :as adapter]
-   [ring.util.response :as response])
+   [mcp-clj.http :as http]
+   [mcp-clj.http-server.adapter :as adapter])
   (:import
    [java.net URL HttpURLConnection]))
 
 (defn test-handler [request]
   (case (:uri request)
-    "/" (-> (response/response "Hello World")
-            (response/content-type "text/plain"))
+    "/" (-> (http/response "Hello World")
+            (http/content-type "text/plain"))
 
-    "/stream" (-> (response/response
+    "/stream" (-> (http/response
                    #(doseq [n (range 3)]
                       (.write % (.getBytes (str "data: " n "\n\n")))
                       (.flush %)))
-                  (response/content-type "text/event-stream"))
+                  (http/content-type "text/event-stream"))
 
-    "/echo-headers" (-> (response/response
+    "/echo-headers" (-> (http/response
                          (pr-str {:headers (:headers request)}))
-                        (response/content-type "application/edn"))
+                        (http/content-type "application/edn"))
 
     "/error" {:status  500
               :headers {"Content-Type" "text/plain"}

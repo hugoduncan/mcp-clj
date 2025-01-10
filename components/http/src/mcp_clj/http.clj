@@ -10,7 +10,7 @@
    :body    body})
 
 (defn status
-  "Returns an updated Ring response with the given status."
+  "Returns an updated response map with the given status."
   [resp status]
   (assoc resp :status status))
 
