@@ -1,8 +1,8 @@
-(ns mcp-clj.http-server.ring-adapter-test
-  "Tests for Ring adapter for Java's HttpServer"
+(ns mcp-clj.http-server.adapter-test
+  "Tests for adapter for Java's HttpServer"
   (:require
    [clojure.test :refer [deftest testing is use-fixtures]]
-   [mcp-clj.http-server.ring-adapter :as adapter]
+   [mcp-clj.http-server.adapter :as adapter]
    [ring.util.response :as response])
   (:import
    [java.net URL HttpURLConnection]))

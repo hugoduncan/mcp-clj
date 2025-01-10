@@ -1,5 +1,5 @@
-(ns mcp-clj.http-server.ring-adapter
-  "Ring adapter for Java's com.sun.net.httpserver.HttpServer with SSE support"
+(ns mcp-clj.http-server.adapter
+  "Adapter for Java's com.sun.net.httpserver.HttpServer with SSE support"
   (:require
    [clojure.string :as str]
    [mcp-clj.log :as log])

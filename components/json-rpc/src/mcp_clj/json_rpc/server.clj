@@ -3,7 +3,7 @@
   (:require
    [clojure.data.json :as json]
    [mcp-clj.http :as http]
-   [mcp-clj.http-server.ring-adapter :as http-server]
+   [mcp-clj.http-server.adapter :as http-server]
    [mcp-clj.json-rpc.protocol :as protocol]
    [mcp-clj.log :as log]
    [mcp-clj.sse :as sse])
