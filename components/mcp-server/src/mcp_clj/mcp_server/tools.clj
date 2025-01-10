@@ -7,10 +7,15 @@
   (try
     (let [form (read-string code-str)]
       {:success true
-       :result  (str (eval form))})
+       :result  (with-out-str (println (eval form)))})
     (catch Throwable e
       {:success false
-       :error   (.getMessage e)})))
+       :error   (str (.getMessage e) "\n"
+                     "ex-data : " (pr-str (ex-data e)) "\n"
+                     (with-out-str
+                       (binding [*err* *out*]
+                         (.printStackTrace (ex-info "err" {})))))})))
+
 
 (def clj-eval-impl
   "Implementation function for clj-eval tool"
