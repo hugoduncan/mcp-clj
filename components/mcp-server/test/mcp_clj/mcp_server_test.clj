@@ -11,10 +11,42 @@
     LinkedBlockingQueue
     TimeUnit]))
 
-(def valid-client-info
-  {:clientInfo      {:name "test-client" :version "1.0"}
-   :protocolVersion @#'mcp/server-protocol-version
-   :capabilities    {:tools {:listChanged false}}})
+(def test-tool
+  "Test tool for server testing"
+  {:name           "test-tool"
+   :description    "A test tool for server testing"
+   :inputSchema    {:type       "object"
+                    :properties {"value" {:type "string"}}
+                    :required   ["value"]}
+   :implementation (fn [{:keys [value]}]
+                     {:content [{:type "text"
+                                 :text (str "test-response:" value)}]})})
+
+(def error-test-tool
+  "Test tool that always returns an error"
+  {:name           "error-test-tool"
+   :description    "A test tool that always returns an error"
+   :inputSchema    {:type       "object"
+                    :properties {"value" {:type "string"}}
+                    :required   ["value"]}
+   :implementation (fn [_]
+                     {:content [{:type "text"
+                                 :text "test-error"}]
+                      :isError true})})
+
+(def test-prompt
+  {:name        "test-prompt"
+   :description "A test prompt for server testing"
+   :messages    [{:role    "system"
+                  :content {:type "text"
+                            :text "Hello"}}
+                 {:role    "user"
+                  :content {:type "text"
+                            :text "Please say {{reply}}"}}]
+   :arguments   [{:name        "reply"
+                  :description "something"
+                  :required    true}]})
+
 
 #_{:clj-kondo/ignore [:uninitialized-var]}
 (def ^:private ^:dynamic  *server*)
@@ -22,7 +54,13 @@
 (defn with-server
   "Test fixture for server lifecycle"
   [f]
-  (let [server (mcp/create-server {:port 0 :threads 2 :queue-size 10})]
+  (let [server (mcp/create-server
+                {:port       0
+                 :threads    2
+                 :queue-size 10
+                 :tools      {"test-tool"       test-tool
+                              "error-test-tool" error-test-tool}
+                 :prompts    {"test-prompt" test-prompt}})]
     (try
       (binding [*server* server]
         (f))
@@ -211,7 +249,7 @@
           (future-cancel f))))))
 
 (deftest tools-test
-  (testing "server lifecycle with SSE"
+  (testing "A server with tools"
     (let [port     (port)
           url      (format "http://localhost:%d" port)
           queue    (LinkedBlockingQueue.)
@@ -234,29 +272,35 @@
                   [state' result] (run-plan state)]
               (is (= :passed result))
               (testing "tool interactions"
-                (let [state           (assoc
-                                       state'
-                                       :plan
-                                       [{:action :send
-                                         :msg    (json-request
-                                                  "tools/list"
-                                                  {}
-                                                  0)}
-                                        {:action :receive
-                                         :data
-                                         {:event "message"
-                                          :data
-                                          (json-result
-                                           {:tools
-                                            [{:name "clj-eval",
-                                              :description
-                                              "Evaluates a Clojure expression and returns the result",
-                                              :inputSchema
-                                              {:type       "object",
-                                               :properties {:code {:type "string"}},
-                                               :required   ["code"]}}]}
-                                           {}
-                                           0)}}])
+                (let [state
+                      (assoc
+                       state'
+                       :plan
+                       [{:action :send
+                         :msg    (json-request
+                                  "tools/list"
+                                  {}
+                                  0)}
+                        {:action :receive
+                         :data
+                         {:event "message"
+                          :data
+                          (json-result
+                           {:tools
+                            [{:name        "test-tool",
+                              :description "A test tool for server testing",
+                              :inputSchema
+                              {:type       "object",
+                               :properties {:value {:type "string"}},
+                               :required   ["value"]}}
+                             {:name        "error-test-tool",
+                              :description "A test tool that always returns an error",
+                              :inputSchema
+                              {:type       "object",
+                               :properties {:value {:type "string"}},
+                               :required   ["value"]}}]}
+                           {}
+                           0)}}])
                       [state' result] (run-plan state)
                       _               (testing "tools/list"
                                         (is (= :passed result) (pr-str state))
@@ -267,31 +311,9 @@
                                        [{:action :send
                                          :msg    (json-request
                                                   "tools/call"
-                                                  {:name      "clj-eval"
-                                                   :arguments {:code "(+ 1 2)"}}
-                                                  0)}
-                                        {:action :receive
-                                         :data   {:event "message"
-                                                  :data
-                                                  (json-result
-                                                   {:content
-                                                    [{:type "text"
-                                                      :text "3"}]}
-                                                   nil
-                                                   0)}}])
-                      [state' result] (run-plan state)
-                      _               (testing "successful tools/call"
-                                        (is (= :passed result))
-                                        (is (not (:failed state'))))
-                      state           (assoc
-                                       state'
-                                       :plan
-                                       [{:action :send
-                                         :msg    (json-request
-                                                  "tools/call"
-                                                  {:name "clj-eval"
+                                                  {:name "test-tool"
                                                    :arguments
-                                                   {:code "(/ 1 0)"}}
+                                                   {:value "me"}}
                                                   0)}
                                         {:action :receive
                                          :data
@@ -300,12 +322,12 @@
                                           (json-result
                                            {:content
                                             [{:type "text"
-                                              :text "Error: Divide by zero"}]
-                                            :isError true}
+                                              :text "test-response:me"}]}
                                            nil
                                            0)}}])
-                      [state' result] (run-plan state)
-                      _               (testing "tools/call with eval error"
+                      [state' result] (testing "makes a successful tools/call"
+                                        (run-plan state))
+                      _               (testing "makes a successful tools/call"
                                         (is (= :passed result))
                                         (is (not (:failed state'))))
                       state           (assoc
@@ -314,9 +336,10 @@
                                        [{:action :send
                                          :msg    (json-request
                                                   "tools/call"
-                                                  {:name "clj-eval"
+                                                  {:name "error-test-tool"
                                                    :arguments
-                                                   {:code "(/ 1 0"}})}
+                                                   {:value "me"}}
+                                                  0)}
                                         {:action :receive
                                          :data
                                          {:event "message"
@@ -324,12 +347,13 @@
                                           (json-result
                                            {:content
                                             [{:type "text"
-                                              :text "Error: EOF while reading"}]
+                                              :text "test-error"}]
                                             :isError true}
                                            nil
                                            0)}}])
-                      [state' result] (run-plan state)
-                      _               (testing "tools/call with invalid clojure"
+                      [state' result] (testing "tools/call with an error"
+                                        (run-plan state))
+                      _               (testing "tools/call with an error"
                                         (is (= :passed result))
                                         (is (not (:failed state'))))
                       state           (assoc
@@ -567,21 +591,29 @@
                   [state' result] (run-plan state)]
               (is (= :passed result))
               (testing "prompt interactions"
-                (let [state           (assoc
-                                       state'
-                                       :plan
-                                       [{:action :send
-                                         :msg    (json-request
-                                                  "prompts/list"
-                                                  {}
-                                                  0)}
-                                        {:action :receive
-                                         :data
-                                         {:event "message"
-                                          :data  (json-result
-                                                  {:prompts []}
-                                                  nil
-                                                  0)}}])
+                (let [state
+                      (assoc
+                       state'
+                       :plan
+                       [{:action :send
+                         :msg    (json-request
+                                  "prompts/list"
+                                  {}
+                                  0)}
+                        {:action :receive
+                         :data
+                         {:event "message"
+                          :data
+                          (json-result
+                           {:prompts
+                            [{:name        "test-prompt",
+                              :description "A test prompt for server testing",
+                              :arguments
+                              [{:name        "reply"
+                                :description "something"
+                                :required    true}]}]}
+                           nil
+                           0)}}])
                       [state' result] (run-plan state)
                       _               (testing "prompts/list"
                                         (is (= :passed result)))]))))

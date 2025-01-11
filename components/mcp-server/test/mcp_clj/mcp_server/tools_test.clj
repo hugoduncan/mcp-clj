@@ -1,38 +1,45 @@
 (ns mcp-clj.mcp-server.tools-test
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.mcp-server.tools :as tools]))
+   [clojure.test :refer [deftest is testing use-fixtures]]
+   [mcp-clj.mcp-server.core :as mcp]
+   [mcp-clj.mcp-server.tools]))
 
-(deftest list-tools-test
-  (testing "list tools"
-    (let [result (tools/list-tools {})]
-      (is (vector? (:tools result)))
-      (is (pos? (count (:tools result))))
-      (is (= "clj-eval" (-> result :tools first :name))))))
+(def ^:private ^:dynamic  *server*)
 
-(deftest call-tool-test
-  (testing "clj-eval tool"
-    (testing "successful evaluation"
-      (let [result (tools/call-tool
-                    {:name      "clj-eval"
-                     :arguments {:code "(+ 1 2)"}})]
-        (is (= [{:type "text"
-                 :text "3"}]
-               (:content result)))
-        (is (not (:isError result)))))
+(defn with-server
+  "Test fixture for server lifecycle"
+  [f]
+  (let [server (mcp/create-server {:port 0 :threads 2 :queue-size 10})]
+    (try
+      (binding [*server* server]
+        (f))
+      (finally
+        ((:stop server))))))
 
-    (testing "evaluation error"
-      (let [result (tools/call-tool
-                    {:name      "clj-eval"
-                     :arguments {:code "(/ 1 0)"}})]
-        (is (:isError result))
-        (is (= 1 (count (:content result))))
-        (is (= "text" (-> result :content first :type)))
-        (is (string? (-> result :content first :text))))))
+(use-fixtures :each with-server)
 
-  (testing "unknown tool"
-    (let [result (tools/call-tool {:name "unknown" :arguments {}})]
-      (is (:isError result))
-      (is (= [{:type "text"
-               :text "Tool not found: unknown"}]
-             (:content result))))))
+(deftest clj-eval-test
+  (testing "clj eval"
+    (let [{:keys [implementation]} (get @(:tool-registry *server*) "clj-eval")]
+
+      (testing "successful evaluation"
+        (let [result (implementation {:code "(+ 1 2)"})]
+          (is (= {:content [{:type "text"
+                             :text "3\n"}]}
+                 result))))
+
+      (testing "divide by zero error"
+        (let [result (implementation {:code "(/ 1 0)"})]
+          (is (:isError result))
+          (is (= "text" (-> result :content first :type)))
+          (is (.contains
+               (-> result :content first :text)
+               "Divide by zero"))))
+
+      (testing "invalid syntax"
+        (let [result (implementation {:code "(/ 1 0"})]
+          (is (:isError result))
+          (is (= "text" (-> result :content first :type)))
+          (is (.contains
+               (-> result :content first :text)
+               "EOF while reading")))))))
