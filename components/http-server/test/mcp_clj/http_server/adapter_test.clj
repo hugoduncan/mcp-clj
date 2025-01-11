@@ -23,6 +23,17 @@
                          (pr-str {:headers (:headers request)}))
                         (http/content-type "application/edn"))
 
+    "/echo-query" (-> (http/response
+                        (pr-str {:query-string (:query-string request)
+                                :query-params ((:query-params request))}))
+                       (http/content-type "application/edn"))
+
+    "/post-echo" (-> (http/response
+                       (slurp (:body request)))
+                      (http/content-type "text/plain"))
+
+    "/throw-error" (throw (RuntimeException. "Deliberate test error"))
+
     "/error" {:status  500
               :headers {"Content-Type" "text/plain"}
               :body    "Error"}))
@@ -47,13 +58,70 @@
 
 (use-fixtures :each server-fixture)
 
-(defn http-get [path]
+(defn make-connection [method path]
   (let [url  (URL. (str "http://localhost:" *port* path))
-        _    (println "Connecting to URL:" url)
         conn ^HttpURLConnection (.openConnection url)]
-    (.setRequestMethod conn "GET")
-    (println "Created connection:" conn)
+    (.setRequestMethod conn method)
     conn))
+
+(defn http-get [path]
+  (make-connection "GET" path))
+
+(defn http-post [path body]
+  (let [conn (make-connection "POST" path)]
+    (.setDoOutput conn true)
+    (when body
+      (.setRequestProperty conn "Content-Type" "text/plain")
+      (with-open [w (.getOutputStream conn)]
+        (.write w (.getBytes body))))
+    conn))
+
+(deftest query-string-test
+  (testing "query string parsing"
+    (testing "empty query string"
+      (let [conn     (http-get "/echo-query")
+            response (read-string (slurp (.getInputStream conn)))]
+        (is (nil? (:query-string response)))
+        (is (empty? (:query-params response)))))
+
+    (testing "single parameter"
+      (let [conn     (http-get "/echo-query?name=value")
+            response (read-string (slurp (.getInputStream conn)))]
+        (is (= "name=value" (:query-string response)))
+        (is (= {"name" "value"} (:query-params response)))))
+
+    (testing "multiple parameters"
+      (let [conn     (http-get "/echo-query?a=1&b=2")
+            response (read-string (slurp (.getInputStream conn)))]
+        (is (= "a=1&b=2" (:query-string response)))
+        (is (= {"a" "1" "b" "2"} (:query-params response)))))
+
+    (testing "URL encoded parameters"
+      (let [conn     (http-get "/echo-query?message=hello%20world&type=greeting%21")
+            response (read-string (slurp (.getInputStream conn)))]
+        (is (= {"message" "hello world" "type" "greeting!"} (:query-params response)))))
+
+    (testing "missing value parameter"
+      (let [conn     (http-get "/echo-query?key=")
+            response (read-string (slurp (.getInputStream conn)))]
+        (is (= {"key" ""} (:query-params response)))))
+
+    (testing "duplicate parameters - last value wins"
+      (let [conn     (http-get "/echo-query?key=1&key=2")
+            response (read-string (slurp (.getInputStream conn)))]
+        (is (= {"key" "2"} (:query-params response)))))))
+
+(deftest post-request-test
+  (testing "POST with body"
+    (let [test-body "Hello Server"
+          conn      (http-post "/post-echo" test-body)]
+      (is (= 200 (.getResponseCode conn)))
+      (is (= test-body (slurp (.getInputStream conn)))))))
+
+(deftest error-handling-test
+  (testing "handler throwing runtime exception"
+    (let [conn (http-get "/throw-error")]
+      (is (= 500 (.getResponseCode conn))))))
 
 (deftest basic-request-test
   (println "Starting basic-request-test")
