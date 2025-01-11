@@ -17,6 +17,7 @@
     TimeUnit
     TimeUnit]))
 
+
 ;;; Executor Service
 
 (def ^:private request-timeout-ms 30000)
@@ -117,12 +118,13 @@
           reply!-fn  (:reply!-fn session)
           rpc-call   (json/read-str (slurp (:body request)) :key-fn keyword)]
       (log/info :rpc/json-request
-                {:json-request rpc-call
-                 :session-id   session-id})
+        {:json-request rpc-call
+         :session-id   session-id})
       (if-let [validation-error (protocol/validate-request rpc-call)]
         (http/json-response
-         (json/write-str {:code    (:code validation-error)
-                          :message (:message validation-error)})
+         (json-rpc-error
+          (:code (:error validation-error))
+          (:message (:error validation-error)))
          http/BadRequest)
         (if-let [handler (get handlers (:method rpc-call))]
           (do
@@ -165,8 +167,10 @@
            port
            on-sse-connect
            on-sse-close]
-    :or   {num-threads (* 2 (.availableProcessors (Runtime/getRuntime)))
-           port        0}}]
+    :or   {num-threads    (* 2 (.availableProcessors (Runtime/getRuntime)))
+           port           0
+           on-sse-connect (fn [& _])
+           on-sse-close   (fn [& _])}}]
   {:pre [(ifn? on-sse-connect) (ifn? on-sse-close)]}
   (let [executor            (create-executor num-threads)
         session-id->session (atom {})

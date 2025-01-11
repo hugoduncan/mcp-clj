@@ -45,12 +45,14 @@
   [{:keys [jsonrpc method] :as request}]
   (cond
     (not= jsonrpc version)
-    (error-response (:invalid-request error-codes)
-                   "Invalid JSON-RPC version")
+    (error-response
+     (:invalid-request error-codes)
+     "Invalid JSON-RPC version")
 
     (not (string? method))
-    (error-response (:invalid-request error-codes)
-                   "Method must be a string")
+    (error-response
+     (:invalid-request error-codes)
+     "Method must be a string")
 
     :else nil))
 
