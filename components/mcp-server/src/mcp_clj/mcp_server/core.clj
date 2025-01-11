@@ -19,7 +19,8 @@
 (defrecord ^:private MCPServer
     [json-rpc-server
      session-id->session
-     tool-registry])
+     tool-registry
+     prompt-registry])
 
 (defn- request-session-id [request]
   (get ((:query-params request)) "session_id"))
@@ -37,6 +38,15 @@
   (json-rpc/notify-all!
    @(:json-rpc-server server)
    "notifications/tools/list_changed"
+   nil))
+
+(defn- notify-prompts-changed!
+  "Notify all sessions that the prompt list has changed"
+  [server]
+  (log/info :server/notify-prompts-changed {:server server})
+  (json-rpc/notify-all!
+   @(:json-rpc-server server)
+   "notifications/prompts/list_changed"
    nil))
 
 (defn- text-map [msg]
@@ -65,8 +75,8 @@
        :protocolVersion server-protocol-version
        :capabilities    {:tools     {:listChanged true}
                          :resources {:listChanged false
-                                     :subscribe   false}
-                         :prompts   {:listChanged false}}
+                                    :subscribe   false}
+                         :prompts   {:listChanged true}}
        :instructions    "mcp-clj is used to interact with a clojure REPL."}))
 
 (defn- handle-initialized
@@ -101,7 +111,7 @@
         {:content [(text-map (str "Error: " (.getMessage e)))]
          :isError true}))
     {:content [(text-map (str "Tool not found: " name))]
-     :isError true})  )
+     :isError true}))
 
 (defn- handle-list-resources
   "Handle resources/list request from client"
@@ -111,9 +121,15 @@
 
 (defn- handle-list-prompts
   "Handle prompts/list request from client"
-  [_server params]
+  [server params]
   (log/info :server/prompts-list)
-  (prompts/list-prompts params))
+  (prompts/list-prompts (:prompt-registry server) params))
+
+(defn- handle-get-prompt
+  "Handle prompts/get request from client"
+  [server params]
+  (log/info :server/prompts-get)
+  (prompts/get-prompt (:prompt-registry server) params))
 
 (defn- request-handler
   "Wrap a handler to support async responses"
@@ -138,7 +154,8 @@
     "tools/list"                handle-list-tools
     "tools/call"                handle-call-tool
     "resources/list"            handle-list-resources
-    "prompts/list"              handle-list-prompts}
+    "prompts/list"              handle-list-prompts
+    "prompts/get"               handle-get-prompt}
    (fn [handler]
      #(request-handler server handler %1 %2))))
 
@@ -160,6 +177,24 @@
   (notify-tools-changed! server)
   server)
 
+(defn add-prompt!
+  "Add or update a prompt in a running server"
+  [server prompt]
+  (log/info :server/add-prompt!)
+  (when-not (prompts/valid-prompt? prompt)
+    (throw (ex-info "Invalid prompt definition" {:prompt prompt})))
+  (swap! (:prompt-registry server) assoc (:name prompt) prompt)
+  (notify-prompts-changed! server)
+  server)
+
+(defn remove-prompt!
+  "Remove a prompt from a running server"
+  [server prompt-name]
+  (log/info :server/remove-prompt!)
+  (swap! (:prompt-registry server) dissoc prompt-name)
+  (notify-prompts-changed! server)
+  server)
+
 (defn- on-sse-connect
   [server id]
   (let [session (->Session id false nil nil)]
@@ -179,26 +214,32 @@
 
 (defn create-server
   "Create MCP server instance"
-  [{:keys [port tools]
-    :or   {tools tools/default-tools}}]
+  [{:keys [port tools prompts]
+    :or   {tools tools/default-tools
+           prompts prompts/default-prompts}}]
   (doseq [tool (vals tools)]
     (when-not (tools/valid-tool? tool)
       (throw (ex-info "Invalid tool in constructor" {:tool tool}))))
+  (doseq [prompt (vals prompts)]
+    (when-not (prompts/valid-prompt? prompt)
+      (throw (ex-info "Invalid prompt in constructor" {:prompt prompt}))))
   (let [session-id->session (atom {})
         tool-registry       (atom tools)
-        rpc-server-prom     (promise)
-        server              (->MCPServer
-                             rpc-server-prom
-                             session-id->session
-                             tool-registry)
-        json-rpc-server     (json-rpc/create-server
-                             {:port           port
-                              :on-sse-connect (partial on-sse-connect server)
-                              :on-sse-close   (partial on-sse-close server)})
-        server              (assoc server
-                                   :stop #(do (stop! server)
-                                              ((:stop json-rpc-server))))
-        handlers            (create-handlers server)]
+        prompt-registry     (atom prompts)
+        rpc-server-prom    (promise)
+        server             (->MCPServer
+                            rpc-server-prom
+                            session-id->session
+                            tool-registry
+                            prompt-registry)
+        json-rpc-server    (json-rpc/create-server
+                            {:port           port
+                             :on-sse-connect (partial on-sse-connect server)
+                             :on-sse-close   (partial on-sse-close server)})
+        server             (assoc server
+                                 :stop #(do (stop! server)
+                                          ((:stop json-rpc-server))))
+        handlers           (create-handlers server)]
     (json-rpc/set-handlers! json-rpc-server handlers)
     (deliver rpc-server-prom json-rpc-server)
     server))
