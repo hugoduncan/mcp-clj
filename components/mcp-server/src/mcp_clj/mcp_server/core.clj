@@ -20,7 +20,8 @@
     [json-rpc-server
      session-id->session
      tool-registry
-     prompt-registry])
+     prompt-registry
+     resource-registry])
 
 (defn- request-session-id [request]
   (get ((:query-params request)) "session_id"))
@@ -48,6 +49,24 @@
    @(:json-rpc-server server)
    "notifications/prompts/list_changed"
    nil))
+
+(defn- notify-resources-changed!
+  "Notify all sessions that the resource list has changed"
+  [server]
+  (log/info :server/notify-resources-changed {:server server})
+  (json-rpc/notify-all!
+   @(:json-rpc-server server)
+   "notifications/resources/list_changed"
+   nil))
+
+(defn- notify-resource-updated!
+  "Notify all sessions that a resource has been updated"
+  [server uri]
+  (log/info :server/notify-resource-updated {:server server :uri uri})
+  (json-rpc/notify-all!
+   @(:json-rpc-server server)
+   "notifications/resources/updated"
+   {:uri uri}))
 
 (defn- text-map [msg]
   {:type "text" :text msg})
@@ -115,9 +134,27 @@
 
 (defn- handle-list-resources
   "Handle resources/list request from client"
-  [_server params]
+  [server params]
   (log/info :server/resources-list)
-  (resources/list-resources params))
+  (resources/list-resources (:resource-registry server) params))
+
+(defn- handle-read-resource
+  "Handle resources/read request from client"
+  [server params]
+  (log/info :server/resources-read)
+  (resources/read-resource (:resource-registry server) params))
+
+(defn- handle-subscribe-resource
+  "Handle resources/subscribe request from client"
+  [server params]
+  (log/info :server/resources-subscribe)
+  (resources/subscribe-resource (:resource-registry server) params))
+
+(defn- handle-unsubscribe-resource
+  "Handle resources/unsubscribe request from client"
+  [server params]
+  (log/info :server/resources-unsubscribe)
+  (resources/unsubscribe-resource (:resource-registry server) params))
 
 (defn- handle-list-prompts
   "Handle prompts/list request from client"
@@ -154,6 +191,9 @@
     "tools/list"                handle-list-tools
     "tools/call"                handle-call-tool
     "resources/list"            handle-list-resources
+    "resources/read"            handle-read-resource
+    "resources/subscribe"       handle-subscribe-resource
+    "resources/unsubscribe"     handle-unsubscribe-resource
     "prompts/list"              handle-list-prompts
     "prompts/get"               handle-get-prompt}
    (fn [handler]
@@ -212,11 +252,30 @@
      @(:json-rpc-server server)
      (:session-id session))))
 
+(defn add-resource!
+  "Add or update a resource in a running server"
+  [server resource]
+  (log/info :server/add-resource!)
+  (when-not (resources/valid-resource? resource)
+    (throw (ex-info "Invalid resource definition" {:resource resource})))
+  (swap! (:resource-registry server) assoc (:name resource) resource)
+  (notify-resources-changed! server)
+  server)
+
+(defn remove-resource!
+  "Remove a resource from a running server"
+  [server resource-name]
+  (log/info :server/remove-resource!)
+  (swap! (:resource-registry server) dissoc resource-name)
+  (notify-resources-changed! server)
+  server)
+
 (defn create-server
   "Create MCP server instance"
-  [{:keys [port tools prompts]
+  [{:keys [port tools prompts resources]
     :or   {tools tools/default-tools
-           prompts prompts/default-prompts}}]
+           prompts prompts/default-prompts
+           resources resources/default-resources}}]
   (doseq [tool (vals tools)]
     (when-not (tools/valid-tool? tool)
       (throw (ex-info "Invalid tool in constructor" {:tool tool}))))
@@ -226,12 +285,14 @@
   (let [session-id->session (atom {})
         tool-registry       (atom tools)
         prompt-registry     (atom prompts)
+        resource-registry   (atom resources)
         rpc-server-prom    (promise)
         server             (->MCPServer
                             rpc-server-prom
                             session-id->session
                             tool-registry
-                            prompt-registry)
+                            prompt-registry
+                            resource-registry)
         json-rpc-server    (json-rpc/create-server
                             {:port           port
                              :on-sse-connect (partial on-sse-connect server)
