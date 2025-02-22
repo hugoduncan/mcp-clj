@@ -1,4 +1,8 @@
-{:paths []
+{:paths ["components/http/src"
+         "components/http-server/src"
+         "components/json-rpc/src"
+         "components/log/src"
+         "components/mcp-server/src"]
  :aliases
  {:dev
   {:extra-paths ["development/src" "components/json-rpc/test"]
