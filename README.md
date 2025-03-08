@@ -16,24 +16,19 @@ implementation.
 
 Add mcp-clj as a dependency to your project.
 
-1. Clone the mcp-clj repository:
-
-```bash
-git clone https://github.com/your-repo/mcp-clj.git
-```
-
-2. Add the project as a dependency:
+1. Add the mcp-project as a dependency:
 
 ```clojure
-:mcp-clj {:extra-deps
-               {org.hugoduncan/mcp-clj
-                {:local/root
-                 "/path tp/mcp-clj"}}}
+:deps {org.hugoduncan/mcp-clj
+        {:git/url   "https://github.com/hugoduncan/mcp-clj"
+         :git/sha   "replace with latest git sha"
+         :deps/root "projects/server"}}
 ```
 
-3. In the project, start the server:
+2. In the project, start the server:
 
 ```clojure
+(require 'mcp-clj.mcp-server.core)
 (def server (mcp-clj.mcp-server.core/create-server {:port 3001}))
 ```
 
