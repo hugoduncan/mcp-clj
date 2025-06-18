@@ -1,11 +1,11 @@
 # mcp-clj
 
-An implementation of the Model-Channel Protocol (MCP) in Clojure,
+An implementation of the Model Context Protocol (MCP) in Clojure,
 designed to expose Clojure REPL functionality over an SSE transport.
 
 ## Project Description
 
-mcp-clj is a Clojure implementation of the Model-Channel Protocol (MCP)
+mcp-clj is a Clojure implementation of the Model Context Protocol (MCP)
 defined by Anthropic. It provides both client and server components for
 MCP communication, with a specific focus on exposing Clojure REPL
 functionality. The project aims to maintain compatibility with
