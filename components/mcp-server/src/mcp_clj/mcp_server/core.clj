@@ -1,7 +1,9 @@
 (ns mcp-clj.mcp-server.core
   "MCP server implementation supporting the Anthropic Model Context Protocol"
   (:require
-   [mcp-clj.json-rpc.sse-server :as json-rpc]
+   [mcp-clj.json-rpc.protocols :as json-rpc-protocols]
+   [mcp-clj.json-rpc.sse-server :as sse-server]
+   [mcp-clj.json-rpc.stdio-server :as stdio-server]
    [mcp-clj.log :as log]
    [mcp-clj.mcp-server.prompts :as prompts]
    [mcp-clj.mcp-server.resources :as resources]
@@ -36,7 +38,7 @@
   "Notify all sessions that the tool list has changed"
   [server]
   (log/info :server/notify-tools-changed {:server server})
-  (json-rpc/notify-all!
+  (json-rpc-protocols/notify-all!
    @(:json-rpc-server server)
    "notifications/tools/list_changed"
    nil))
@@ -45,7 +47,7 @@
   "Notify all sessions that the prompt list has changed"
   [server]
   (log/info :server/notify-prompts-changed {:server server})
-  (json-rpc/notify-all!
+  (json-rpc-protocols/notify-all!
    @(:json-rpc-server server)
    "notifications/prompts/list_changed"
    nil))
@@ -54,7 +56,7 @@
   "Notify all sessions that the resource list has changed"
   [server]
   (log/info :server/notify-resources-changed {:server server})
-  (json-rpc/notify-all!
+  (json-rpc-protocols/notify-all!
    @(:json-rpc-server server)
    "notifications/resources/list_changed"
    nil))
@@ -63,7 +65,7 @@
   "Notify all sessions that a resource has been updated"
   [server uri]
   (log/info :server/notify-resource-updated {:server server :uri uri})
-  (json-rpc/notify-all!
+  (json-rpc-protocols/notify-all!
    @(:json-rpc-server server)
    "notifications/resources/updated"
    {:uri uri}))
@@ -247,10 +249,11 @@
 
 (defn- stop!
   [server]
-  (doseq [session (vals @(:session-id->session server))]
-    (json-rpc/close!
-     @(:json-rpc-server server)
-     (:session-id session))))
+  (let [rpc-server @(:json-rpc-server server)]
+    ;; Close individual sessions only for SSE servers
+    (when (contains? rpc-server :session-id->session)
+      (doseq [session (vals @(:session-id->session server))]
+        (sse-server/close! rpc-server (:session-id session))))))
 
 (defn add-resource!
   "Add or update a resource in a running server"
@@ -270,19 +273,51 @@
   (notify-resources-changed! server)
   server)
 
+(defn- determine-transport
+  "Determine transport type from configuration"
+  [{:keys [transport port]}]
+  (cond
+    (= transport :stdio) :stdio
+    (= transport :sse) :sse
+    (some? port) :sse
+    (nil? transport) :stdio
+    :else (throw (ex-info "Unsupported transport type" {:transport transport}))))
+
+(defn- create-json-rpc-server
+  "Create JSON-RPC server based on transport type"
+  [transport {:keys [port on-sse-connect on-sse-close] :as opts}]
+  (case transport
+    :sse (sse-server/create-server
+          {:port port
+           :on-sse-connect on-sse-connect
+           :on-sse-close on-sse-close})
+    :stdio (stdio-server/create-server
+            (into {} (filter (comp some? val) (select-keys opts [:num-threads]))))
+    (throw (ex-info "Unsupported transport type" {:transport transport}))))
+
 (defn create-server
-  "Create MCP server instance"
-  [{:keys [port tools prompts resources]
+  "Create MCP server instance.
+  
+  Options:
+  - :transport - Transport type (:sse or :stdio). Defaults based on presence of :port
+  - :port - Port for SSE server (implies :transport :sse)
+  - :num-threads - Number of threads for request handling
+  - :tools - Map of tool name to tool definition
+  - :prompts - Map of prompt name to prompt definition  
+  - :resources - Map of resource name to resource definition"
+  [{:keys [transport port num-threads tools prompts resources]
     :or {tools tools/default-tools
          prompts prompts/default-prompts
-         resources resources/default-resources}}]
+         resources resources/default-resources}
+    :as opts}]
   (doseq [tool (vals tools)]
     (when-not (tools/valid-tool? tool)
       (throw (ex-info "Invalid tool in constructor" {:tool tool}))))
   (doseq [prompt (vals prompts)]
     (when-not (prompts/valid-prompt? prompt)
       (throw (ex-info "Invalid prompt in constructor" {:prompt prompt}))))
-  (let [session-id->session (atom {})
+  (let [actual-transport (determine-transport opts)
+        session-id->session (atom {})
         tool-registry (atom tools)
         prompt-registry (atom prompts)
         resource-registry (atom resources)
@@ -293,14 +328,16 @@
                 tool-registry
                 prompt-registry
                 resource-registry)
-        json-rpc-server (json-rpc/create-server
+        json-rpc-server (create-json-rpc-server
+                         actual-transport
                          {:port port
+                          :num-threads num-threads
                           :on-sse-connect (partial on-sse-connect server)
                           :on-sse-close (partial on-sse-close server)})
         server (assoc server
                       :stop #(do (stop! server)
-                                 ((:stop json-rpc-server))))
+                                 (json-rpc-protocols/stop! json-rpc-server)))
         handlers (create-handlers server)]
-    (json-rpc/set-handlers! json-rpc-server handlers)
+    (json-rpc-protocols/set-handlers! json-rpc-server handlers)
     (deliver rpc-server-prom json-rpc-server)
     server))
