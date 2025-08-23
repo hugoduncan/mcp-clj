@@ -22,7 +22,7 @@
     (let [{:keys [port]} (parse-args args)]
       (log/info :starting-sse-server {:port port})
       (let [server (mcp-server/create-server {:transport :sse
-                                              :port port})]
+                                              :port      port})]
         (log/info :sse-server-started)
         (.addShutdownHook (Runtime/getRuntime)
                           (Thread. #(do

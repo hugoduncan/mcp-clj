@@ -54,16 +54,16 @@
 (defn- establish-sse-connection
   "Establish an SSE connection and return session information"
   [port]
-  (let [sse-url (format "http://localhost:%d/sse" port)
-        response (hato/get sse-url
-                           {:headers {"Accept" "text/event-stream"}
-                            :as :stream})
-        reader (java.io.BufferedReader.
-                (java.io.InputStreamReader.
-                 (:body response)))]
+  (let [sse-url  (format "http://localhost:%d/sse" port)
+        response (hato/post sse-url
+                            {:headers {"Accept" "text/event-stream"}
+                             :as      :stream})
+        reader   (java.io.BufferedReader.
+                  (java.io.InputStreamReader.
+                   (:body response)))]
     (when (= http/Ok (:status response))
       (when-let [endpoint (wait-for-endpoint reader)]
-        {:reader reader
+        {:reader   reader
          :response response
          :endpoint endpoint}))))
 

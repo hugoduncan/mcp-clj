@@ -7,6 +7,8 @@
    [mcp-clj.json-rpc.protocols :as protocols]
    [mcp-clj.log :as log])
   (:import
+   [java.io BufferedReader
+    InputStreamReader]
    [java.util.concurrent RejectedExecutionException]))
 
 ;;; Configuration
@@ -18,9 +20,12 @@
 (defn- read-json
   [reader]
   (try
-    (let [json-str (json/read reader :key-fn keyword)]
-      (when json-str
-        [json-str nil]))
+    (binding [*in* reader]
+      (let [line     (read-line)
+            json-str (when line
+                       (json/read-str line :key-fn keyword))]
+        (when json-str
+          [json-str nil])))
     (catch java.io.EOFException _
       nil)
     (catch Exception e
@@ -105,29 +110,37 @@
 ;;; Server
 
 (defrecord StdioServer
-           [executor
-            handlers
-            server-future
-            stop-fn])
+    [executor
+     handlers
+     out
+     server-future
+     stop-fn])
+
+(defn- input-reader
+  []
+  (BufferedReader.
+   (InputStreamReader. System/in) 1024))
 
 (defn create-server
   "Create JSON-RPC server over stdio."
   [{:keys [num-threads handlers]
-    :or {num-threads (* 2 (.availableProcessors (Runtime/getRuntime)))
-         handlers {}}}]
+    :or   {num-threads (* 2 (.availableProcessors (Runtime/getRuntime)))
+           handlers    {}}}]
   (let [executor (executor/create-executor num-threads)
         handlers (atom handlers)
-        running (atom true)
-        out *out*
+        running  (atom true)
+        out      *out*
+        in       (input-reader)
+        #_       (PushbackReader.
+                  (InputStreamReader. System/in) 1024)
 
         server-future
         (future
           (binding [*out* out]
             (try
-
               (loop []
                 (when @running
-                  (let [[rpc-call ex :as resp] (read-json *in*)
+                  (let [[rpc-call ex :as resp] (read-json in)
                         v
                         (cond
                           (nil? resp)
@@ -149,7 +162,7 @@
                   (reset! running false)
                   (executor/shutdown-executor executor))]
 
-    (->StdioServer executor handlers server-future stop-fn)))
+    (->StdioServer executor handlers *out* server-future stop-fn)))
 
 (defn set-handlers!
   "Set the handler map for the server"
@@ -178,9 +191,9 @@
     (reset! (:handlers server) handlers))
 
   (notify-all! [server method params]
-    ;; Placeholder implementation for stdio server
-    ;; Since stdio doesn't have sessions/connections, this is a no-op
-    (log/info :rpc/notify-all! {:method method :params params :note "stdio server - no-op"}))
+    (write-json!
+     (:out server)
+     (json-protocol/json-rpc-notification method params)))
 
   (stop! [server]
     ((:stop-fn server))))

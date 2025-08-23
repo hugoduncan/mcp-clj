@@ -125,7 +125,7 @@
                      @handlers
                      request)
 
-                    [:get "/sse"]
+                    [:post "/sse"]
                     (let [id (uuid->hex (random-uuid))
                           uri (str "/messages?session_id=" id)
                           {:keys [reply! close! response]}

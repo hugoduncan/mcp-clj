@@ -43,4 +43,9 @@
 
   :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.0.0"}
                        org.clojure/clojure {:mvn/version "1.12.0"}}
-          :main-opts ["-m" "nrepl.cmdline"]}}}
+          :main-opts ["-m" "nrepl.cmdline"]}
+  :sse-server {:main-opts ["-m" "mcp-clj.sse-server.main" "--port" "3456"]
+               :deps {poly/server {:local/root "projects/server"}}}
+  :stdio-server {:main-opts ["-m" "mcp-clj.stdio-server.main"]
+                 :exec-fn mcp-clj.stdio-server.main/start
+                 :deps {poly/server {:local/root "projects/server"}}}}}

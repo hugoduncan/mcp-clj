@@ -1,3 +1,3 @@
 {:deps
  {poly/mcp-server {:local/root "../../components/mcp-server"}
-  poly/log {:local/root "../../components/log"}}}
+  poly/log        {:local/root "../../components/log"}}}

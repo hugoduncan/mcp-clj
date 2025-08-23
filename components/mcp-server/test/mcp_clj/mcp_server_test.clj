@@ -223,25 +223,25 @@
 
 (deftest lifecycle-test
   (testing "server lifecycle with SSE"
-    (let [port (port)
-          url (format "http://localhost:%d" port)
-          queue (LinkedBlockingQueue.)
-          state {:url url
-                 :queue queue
-                 :failed false}
-          response (hato/get (str url "/sse")
-                             {:headers {"Accept" "text/event-stream"}
-                              :as :stream})]
+    (let [port     (port)
+          url      (format "http://localhost:%d" port)
+          queue    (LinkedBlockingQueue.)
+          state    {:url    url
+                    :queue  queue
+                    :failed false}
+          response (hato/post (str url "/sse")
+                              {:headers {"Accept" "text/event-stream"}
+                               :as      :stream})]
       (with-open [reader (io/reader (:body response))]
         (let [done (volatile! nil)
-              f (future
-                  (try
-                    (wait-for-sse-events reader queue done)
-                    (catch Throwable e
-                      (prn :error e)
-                      (flush))))]
+              f    (future
+                     (try
+                       (wait-for-sse-events reader queue done)
+                       (catch Throwable e
+                         (prn :error e)
+                         (flush))))]
           (testing "initialisation"
-            (let [state (assoc state :plan (initialisation-plan))
+            (let [state           (assoc state :plan (initialisation-plan))
                   [state' result] (run-plan state)]
               (is (= :passed result))
               (is (not (:failed state')))))
@@ -249,25 +249,25 @@
 
 (deftest tools-test
   (testing "A server with tools"
-    (let [port (port)
-          url (format "http://localhost:%d" port)
-          queue (LinkedBlockingQueue.)
-          state {:url url
-                 :queue queue
-                 :failed false}
-          response (hato/get (str url "/sse")
-                             {:headers {"Accept" "text/event-stream"}
-                              :as :stream})]
+    (let [port     (port)
+          url      (format "http://localhost:%d" port)
+          queue    (LinkedBlockingQueue.)
+          state    {:url    url
+                    :queue  queue
+                    :failed false}
+          response (hato/post (str url "/sse")
+                              {:headers {"Accept" "text/event-stream"}
+                               :as      :stream})]
       (with-open [reader (io/reader (:body response))]
         (let [done (volatile! nil)
-              f (future
-                  (try
-                    (wait-for-sse-events reader queue done)
-                    (catch Throwable e
-                      (prn :error e)
-                      (flush))))]
+              f    (future
+                     (try
+                       (wait-for-sse-events reader queue done)
+                       (catch Throwable e
+                         (prn :error e)
+                         (flush))))]
           (testing "initialisation"
-            (let [state (assoc state :plan (initialisation-plan))
+            (let [state           (assoc state :plan (initialisation-plan))
                   [state' result] (run-plan state)]
               (is (= :passed result))
               (testing "tool interactions"
@@ -276,159 +276,159 @@
                        state'
                        :plan
                        [{:action :send
-                         :msg (json-request
-                               "tools/list"
-                               {}
-                               0)}
+                         :msg    (json-request
+                                  "tools/list"
+                                  {}
+                                  0)}
                         {:action :receive
                          :data
                          {:event "message"
                           :data
                           (json-result
                            {:tools
-                            [{:name "test-tool",
+                            [{:name        "test-tool",
                               :description "A test tool for server testing",
                               :inputSchema
-                              {:type "object",
+                              {:type       "object",
                                :properties {:value {:type "string"}},
-                               :required ["value"]}}
-                             {:name "error-test-tool",
+                               :required   ["value"]}}
+                             {:name        "error-test-tool",
                               :description "A test tool that always returns an error",
                               :inputSchema
-                              {:type "object",
+                              {:type       "object",
                                :properties {:value {:type "string"}},
-                               :required ["value"]}}]}
+                               :required   ["value"]}}]}
                            {}
                            0)}}])
                       [state' result] (run-plan state)
-                      _ (testing "tools/list"
-                          (is (= :passed result) (pr-str state))
-                          (is (not (:failed state'))))
-                      state (assoc
-                             state'
-                             :plan
-                             [{:action :send
-                               :msg (json-request
-                                     "tools/call"
-                                     {:name "test-tool"
-                                      :arguments
-                                      {:value "me"}}
-                                     0)}
-                              {:action :receive
-                               :data
-                               {:event "message"
-                                :data
-                                (json-result
-                                 {:content
-                                  [{:type "text"
-                                    :text "test-response:me"}]}
-                                 nil
-                                 0)}}])
+                      _               (testing "tools/list"
+                                        (is (= :passed result) (pr-str state))
+                                        (is (not (:failed state'))))
+                      state           (assoc
+                                       state'
+                                       :plan
+                                       [{:action :send
+                                         :msg    (json-request
+                                                  "tools/call"
+                                                  {:name "test-tool"
+                                                   :arguments
+                                                   {:value "me"}}
+                                                  0)}
+                                        {:action :receive
+                                         :data
+                                         {:event "message"
+                                          :data
+                                          (json-result
+                                           {:content
+                                            [{:type "text"
+                                              :text "test-response:me"}]}
+                                           nil
+                                           0)}}])
                       [state' result] (testing "makes a successful tools/call"
                                         (run-plan state))
-                      _ (testing "makes a successful tools/call"
-                          (is (= :passed result))
-                          (is (not (:failed state'))))
-                      state (assoc
-                             state'
-                             :plan
-                             [{:action :send
-                               :msg (json-request
-                                     "tools/call"
-                                     {:name "error-test-tool"
-                                      :arguments
-                                      {:value "me"}}
-                                     0)}
-                              {:action :receive
-                               :data
-                               {:event "message"
-                                :data
-                                (json-result
-                                 {:content
-                                  [{:type "text"
-                                    :text "test-error"}]
-                                  :isError true}
-                                 nil
-                                 0)}}])
+                      _               (testing "makes a successful tools/call"
+                                        (is (= :passed result))
+                                        (is (not (:failed state'))))
+                      state           (assoc
+                                       state'
+                                       :plan
+                                       [{:action :send
+                                         :msg    (json-request
+                                                  "tools/call"
+                                                  {:name "error-test-tool"
+                                                   :arguments
+                                                   {:value "me"}}
+                                                  0)}
+                                        {:action :receive
+                                         :data
+                                         {:event "message"
+                                          :data
+                                          (json-result
+                                           {:content
+                                            [{:type "text"
+                                              :text "test-error"}]
+                                            :isError true}
+                                           nil
+                                           0)}}])
                       [state' result] (testing "tools/call with an error"
                                         (run-plan state))
-                      _ (testing "tools/call with an error"
-                          (is (= :passed result))
-                          (is (not (:failed state'))))
-                      state (assoc
-                             state'
-                             :plan
-                             [{:action :send
-                               :msg (json-request
-                                     "tools/call"
-                                     {:name "unkown"
-                                      :arguments
-                                      {:code "(/ 1 0)"}}
-                                     0)}
-                              {:action :receive
-                               :data
-                               {:event "message"
-                                :data
-                                (json-result
-                                 {:content
-                                  [{:type "text"
-                                    :text "Tool not found: unkown"}]
-                                  :isError true}
-                                 nil
-                                 0)}}])
+                      _               (testing "tools/call with an error"
+                                        (is (= :passed result))
+                                        (is (not (:failed state'))))
+                      state           (assoc
+                                       state'
+                                       :plan
+                                       [{:action :send
+                                         :msg    (json-request
+                                                  "tools/call"
+                                                  {:name "unkown"
+                                                   :arguments
+                                                   {:code "(/ 1 0)"}}
+                                                  0)}
+                                        {:action :receive
+                                         :data
+                                         {:event "message"
+                                          :data
+                                          (json-result
+                                           {:content
+                                            [{:type "text"
+                                              :text "Tool not found: unkown"}]
+                                            :isError true}
+                                           nil
+                                           0)}}])
                       [state' result] (run-plan state)
-                      _ (testing "tools/call with unknown tool"
-                          (is (= :passed result))
-                          (is (not (:failed state'))))]))))
+                      _               (testing "tools/call with unknown tool"
+                                        (is (= :passed result))
+                                        (is (not (:failed state'))))]))))
           (future-cancel f))))))
 
 (deftest tool-change-notifications-test
   (testing "tool change notifications"
-    (let [port (port)
-          url (format "http://localhost:%d" port)
-          queue (LinkedBlockingQueue.)
-          state {:url url
-                 :queue queue
-                 :failed false}
-          test-tool {:name "test-tool"
-                     :description "A test tool"
-                     :inputSchema {:type "object"
-                                   :properties {"value" {:type "string"}}
-                                   :required ["value"]}
+    (let [port      (port)
+          url       (format "http://localhost:%d" port)
+          queue     (LinkedBlockingQueue.)
+          state     {:url    url
+                     :queue  queue
+                     :failed false}
+          test-tool {:name           "test-tool"
+                     :description    "A test tool"
+                     :inputSchema    {:type       "object"
+                                      :properties {"value" {:type "string"}}
+                                      :required   ["value"]}
                      :implementation (fn [{:keys [value]}]
                                        {:content [{:type "text"
                                                    :text (str "Got: " value)}]})}
-          response (hato/get (str url "/sse")
-                             {:headers {"Accept" "text/event-stream"}
-                              :as :stream})]
+          response  (hato/post (str url "/sse")
+                               {:headers {"Accept" "text/event-stream"}
+                                :as      :stream})]
       (with-open [reader (io/reader (:body response))]
         (let [done (volatile! nil)
-              f (future
-                  (try
-                    (wait-for-sse-events reader queue done)
-                    (catch Throwable e
-                      (prn :error e)
-                      (flush))))]
+              f    (future
+                     (try
+                       (wait-for-sse-events reader queue done)
+                       (catch Throwable e
+                         (prn :error e)
+                         (flush))))]
           (testing "initialisation and tool changes"
-            (let [state (assoc
-                         state
-                         :plan
-                         (into
-                          (initialisation-plan)
-                          [;; Add tool and check for notification
-                           {:action :clj
-                            :fn #(mcp/add-tool! *server* test-tool)}
-                           {:action :receive
-                            :data {:event "message"
-                                   :data {:jsonrpc "2.0"
-                                          :method "notifications/tools/list_changed"}}}
+            (let [state           (assoc
+                                   state
+                                   :plan
+                                   (into
+                                    (initialisation-plan)
+                                    [;; Add tool and check for notification
+                                     {:action :clj
+                                      :fn     #(mcp/add-tool! *server* test-tool)}
+                                     {:action :receive
+                                      :data   {:event "message"
+                                               :data  {:jsonrpc "2.0"
+                                                       :method  "notifications/tools/list_changed"}}}
                                      ;; Remove tool and check for notification
-                           {:action :clj
-                            :fn #(mcp/remove-tool! *server* "test-tool")}
-                           {:action :receive
-                            :data {:event "message"
-                                   :data {:jsonrpc "2.0"
-                                          :method "notifications/tools/list_changed"}}}]))
+                                     {:action :clj
+                                      :fn     #(mcp/remove-tool! *server* "test-tool")}
+                                     {:action :receive
+                                      :data   {:event "message"
+                                               :data  {:jsonrpc "2.0"
+                                                       :method  "notifications/tools/list_changed"}}}]))
                   [state' result] (run-plan state)]
               (is (= :passed result))
               (is (not (:failed state')))))
@@ -469,124 +469,124 @@
 
 (deftest custom-tools-test
   (testing "server with custom tools"
-    (let [custom-tool {:name "echo"
-                       :description "Echo the input"
-                       :inputSchema {:type "object"
-                                     :properties {"text" {:type "string"}}
-                                     :required ["text"]}
+    (let [custom-tool {:name           "echo"
+                       :description    "Echo the input"
+                       :inputSchema    {:type       "object"
+                                        :properties {"text" {:type "string"}}
+                                        :required   ["text"]}
                        :implementation (fn [{:keys [text]}]
                                          {:content [{:type "text"
                                                      :text text}]})}
-          port (port)
-          url (format "http://localhost:%d" port)
-          queue (LinkedBlockingQueue.)
-          state {:url url
-                 :queue queue
-                 :failed false}]
+          port        (port)
+          url         (format "http://localhost:%d" port)
+          queue       (LinkedBlockingQueue.)
+          state       {:url    url
+                       :queue  queue
+                       :failed false}]
       ;; Add custom tool to server
       (mcp/add-tool! *server* custom-tool)
 
-      (let [response (hato/get (str url "/sse")
-                               {:headers {"Accept" "text/event-stream"}
-                                :as :stream})]
+      (let [response (hato/post (str url "/sse")
+                                {:headers {"Accept" "text/event-stream"}
+                                 :as      :stream})]
         (with-open [reader (io/reader (:body response))]
           (let [done (volatile! nil)
-                f (future
-                    (try
-                      (wait-for-sse-events reader queue done)
-                      (catch Throwable e
-                        (prn :error e)
-                        (flush))))]
+                f    (future
+                       (try
+                         (wait-for-sse-events reader queue done)
+                         (catch Throwable e
+                           (prn :error e)
+                           (flush))))]
             (testing "using custom tool"
-              (let [state (assoc state :plan (initialisation-plan))
+              (let [state           (assoc state :plan (initialisation-plan))
                     [state' result] (run-plan state)]
                 (is (= :passed result))
                 (testing "tool interactions"
-                  (let [state (assoc
-                               state'
-                               :plan
-                               [{:action :send
-                                 :msg (json-request
-                                       "tools/call"
-                                       {:name "echo"
-                                        :arguments {:text "hello"}}
-                                       0)}
-                                {:action :receive
-                                 :data
-                                 {:event "message"
-                                  :data (json-result
-                                         {:content
-                                          [{:type "text"
-                                            :text "hello"}]}
-                                         nil
-                                         0)}}])
+                  (let [state           (assoc
+                                         state'
+                                         :plan
+                                         [{:action :send
+                                           :msg    (json-request
+                                                    "tools/call"
+                                                    {:name      "echo"
+                                                     :arguments {:text "hello"}}
+                                                    0)}
+                                          {:action :receive
+                                           :data
+                                           {:event "message"
+                                            :data  (json-result
+                                                    {:content
+                                                     [{:type "text"
+                                                       :text "hello"}]}
+                                                    nil
+                                                    0)}}])
                         [state' result] (run-plan state)]
                     (is (= :passed result))))))
             (future-cancel f)))))))
 
 (deftest resource-test
   (testing "server lifecycle with SSE"
-    (let [port (port)
-          url (format "http://localhost:%d" port)
-          queue (LinkedBlockingQueue.)
-          state {:url url
-                 :queue queue
-                 :failed false}
-          response (hato/get (str url "/sse")
-                             {:headers {"Accept" "text/event-stream"}
-                              :as :stream})]
+    (let [port     (port)
+          url      (format "http://localhost:%d" port)
+          queue    (LinkedBlockingQueue.)
+          state    {:url    url
+                    :queue  queue
+                    :failed false}
+          response (hato/post (str url "/sse")
+                              {:headers {"Accept" "text/event-stream"}
+                               :as      :stream})]
       (with-open [reader (io/reader (:body response))]
         (let [done (volatile! nil)
-              f (future
-                  (try
-                    (wait-for-sse-events reader queue done)
-                    (catch Throwable e
-                      (prn :error e)
-                      (flush))))]
+              f    (future
+                     (try
+                       (wait-for-sse-events reader queue done)
+                       (catch Throwable e
+                         (prn :error e)
+                         (flush))))]
           (testing "initialisation"
-            (let [state (assoc state :plan (initialisation-plan))
+            (let [state           (assoc state :plan (initialisation-plan))
                   [state' result] (run-plan state)]
               (is (= :passed result))
               (testing "resource interactions"
-                (let [state (assoc
-                             state'
-                             :plan
-                             [{:action :send
-                               :msg (json-request
-                                     "resources/list" {} 0)}
-                              {:action :receive
-                               :data
-                               {:event "message"
-                                :data (json-result
-                                       {:resources []}
-                                       nil
-                                       0)}}])
+                (let [state           (assoc
+                                       state'
+                                       :plan
+                                       [{:action :send
+                                         :msg    (json-request
+                                                  "resources/list" {} 0)}
+                                        {:action :receive
+                                         :data
+                                         {:event "message"
+                                          :data  (json-result
+                                                  {:resources []}
+                                                  nil
+                                                  0)}}])
                       [state' result] (run-plan state)
-                      _ (testing "resources/list"
-                          (is (= :passed result)))]))))
+                      _               (testing "resources/list"
+                                        (is (= :passed result)))]))))
           (future-cancel f))))))
 
 (deftest prompt-test
   (testing "server lifecycle with SSE"
-    (let [port (port)
-          url (format "http://localhost:%d" port)
-          queue (LinkedBlockingQueue.)
-          state {:url url
-                 :queue queue
-                 :failed false}
-          response (hato/get (str url "/sse")
-                             {:headers {"Accept" "text/event-stream"}
-                              :as :stream})]
+    (let [port     (port)
+          url      (format "http://localhost:%d" port)
+          queue    (LinkedBlockingQueue.)
+          state    {:url    url
+                    :queue  queue
+                    :failed false}
+          response (hato/post (str url "/sse")
+                              {:headers {"Accept" "text/event-stream"}
+                               :as      :stream})]
       (with-open [reader (io/reader (:body response))]
         (let [done (volatile! nil)
-              f (future
-                  (try
-                    (wait-for-sse-events reader queue done)
-                    (catch Throwable e
-                      (prn :error e)
-                      (flush))))]
+              f    (future
+                     (try
+                       (wait-for-sse-events reader queue done)
+                       (catch Throwable e
+                         (prn :error e)
+                         (flush))))]
           (testing "initialisation"
-            (let [state (assoc state :plan (initialisation-plan))
+            (let [state           (assoc state :plan (initialisation-plan))
                   [state' result] (run-plan state)]
               (is (= :passed result))
               (testing "prompt interactions"
@@ -595,27 +595,27 @@
                        state'
                        :plan
                        [{:action :send
-                         :msg (json-request
-                               "prompts/list"
-                               {}
-                               0)}
+                         :msg    (json-request
+                                  "prompts/list"
+                                  {}
+                                  0)}
                         {:action :receive
                          :data
                          {:event "message"
                           :data
                           (json-result
                            {:prompts
-                            [{:name "test-prompt",
+                            [{:name        "test-prompt",
                               :description "A test prompt for server testing",
                               :arguments
-                              [{:name "reply"
+                              [{:name        "reply"
                                 :description "something"
-                                :required true}]}]}
+                                :required    true}]}]}
                            nil
                            0)}}])
                       [state' result] (run-plan state)
-                      _ (testing "prompts/list"
-                          (is (= :passed result)))]))))
+                      _               (testing "prompts/list"
+                                        (is (= :passed result)))]))))
           (future-cancel f))))))
 
 #_(deftest error-handling-test

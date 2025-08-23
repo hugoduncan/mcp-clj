@@ -5,13 +5,13 @@
    [mcp-clj.log :as log])
   (:gen-class))
 
-(defn -main
+(defn start
   "Start stdio MCP server (uses stdin/stdout)"
-  [& _args]
+  [_]
   (try
-    (log/info :starting-stdio-server)
+    (log/warn :stdio-server {:msg "Starting"})
     (let [server (mcp-server/create-server {:transport :stdio})]
-      (log/info :stdio-server-started)
+      (log/warn :stdio-server {:msg "Started"})
       (.addShutdownHook (Runtime/getRuntime)
                         (Thread. #(do
                                     (log/info :shutting-down-stdio-server)
@@ -19,5 +19,10 @@
       ;; Keep the main thread alive
       @(promise))
     (catch Exception e
-      (log/error :stdio-server-start-failed {:error (.getMessage e)})
+      (log/error :stdio-server {:error (.getMessage e)})
       (System/exit 1))))
+
+(defn -main
+  "Start stdio MCP server (uses stdin/stdout)"
+  [& _args]
+  (start {}))

@@ -1,16 +1,15 @@
 (ns mcp-clj.json-rpc.stdio-server-test
   (:require
    [clojure.data.json :as json]
+   [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [mcp-clj.json-rpc.stdio-server :as stdio-server]
-   [mcp-clj.json-rpc.json-protocol :as json-protocol]
    [mcp-clj.json-rpc.protocols :as protocols]
-   [clojure.java.io :as io])
+   [mcp-clj.json-rpc.stdio-server :as stdio-server])
   (:import
-   [java.io ByteArrayInputStream
+   [java.io BufferedReader
+    ByteArrayInputStream
     ByteArrayOutputStream
-    PushbackReader
     StringReader]))
 
 (defn- create-test-input
@@ -35,7 +34,7 @@
 
 (deftest test-read-json
   (testing "reads valid JSON"
-    (let [reader (PushbackReader.
+    (let [reader (BufferedReader.
                   (StringReader.
                    "{\"jsonrpc\":\"2.0\",\"method\":\"test\",\"id\":1}")
                   1024)]
@@ -43,11 +42,11 @@
              (#'stdio-server/read-json reader)))))
 
   (testing "handles EOF"
-    (let [reader (PushbackReader. (StringReader. ""))]
+    (let [reader (BufferedReader. (StringReader. ""))]
       (is (nil? (#'stdio-server/read-json reader)))))
 
   (testing "handles malformed JSON"
-    (let [reader (PushbackReader. (StringReader. "{invalid json}"))
+    (let [reader         (BufferedReader. (StringReader. "{invalid json}"))
           [result error] (#'stdio-server/read-json reader)]
       (is (= :error result))
       (is (instance? Exception error)))))
@@ -212,28 +211,30 @@
 
 (deftest test-integration
   (testing "full request-response cycle"
-    (let [requests [{:jsonrpc "2.0"
-                     :method "add"
-                     :params [1 2]
-                     :id 1}
-                    {:jsonrpc "2.0"
-                     :method "echo"
-                     :params {:message "hello"}
-                     :id 2}]
+    (let [requests   [{:jsonrpc "2.0"
+                       :method  "add"
+                       :params  [1 2]
+                       :id      1}
+                      {:jsonrpc "2.0"
+                       :method  "echo"
+                       :params  {:message "hello"}
+                       :id      2}]
           ;; Convert to JSON strings, one per line
-          json-input (str/join (mapv json/write-str requests))
+          json-input (str/join
+                      (mapv (comp #(str % "\n") json/write-str) requests))
           response
           (with-out-str
-            (binding [*in* (PushbackReader.
-                            (io/reader (StringReader. json-input))
-                            1024)]
-              (let [handlers {"add" (fn [_method params]
-                                      {:sum
-                                       (+ (first params) (second params))})
+            (with-redefs [mcp-clj.json-rpc.stdio-server/input-reader
+                          (constantly
+                           (BufferedReader.
+                            (StringReader. json-input)))]
+              (let [handlers {"add"  (fn [_method params]
+                                       {:sum
+                                        (+ (first params) (second params))})
                               "echo" (fn [_method params]
                                        params)}
-                    server (stdio-server/create-server
-                            {:handlers handlers})]
+                    server   (stdio-server/create-server
+                              {:handlers handlers})]
                 ;; server will EOF on input
                 @(:server-future server))))]
       (is (str/includes? response "\"sum\":3"))
@@ -241,9 +242,9 @@
 
 (deftest test-error-handling
   (testing "handles malformed JSON gracefully"
-    (let [server (stdio-server/create-server {})
+    (let [server         (stdio-server/create-server {})
           malformed-json "{invalid: json}"
-          reader (PushbackReader. (StringReader. malformed-json))]
+          reader         (BufferedReader. (StringReader. malformed-json))]
 
       (let [[result error] (#'stdio-server/read-json reader)]
         (is (= :error result))
@@ -252,9 +253,9 @@
       (stdio-server/stop! server)))
 
   (testing "handles notification requests (no id)"
-    (let [server (stdio-server/create-server {})
+    (let [server   (stdio-server/create-server {})
           handlers {"notify" (fn [method params] "notified")}
-          request {:jsonrpc "2.0" :method "notify" :params []}] ; no id field
+          request  {:jsonrpc "2.0" :method "notify" :params []}] ; no id field
 
       (stdio-server/set-handlers! server handlers)
 
