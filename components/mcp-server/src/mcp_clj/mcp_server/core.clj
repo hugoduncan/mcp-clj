@@ -1,10 +1,10 @@
-(ns mcp-clj.sse-server.core
-  "SSE server implementation supporting the Anthropic Model Context Protocol"
+(ns mcp-clj.mcp-server.core
+  "MCP server implementation supporting the Anthropic Model Context Protocol"
   (:require
    [mcp-clj.json-rpc.sse-server :as json-rpc]
    [mcp-clj.log :as log]
-   [mcp-clj.sse-server.prompts :as prompts]
-   [mcp-clj.sse-server.resources :as resources]
+   [mcp-clj.mcp-server.prompts :as prompts]
+   [mcp-clj.mcp-server.resources :as resources]
    [mcp-clj.tools.core :as tools]))
 
 (def ^:private server-protocol-version "2024-11-05")

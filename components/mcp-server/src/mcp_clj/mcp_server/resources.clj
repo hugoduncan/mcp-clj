@@ -1,4 +1,4 @@
-(ns mcp-clj.sse-server.resources
+(ns mcp-clj.mcp-server.resources
   "MCP resource endpoints"
   (:require [mcp-clj.log :as log]))
 

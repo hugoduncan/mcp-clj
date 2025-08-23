@@ -1,11 +1,11 @@
-(ns mcp-clj.sse-server-test
+(ns mcp-clj.mcp-server-test
   (:require
    [clojure.data.json :as json]
    [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing use-fixtures]]
    [hato.client :as hato]
-   [mcp-clj.sse-server.core :as mcp])
+   [mcp-clj.mcp-server.core :as mcp])
   (:import
    [java.util.concurrent BlockingQueue
     LinkedBlockingQueue

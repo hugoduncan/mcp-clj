@@ -1,4 +1,4 @@
-(ns mcp-clj.sse-server.prompts
+(ns mcp-clj.mcp-server.prompts
   "MCP prompt endpoints"
   (:require
    [clojure.string :as str]

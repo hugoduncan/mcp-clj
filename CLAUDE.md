@@ -48,8 +48,8 @@ clj -M:dev
 ### Server Usage
 ```clojure
 ;; Start SSE server
-(require 'mcp-clj.sse-server.core)
-(def server (mcp-clj.sse-server.core/create-server {:port 3001}))
+(require 'mcp-clj.mcp-server.core)
+(def server (mcp-clj.mcp-server.core/create-server {:port 3001}))
 
 ;; Stop server
 ((:stop server))

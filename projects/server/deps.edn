@@ -3,5 +3,5 @@
   poly/http-server {:local/root "../../components/http-server"}
   poly/json-rpc {:local/root "../../components/json-rpc"}
   poly/log {:local/root "../../components/log"}
-  poly/sse-server {:local/root "../../components/sse-server"}
+  poly/mcp-server {:local/root "../../components/mcp-server"}
   poly/tools {:local/root "../../components/tools"}}}

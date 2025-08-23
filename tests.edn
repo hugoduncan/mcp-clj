@@ -5,13 +5,13 @@
                           "components/http-server/src"
                           "components/json-rpc/src"
                           "components/log/src"
-                          "components/sse-server/src"
+                          "components/mcp-server/src"
                           "components/stdio-server/src"
                           "components/tools/src"]
            :test-paths ["components/http-server/test"
                         "components/json-rpc/test"
                         "components/log/test"
-                        "components/sse-server/test"
+                        "components/mcp-server/test"
                         "components/stdio-server/test"
                         "components/tools/test"]
            :skip-meta [:very-slow]}]
