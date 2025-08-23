@@ -4,4 +4,10 @@
   poly/json-rpc {:local/root "../../components/json-rpc"}
   poly/log {:local/root "../../components/log"}
   poly/mcp-server {:local/root "../../components/mcp-server"}
-  poly/tools {:local/root "../../components/tools"}}}
+  poly/tools {:local/root "../../components/tools"}
+  poly/sse-server {:local/root "../../bases/sse-server"}
+  poly/stdio-server {:local/root "../../bases/stdio-server"}}
+
+ :aliases
+ {:sse-server {:main-opts ["-m" "mcp-clj.sse-server.main"]}
+  :stdio-server {:main-opts ["-m" "mcp-clj.stdio-server.main"]}}}
