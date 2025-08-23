@@ -1,4 +1,4 @@
-(ns mcp-clj.json-rpc.server-test
+(ns mcp-clj.json-rpc.sse-server-test
   (:require
    [clojure.data.json :as json]
    [clojure.string :as str]
@@ -6,7 +6,7 @@
    [hato.client :as hato]
    [hato.middleware :as mw]
    [mcp-clj.http :as http]
-   [mcp-clj.json-rpc.server :as server])
+   [mcp-clj.json-rpc.sse-server :as server])
   (:import
    [java.util.concurrent
     CountDownLatch

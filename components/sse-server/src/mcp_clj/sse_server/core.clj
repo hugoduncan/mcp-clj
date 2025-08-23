@@ -1,7 +1,7 @@
 (ns mcp-clj.sse-server.core
   "SSE server implementation supporting the Anthropic Model Context Protocol"
   (:require
-   [mcp-clj.json-rpc.server :as json-rpc]
+   [mcp-clj.json-rpc.sse-server :as json-rpc]
    [mcp-clj.log :as log]
    [mcp-clj.sse-server.prompts :as prompts]
    [mcp-clj.sse-server.resources :as resources]

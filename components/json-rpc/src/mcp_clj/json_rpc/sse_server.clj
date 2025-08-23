@@ -1,4 +1,4 @@
-(ns mcp-clj.json-rpc.server
+(ns mcp-clj.json-rpc.sse-server
   "JSON-RPC 2.0 server with Server-Sent Events (SSE) support"
   (:require
    [clojure.data.json :as json]
