@@ -8,14 +8,14 @@
 
 ;;; Standard error codes
 (def error-codes
-  {:parse-error        -32700
-   :invalid-request    -32600
-   :method-not-found   -32601
-   :invalid-params     -32602
-   :internal-error     -32603
-   :overloaded         -32000           ; non-standard
+  {:parse-error -32700
+   :invalid-request -32600
+   :method-not-found -32601
+   :invalid-params -32602
+   :internal-error -32603
+   :overloaded -32000 ; non-standard
    :server-error-start -32000
-   :server-error-end   -32099})
+   :server-error-end -32099})
 
 ;;; Response construction
 
@@ -36,6 +36,28 @@
   {:jsonrpc version
    :result result
    :id id})
+
+(defn json-rpc-result
+  "Wrap a handler result in a JSON-RPC response"
+  [result id]
+  {:jsonrpc version
+   :id id
+   :result result})
+
+(defn json-rpc-notification
+  "Create a JSON-RPC notification"
+  [method params]
+  (cond-> {:jsonrpc version
+           :method method}
+    params (assoc :params params)))
+
+(defn json-rpc-error
+  "Wrap a handler error in a JSON-RPC error response"
+  [code message & [id]]
+  (cond-> {:jsonrpc version
+           :error {:code (error-codes code code)
+                   :message message}}
+    id (assoc :id id)))
 
 ;;; Request validation
 
@@ -60,11 +82,11 @@
 
 (def write-json-options
   "Options for writing JSON"
-  {:key-fn name})  ; Convert keywords to strings
+  {:key-fn name}) ; Convert keywords to strings
 
 (def read-json-options
   "Options for reading JSON"
-  {:key-fn keyword})  ; Convert strings to keywords
+  {:key-fn keyword}) ; Convert strings to keywords
 
 (defn parse-json
   "Parse JSON string to EDN, with error handling"
@@ -73,7 +95,7 @@
     [(json/read-str s read-json-options) nil]
     (catch Exception e
       [nil (error-response (:parse-error error-codes)
-                          "Invalid JSON")])))
+                           "Invalid JSON")])))
 
 (defn write-json
   "Convert EDN to JSON string, with error handling"
@@ -82,4 +104,4 @@
     [(json/write-str data write-json-options) nil]
     (catch Exception e
       [nil (error-response (:internal-error error-codes)
-                          "JSON conversion error")])))
+                           "JSON conversion error")])))

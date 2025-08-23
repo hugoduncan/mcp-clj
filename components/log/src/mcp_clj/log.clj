@@ -38,10 +38,11 @@
   (get-in @config [level aspect]))
 
 (defn output [level aspect id data]
-  (locking *out*
-    (println
-     (str (level-names level) " [" aspect "/" (name id) "]"
-          (when data (str " " (pr-str data)))))))
+  (binding [*out* *err*]
+    (locking *err*
+      (println
+       (str (level-names level) " [" aspect "/" (name id) "]"
+            (when data (str " " (pr-str data))))))))
 
 (defmacro log
   "Log a message if enabled for the specified level and aspect.
@@ -66,6 +67,8 @@
   (enable! :info "sse")
   (enable! :info "rpc")
   (enable! :info "server")
+  (enable! :info "handle-error")
+  (disable! :info "handle-error")
 
   (enable! :debug "fred")
   (debug :fred/bloggs {:hello "some data"})
