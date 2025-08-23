@@ -1,4 +1,4 @@
-(ns mcp-clj.mcp-server.tools
+(ns mcp-clj.sse-server.tools
   "Tool definitions and validation for MCP server")
 
 (defn safe-eval
@@ -7,21 +7,20 @@
   (try
     (let [form (read-string code-str)]
       {:success true
-       :result  (with-out-str
-                  (binding [*err* *out*]
-                    (try
-                      (println (eval form))
-                      (catch Throwable e
-                        (println (ex-message e) (pr-str (ex-data e)))
-                        (.printStackTrace e)))))})
+       :result (with-out-str
+                 (binding [*err* *out*]
+                   (try
+                     (println (eval form))
+                     (catch Throwable e
+                       (println (ex-message e) (pr-str (ex-data e)))
+                       (.printStackTrace e)))))})
     (catch Throwable e
       {:success false
-       :error   (str (.getMessage e) "\n"
-                     "ex-data : " (pr-str (ex-data e)) "\n"
-                     (with-out-str
-                       (binding [*err* *out*]
-                         (.printStackTrace (ex-info "err" {})))))})))
-
+       :error (str (.getMessage e) "\n"
+                   "ex-data : " (pr-str (ex-data e)) "\n"
+                   (with-out-str
+                     (binding [*err* *out*]
+                       (.printStackTrace (ex-info "err" {})))))})))
 
 (def clj-eval-impl
   "Implementation function for clj-eval tool"
@@ -36,11 +35,11 @@
 
 (def clj-eval-tool
   "Built-in clojure evaluation tool"
-  {:name           "clj-eval"
-   :description    "Evaluates a Clojure expression and returns the result"
-   :inputSchema    {:type       "object"
-                    :properties {"code" {:type "string"}}
-                    :required   ["code"]}
+  {:name "clj-eval"
+   :description "Evaluates a Clojure expression and returns the result"
+   :inputSchema {:type "object"
+                 :properties {"code" {:type "string"}}
+                 :required ["code"]}
    :implementation clj-eval-impl})
 
 (defn valid-tool?

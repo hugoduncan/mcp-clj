@@ -1,4 +1,4 @@
-(ns mcp-clj.mcp-server.prompts
+(ns mcp-clj.sse-server.prompts
   "MCP prompt endpoints"
   (:require
    [clojure.string :as str]
@@ -68,27 +68,27 @@
   (log/info :prompts/get {:params params})
   (if-let [prompt (get @registry name)]
     (let [messages (if arguments
-                    (mapv #(apply-template % arguments) (:messages prompt))
-                    (:messages prompt))]
+                     (mapv #(apply-template % arguments) (:messages prompt))
+                     (:messages prompt))]
       {:messages messages
        :description (:description prompt)})
     {:content [{:type "text"
-               :text (str "Prompt not found: " name)}]
+                :text (str "Prompt not found: " name)}]
      :isError true}))
 
 (def ^:private repl-prompt
   (valid-prompt?
-   {:name        "repl"
+   {:name "repl"
     :description "Standard REPL prompt for code evaluation"
-    :messages    [{:role    "system"
-                   :content {:type "text"
-                             :text "You are interacting with a Clojure REPL."}}
-                  {:role    "user"
-                   :content {:type "text"
-                             :text "Please evaluate {{code}}"}}]
-    :arguments   [{:name        "code"
-                   :description "Clojure code to evaluate"
-                   :required    true}]}))
+    :messages [{:role "system"
+                :content {:type "text"
+                          :text "You are interacting with a Clojure REPL."}}
+               {:role "user"
+                :content {:type "text"
+                          :text "Please evaluate {{code}}"}}]
+    :arguments [{:name "code"
+                 :description "Clojure code to evaluate"
+                 :required true}]}))
 
 (def default-prompts
   "Default set of built-in prompts"

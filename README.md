@@ -28,8 +28,8 @@ Add mcp-clj as a dependency to your project.
 2. In the project, start the server:
 
 ```clojure
-(require 'mcp-clj.mcp-server.core)
-(def server (mcp-clj.mcp-server.core/create-server {:port 3001}))
+(require 'mcp-clj.sse-server.core)
+(def server (mcp-clj.sse-server.core/create-server {:port 3001}))
 ```
 
 This will start the server on port 3001. You can then connect to the

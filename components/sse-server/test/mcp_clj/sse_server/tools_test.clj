@@ -1,10 +1,10 @@
-(ns mcp-clj.mcp-server.tools-test
+(ns mcp-clj.sse-server.tools-test
   (:require
    [clojure.test :refer [deftest is testing use-fixtures]]
-   [mcp-clj.mcp-server.core :as mcp]
-   [mcp-clj.mcp-server.tools]))
+   [mcp-clj.sse-server.core :as mcp]
+   [mcp-clj.sse-server.tools]))
 
-(def ^:private ^:dynamic  *server*)
+(def ^:private ^:dynamic *server*)
 
 (defn with-server
   "Test fixture for server lifecycle"
@@ -31,6 +31,7 @@
       (testing "divide by zero error"
         (let [result (implementation {:code "(/ 1 0)"})]
           (is (:isError result))
+          (is (nil? result))
           (is (= "text" (-> result :content first :type)))
           (is (.contains
                (-> result :content first :text)
@@ -39,6 +40,7 @@
       (testing "invalid syntax"
         (let [result (implementation {:code "(/ 1 0"})]
           (is (:isError result))
+          (is (nil? result))
           (is (= "text" (-> result :content first :type)))
           (is (.contains
                (-> result :content first :text)

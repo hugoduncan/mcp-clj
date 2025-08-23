@@ -1,34 +1,34 @@
-(ns mcp-clj.mcp-server.core
-  "MCP server implementation supporting the Anthropic Model Context Protocol"
+(ns mcp-clj.sse-server.core
+  "SSE server implementation supporting the Anthropic Model Context Protocol"
   (:require
    [mcp-clj.json-rpc.server :as json-rpc]
    [mcp-clj.log :as log]
-   [mcp-clj.mcp-server.prompts :as prompts]
-   [mcp-clj.mcp-server.resources :as resources]
-   [mcp-clj.mcp-server.tools :as tools]))
+   [mcp-clj.sse-server.prompts :as prompts]
+   [mcp-clj.sse-server.resources :as resources]
+   [mcp-clj.sse-server.tools :as tools]))
 
 (def ^:private server-protocol-version "2024-11-05")
 (def ^:private required-client-version "2024-11-05")
 
 (defrecord ^:private Session
-    [^String session-id
-     initialized?
-     client-info
-     client-capabilities])
+           [^String session-id
+            initialized?
+            client-info
+            client-capabilities])
 
 (defrecord ^:private MCPServer
-    [json-rpc-server
-     session-id->session
-     tool-registry
-     prompt-registry
-     resource-registry])
+           [json-rpc-server
+            session-id->session
+            tool-registry
+            prompt-registry
+            resource-registry])
 
 (defn- request-session-id [request]
   (get ((:query-params request)) "session_id"))
 
 (defn- request-session
   [server request]
-  (let [session-id          (request-session-id request)
+  (let [session-id (request-session-id request)
         session-id->session (:session-id->session server)]
     (get @session-id->session session-id)))
 
@@ -78,7 +78,7 @@
     {:isError true
      :content [(text-map "Unsupported MCP protocol version")
                (text-map (str "Expected: " required-client-version))
-               (text-map (str "Client: " protocolVersion))] })
+               (text-map (str "Client: " protocolVersion))]})
   #_(when-not (get-in capabilities [:tools])
       (throw (ex-info "Client must support tools capability"
                       {:code -32001
@@ -89,14 +89,14 @@
   [_server params]
   (log/info :server/initialize)
   (or (validate-initialization! params)
-      {:serverInfo      {:name    "mcp-clj"
-                         :version "0.1.0"}
+      {:serverInfo {:name "mcp-clj"
+                    :version "0.1.0"}
        :protocolVersion server-protocol-version
-       :capabilities    {:tools     {:listChanged true}
-                         :resources {:listChanged false
-                                    :subscribe   false}
-                         :prompts   {:listChanged true}}
-       :instructions    "mcp-clj is used to interact with a clojure REPL."}))
+       :capabilities {:tools {:listChanged true}
+                      :resources {:listChanged false
+                                  :subscribe false}
+                      :prompts {:listChanged true}}
+       :instructions "mcp-clj is used to interact with a clojure REPL."}))
 
 (defn- handle-initialized
   "Handle initialized notification"
@@ -185,17 +185,17 @@
   "Create request handlers with server reference"
   [server]
   (update-vals
-   {"initialize"                handle-initialize
+   {"initialize" handle-initialize
     "notifications/initialized" handle-initialized
-    "ping"                      handle-ping
-    "tools/list"                handle-list-tools
-    "tools/call"                handle-call-tool
-    "resources/list"            handle-list-resources
-    "resources/read"            handle-read-resource
-    "resources/subscribe"       handle-subscribe-resource
-    "resources/unsubscribe"     handle-unsubscribe-resource
-    "prompts/list"              handle-list-prompts
-    "prompts/get"               handle-get-prompt}
+    "ping" handle-ping
+    "tools/list" handle-list-tools
+    "tools/call" handle-call-tool
+    "resources/list" handle-list-resources
+    "resources/read" handle-read-resource
+    "resources/subscribe" handle-subscribe-resource
+    "resources/unsubscribe" handle-unsubscribe-resource
+    "prompts/list" handle-list-prompts
+    "prompts/get" handle-get-prompt}
    (fn [handler]
      #(request-handler server handler %1 %2))))
 
@@ -273,9 +273,9 @@
 (defn create-server
   "Create MCP server instance"
   [{:keys [port tools prompts resources]
-    :or   {tools tools/default-tools
-           prompts prompts/default-prompts
-           resources resources/default-resources}}]
+    :or {tools tools/default-tools
+         prompts prompts/default-prompts
+         resources resources/default-resources}}]
   (doseq [tool (vals tools)]
     (when-not (tools/valid-tool? tool)
       (throw (ex-info "Invalid tool in constructor" {:tool tool}))))
@@ -283,24 +283,24 @@
     (when-not (prompts/valid-prompt? prompt)
       (throw (ex-info "Invalid prompt in constructor" {:prompt prompt}))))
   (let [session-id->session (atom {})
-        tool-registry       (atom tools)
-        prompt-registry     (atom prompts)
-        resource-registry   (atom resources)
-        rpc-server-prom    (promise)
-        server             (->MCPServer
-                            rpc-server-prom
-                            session-id->session
-                            tool-registry
-                            prompt-registry
-                            resource-registry)
-        json-rpc-server    (json-rpc/create-server
-                            {:port           port
-                             :on-sse-connect (partial on-sse-connect server)
-                             :on-sse-close   (partial on-sse-close server)})
-        server             (assoc server
-                                 :stop #(do (stop! server)
-                                          ((:stop json-rpc-server))))
-        handlers           (create-handlers server)]
+        tool-registry (atom tools)
+        prompt-registry (atom prompts)
+        resource-registry (atom resources)
+        rpc-server-prom (promise)
+        server (->MCPServer
+                rpc-server-prom
+                session-id->session
+                tool-registry
+                prompt-registry
+                resource-registry)
+        json-rpc-server (json-rpc/create-server
+                         {:port port
+                          :on-sse-connect (partial on-sse-connect server)
+                          :on-sse-close (partial on-sse-close server)})
+        server (assoc server
+                      :stop #(do (stop! server)
+                                 ((:stop json-rpc-server))))
+        handlers (create-handlers server)]
     (json-rpc/set-handlers! json-rpc-server handlers)
     (deliver rpc-server-prom json-rpc-server)
     server))

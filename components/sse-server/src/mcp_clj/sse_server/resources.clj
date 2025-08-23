@@ -1,4 +1,4 @@
-(ns mcp-clj.mcp-server.resources
+(ns mcp-clj.sse-server.resources
   "MCP resource endpoints"
   (:require [mcp-clj.log :as log]))
 
@@ -39,28 +39,28 @@
   [{:keys [name uri mime-type annotations] :as resource}]
   (when-not (valid-string? name)
     (throw (ex-info "name must be a non-empty string"
-                   {:type :validation-error
-                    :field :name
-                    :value name
-                    :resource resource})))
+                    {:type :validation-error
+                     :field :name
+                     :value name
+                     :resource resource})))
   (when-not (valid-uri? uri)
     (throw (ex-info "uri must be a valid URI string"
-                   {:type :validation-error
-                    :field :uri
-                    :value uri
-                    :resource resource})))
+                    {:type :validation-error
+                     :field :uri
+                     :value uri
+                     :resource resource})))
   (when (and mime-type (not (valid-string? mime-type)))
     (throw (ex-info "mime-type must be a non-empty string"
-                   {:type :validation-error
-                    :field :mime-type
-                    :value mime-type
-                    :resource resource})))
+                    {:type :validation-error
+                     :field :mime-type
+                     :value mime-type
+                     :resource resource})))
   (when (and annotations (not (valid-annotations? annotations)))
     (throw (ex-info "invalid annotations"
-                   {:type :validation-error
-                    :field :annotations
-                    :value annotations
-                    :resource resource})))
+                    {:type :validation-error
+                     :field :annotations
+                     :value annotations
+                     :resource resource})))
   true)
 
 (defn resource-definition

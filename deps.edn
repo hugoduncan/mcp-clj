@@ -6,41 +6,37 @@
                  "components/http-server/test"
                  "components/json-rpc/test"
                  "components/log/test"
-                 "components/mcp-server/test"]
+                 "components/sse-server/test"]
    :extra-deps
-   {poly/http                     {:local/root "components/http"}
-    poly/http-server              {:local/root "components/http-server"}
-    poly/json-rpc                 {:local/root "components/json-rpc"}
-    poly/log                      {:local/root "components/log"}
-    poly/mcp-server               {:local/root "components/mcp-server"}
-    lambdaisland/kaocha           {:mvn/version "1.87.1366"}
+   {poly/http {:local/root "components/http"}
+    poly/http-server {:local/root "components/http-server"}
+    poly/json-rpc {:local/root "components/json-rpc"}
+    poly/log {:local/root "components/log"}
+    poly/sse-server {:local/root "components/sse-server"}
+    lambdaisland/kaocha {:mvn/version "1.87.1366"}
     lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}
-    org.clojure/clojure           {:mvn/version "1.12.0"}}}
-  :test   {:extra-paths ["components/http/test"
-                         "components/http-server/test"
-                         "components/json-rpc/test"
-                         "components/log/test"
-                         "components/mcp-server/test"]
-           :extra-deps
-           {hato/hato              {:mvn/version "1.0.0"}
-            org.clojure/test.check {:mvn/version "1.1.1"}}
-           :exec-fn     kaocha.runner/exec-fn
-           :exec-args   {}
-           :jvm-opts    ["-XX:-OmitStackTraceInFastThrow"
-                         "-Dclojure.main.report=stderr"]           }
-  :kaocha {:extra-paths ["components/json-rpc/test"]
-           :extra-deps
-           {lambdaisland/kaocha           {:mvn/version "1.91.1392"}
+    org.clojure/clojure {:mvn/version "1.12.0"}}}
+  :test {:extra-paths ["components/http/test"
+                       "components/http-server/test"
+                       "components/json-rpc/test"
+                       "components/log/test"
+                       "components/sse-server/test"]
+         :extra-deps
+         {hato/hato {:mvn/version "1.0.0"}
+          org.clojure/test.check {:mvn/version "1.1.1"}}
+         :exec-fn kaocha.runner/exec-fn
+         :exec-args {}
+         :jvm-opts ["-XX:-OmitStackTraceInFastThrow"
+                    "-Dclojure.main.report=stderr"]}
+  :kaocha {:extra-deps
+           {lambdaisland/kaocha {:mvn/version "1.91.1392"}
             lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}
-            org.clojure/test.check        {:mvn/version "1.1.1"}}
-           :exec-fn     kaocha.runner/exec-fn
-           :exec-args   {}
-           :jvm-opts    ["-XX:-OmitStackTraceInFastThrow"
-                         "-Dclojure.main.report=stderr"]
-           :main-opts   ["-m" "kaocha.runner"]}
+            org.clojure/test.check {:mvn/version "1.1.1"}}
+           :exec-fn kaocha.runner/exec-fn
+           :exec-args {}
+           :jvm-opts ["-XX:-OmitStackTraceInFastThrow"
+                      "-Dclojure.main.report=stderr"]
+           :main-opts ["-m" "kaocha.runner"]}
 
   :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.0.0"}}
-          :main-opts  ["-m" "nrepl.cmdline"]}
-
-  }
- }
+          :main-opts ["-m" "nrepl.cmdline"]}}}
