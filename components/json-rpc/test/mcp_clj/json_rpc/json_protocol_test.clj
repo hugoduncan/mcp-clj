@@ -1,7 +1,7 @@
-(ns mcp-clj.json-rpc.protocol-test
+(ns mcp-clj.json-rpc.json-protocol-test
   (:require
    [clojure.test :refer :all]
-   [mcp-clj.json-rpc.protocol :as protocol]))
+   [mcp-clj.json-rpc.json-protocol :as protocol]))
 
 (deftest json-conversion
   (testing "EDN to JSON conversion"

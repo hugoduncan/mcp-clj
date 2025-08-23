@@ -1,4 +1,4 @@
-(ns mcp-clj.json-rpc.protocol
+(ns mcp-clj.json-rpc.json-protocol
   "JSON-RPC 2.0 protocol constants and utilities"
   (:require
    [clojure.data.json :as json]))

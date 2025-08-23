@@ -3,7 +3,8 @@
   (:require
    [clojure.data.json :as json]
    [mcp-clj.json-rpc.executor :as executor]
-   [mcp-clj.json-rpc.protocol :as protocol]
+   [mcp-clj.json-rpc.json-protocol :as json-protocol]
+   [mcp-clj.json-rpc.protocols :as protocols]
    [mcp-clj.log :as log])
   (:import
    [java.util.concurrent RejectedExecutionException]))
@@ -46,7 +47,7 @@
   (log/info :rpc/invoke {:method method :params params})
   (when-let [response (handler method params)]
     (log/info :server/handler-response response)
-    (write-json! *out* (protocol/json-rpc-result response id))))
+    (write-json! *out* (json-protocol/json-rpc-result response id))))
 
 (defn- dispatch-rpc-call
   "Dispatch RPC call with timeout handling"
@@ -61,7 +62,7 @@
           (log/error :rpc/handler-error {:error e})
           (write-json!
            out
-           (protocol/json-rpc-error
+           (json-protocol/json-rpc-error
             :internal-error
             (.getMessage e)
             (:id rpc-call)))))
@@ -72,10 +73,10 @@
   [executor handlers rpc-call]
   (try
     (log/info :rpc/json-request {:json-request rpc-call})
-    (if-let [validation-error (protocol/validate-request rpc-call)]
+    (if-let [validation-error (json-protocol/validate-request rpc-call)]
       (write-json!
        *out*
-       (protocol/json-rpc-error
+       (json-protocol/json-rpc-error
         (:code (:error validation-error))
         (:message (:error validation-error))
         (:id rpc-call)))
@@ -83,7 +84,7 @@
         (dispatch-rpc-call executor handler rpc-call)
         (write-json!
          *out*
-         (protocol/json-rpc-error
+         (json-protocol/json-rpc-error
           :method-not-found
           (str "Method not found: " (:method rpc-call))
           (:id rpc-call)))))
@@ -91,12 +92,12 @@
       (log/warn :rpc/overload-rejection)
       (write-json!
        *out*
-       (protocol/json-rpc-error :overloaded "Server overloaded")))
+       (json-protocol/json-rpc-error :overloaded "Server overloaded")))
     (catch Exception e
       (log/error :rpc/error {:error e})
       (write-json!
        *out*
-       (protocol/json-rpc-error
+       (json-protocol/json-rpc-error
         :internal-error
         (.getMessage e)
         (:id rpc-call))))))
@@ -112,12 +113,12 @@
 (defn create-server
   "Create JSON-RPC server over stdio."
   [{:keys [num-threads handlers]
-    :or   {num-threads (* 2 (.availableProcessors (Runtime/getRuntime)))
-           handlers    {}}}]
+    :or {num-threads (* 2 (.availableProcessors (Runtime/getRuntime)))
+         handlers {}}}]
   (let [executor (executor/create-executor num-threads)
         handlers (atom handlers)
-        running  (atom true)
-        out      *out*
+        running (atom true)
+        out *out*
 
         server-future
         (future
@@ -165,3 +166,21 @@
 
 (defn stdio-server? [x]
   (instance? StdioServer x))
+
+;;; Protocol Implementation
+
+(extend-type StdioServer
+  protocols/JsonRpcServer
+  (set-handlers! [server handlers]
+    (when-not (map? handlers)
+      (throw (ex-info "Handlers must be a map"
+                      {:handlers handlers})))
+    (reset! (:handlers server) handlers))
+
+  (notify-all! [server method params]
+    ;; Placeholder implementation for stdio server
+    ;; Since stdio doesn't have sessions/connections, this is a no-op
+    (log/info :rpc/notify-all! {:method method :params params :note "stdio server - no-op"}))
+
+  (stop! [server]
+    ((:stop-fn server))))

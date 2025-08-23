@@ -4,6 +4,8 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [mcp-clj.json-rpc.stdio-server :as stdio-server]
+   [mcp-clj.json-rpc.json-protocol :as json-protocol]
+   [mcp-clj.json-rpc.protocols :as protocols]
    [clojure.java.io :as io])
   (:import
    [java.io ByteArrayInputStream
@@ -45,7 +47,7 @@
       (is (nil? (#'stdio-server/read-json reader)))))
 
   (testing "handles malformed JSON"
-    (let [reader         (PushbackReader. (StringReader. "{invalid json}"))
+    (let [reader (PushbackReader. (StringReader. "{invalid json}"))
           [result error] (#'stdio-server/read-json reader)]
       (is (= :error result))
       (is (instance? Exception error)))))
@@ -70,36 +72,36 @@
 
 (deftest test-handle-json-rpc
   (testing "processes valid request and returns result"
-    (let [handler  (fn [method params]
-                     (when (= method "test")
-                       {:result "success"}))
-          request  {:method "test" :params {:arg "value"} :id 1}
+    (let [handler (fn [method params]
+                    (when (= method "test")
+                      {:result "success"}))
+          request {:method "test" :params {:arg "value"} :id 1}
           response (with-out-str
                      (#'stdio-server/handle-json-rpc handler request))]
       (is (= {:jsonrpc "2.0" :result {:result "success"} :id 1}
              (json/read-str response :key-fn keyword)))))
 
   (testing "returns nil for handler returning nil"
-    (let [handler  (fn [method params] nil)
-          request  {:method "test" :params {} :id 1}
+    (let [handler (fn [method params] nil)
+          request {:method "test" :params {} :id 1}
           response (#'stdio-server/handle-json-rpc handler request)]
       (is (nil? response))))
 
   (testing "uses simplified handler interface"
     (let [captured-args (atom [])
-          handler       (fn [method params]
-                          (reset! captured-args [method params])
-                          "result")
-          request       {:method "add" :params [1 2] :id 1}]
+          handler (fn [method params]
+                    (reset! captured-args [method params])
+                    "result")
+          request {:method "add" :params [1 2] :id 1}]
       (#'stdio-server/handle-json-rpc handler request)
       (is (= ["add" [1 2]] @captured-args)))))
 
 (deftest test-dispatch-rpc-call
   (testing "dispatches call successfully"
-    (let [server   (stdio-server/create-server {})
-          handler  (fn [_method params]
-                     {:sum (+ (first params) (second params))})
-          request  {:method "add" :params [1 2] :id 1}
+    (let [server (stdio-server/create-server {})
+          handler (fn [_method params]
+                    {:sum (+ (first params) (second params))})
+          request {:method "add" :params [1 2] :id 1}
           response (with-out-str
                      @(#'stdio-server/dispatch-rpc-call
                        (:executor server) handler request))]
@@ -108,71 +110,71 @@
       (stdio-server/stop! server)))
 
   (testing "handles handler exceptions"
-    (let [server   (stdio-server/create-server {})
-          handler  (fn [_method _params]
-                     (throw (RuntimeException. "Handler error")))
-          request  {:method "error" :params [] :id 1}
+    (let [server (stdio-server/create-server {})
+          handler (fn [_method _params]
+                    (throw (RuntimeException. "Handler error")))
+          request {:method "error" :params [] :id 1}
           response (with-out-str
                      @(#'stdio-server/dispatch-rpc-call
                        (:executor server) handler request))]
       (is (= {:jsonrpc "2.0"
-              :error   {:code -32603, :message "Handler error"}
-              :id      1}
+              :error {:code -32603, :message "Handler error"}
+              :id 1}
              (json/read-str response :key-fn keyword)))
       (stdio-server/stop! server))))
 
 (deftest test-handle-request
   (testing "handles valid request"
-    (let [server   (stdio-server/create-server {})
+    (let [server (stdio-server/create-server {})
           handlers {"add" (fn [_method params]
                             {:sum (+ (first params) (second params))})}
-          request  {:jsonrpc "2.0" :method "add" :params [1 2] :id 1}
-          output   (with-out-str
-                     @(#'stdio-server/handle-request
-                       (:executor server)
-                       handlers
-                       request))]
+          request {:jsonrpc "2.0" :method "add" :params [1 2] :id 1}
+          output (with-out-str
+                   @(#'stdio-server/handle-request
+                     (:executor server)
+                     handlers
+                     request))]
       (is (str/includes? output "\"result\""))
       (is (str/includes? output "\"sum\":3"))
       (stdio-server/stop! server)))
 
   (testing "handles method not found"
-    (let [server   (stdio-server/create-server {})
+    (let [server (stdio-server/create-server {})
           handlers {}
-          request  {:jsonrpc "2.0" :method "unknown" :params [] :id 1}
-          output   (with-out-str
-                     (#'stdio-server/handle-request
-                      (:executor server)
-                      handlers
-                      request))
+          request {:jsonrpc "2.0" :method "unknown" :params [] :id 1}
+          output (with-out-str
+                   (#'stdio-server/handle-request
+                    (:executor server)
+                    handlers
+                    request))
           response (json/read-str output :key-fn keyword)]
       (is (= -32601 (-> response :error :code)))
       (is (str/includes? (-> response :error :message) "Method not found"))
       (stdio-server/stop! server)))
 
   (testing "handles validation errors"
-    (let [server   (stdio-server/create-server {})
+    (let [server (stdio-server/create-server {})
           handlers {"test" (fn [_method _params] "result")}
-          request  {:method "test" :params []} ; missing jsonrpc field
-          output   (with-out-str
-                     (#'stdio-server/handle-request
-                      (:executor server)
-                      handlers
-                      request))
+          request {:method "test" :params []} ; missing jsonrpc field
+          output (with-out-str
+                   (#'stdio-server/handle-request
+                    (:executor server)
+                    handlers
+                    request))
           response (json/read-str output :key-fn keyword)]
       (is (= -32600 (-> response :error :code)))
       (stdio-server/stop! server)))
 
   (testing "handles server overload"
-    (let [server   (stdio-server/create-server {:num-threads 1})
+    (let [server (stdio-server/create-server {:num-threads 1})
           handlers {"test" (fn [_method _params] (Thread/sleep 100) "result")}
-          request  {:jsonrpc "2.0" :method "test" :params [] :id 1}]
+          request {:jsonrpc "2.0" :method "test" :params [] :id 1}]
       (stdio-server/stop! server) ; shut down executor to cause rejection
-      (let [output   (with-out-str
-                       (#'stdio-server/handle-request
-                        (:executor server)
-                        handlers
-                        request))
+      (let [output (with-out-str
+                     (#'stdio-server/handle-request
+                      (:executor server)
+                      handlers
+                      request))
             response (json/read-str output :key-fn keyword)]
         (is (= -32000 (-> response :error :code)))
         (is (str/includes? (-> response :error :message) "overloaded"))))))
@@ -210,14 +212,14 @@
 
 (deftest test-integration
   (testing "full request-response cycle"
-    (let [requests   [{:jsonrpc "2.0"
-                       :method  "add"
-                       :params  [1 2]
-                       :id      1}
-                      {:jsonrpc "2.0"
-                       :method  "echo"
-                       :params  {:message "hello"}
-                       :id      2}]
+    (let [requests [{:jsonrpc "2.0"
+                     :method "add"
+                     :params [1 2]
+                     :id 1}
+                    {:jsonrpc "2.0"
+                     :method "echo"
+                     :params {:message "hello"}
+                     :id 2}]
           ;; Convert to JSON strings, one per line
           json-input (str/join (mapv json/write-str requests))
           response
@@ -225,13 +227,13 @@
             (binding [*in* (PushbackReader.
                             (io/reader (StringReader. json-input))
                             1024)]
-              (let [handlers {"add"  (fn [_method params]
-                                       {:sum
-                                        (+ (first params) (second params))})
+              (let [handlers {"add" (fn [_method params]
+                                      {:sum
+                                       (+ (first params) (second params))})
                               "echo" (fn [_method params]
                                        params)}
-                    server   (stdio-server/create-server
-                              {:handlers handlers})]
+                    server (stdio-server/create-server
+                            {:handlers handlers})]
                 ;; server will EOF on input
                 @(:server-future server))))]
       (is (str/includes? response "\"sum\":3"))
@@ -239,9 +241,9 @@
 
 (deftest test-error-handling
   (testing "handles malformed JSON gracefully"
-    (let [server         (stdio-server/create-server {})
+    (let [server (stdio-server/create-server {})
           malformed-json "{invalid: json}"
-          reader         (PushbackReader. (StringReader. malformed-json))]
+          reader (PushbackReader. (StringReader. malformed-json))]
 
       (let [[result error] (#'stdio-server/read-json reader)]
         (is (= :error result))
@@ -250,9 +252,9 @@
       (stdio-server/stop! server)))
 
   (testing "handles notification requests (no id)"
-    (let [server   (stdio-server/create-server {})
+    (let [server (stdio-server/create-server {})
           handlers {"notify" (fn [method params] "notified")}
-          request  {:jsonrpc "2.0" :method "notify" :params []}] ; no id field
+          request {:jsonrpc "2.0" :method "notify" :params []}] ; no id field
 
       (stdio-server/set-handlers! server handlers)
 
@@ -262,3 +264,31 @@
         (is (empty? (str/trim output))))
 
       (stdio-server/stop! server))))
+
+(deftest test-protocol-implementation
+  (testing "JsonRpcServer protocol implementation"
+    (testing "set-handlers! through protocol"
+      (let [server (stdio-server/create-server {})
+            test-handler (fn [method params] {:protocol-result params})]
+        (protocols/set-handlers! server {"protocol-test" test-handler})
+        (is (= {"protocol-test" test-handler} @(:handlers server)))
+        (stdio-server/stop! server)))
+
+    (testing "notify-all! through protocol - no-op for stdio"
+      (let [server (stdio-server/create-server {})]
+        ;; This should not throw and should be a no-op
+        (is (nil? (protocols/notify-all! server "test-notification" {:data "test"})))
+        (stdio-server/stop! server)))
+
+    (testing "stop! through protocol"
+      (let [server (stdio-server/create-server {})]
+        ;; Test that stop! can be called through protocol
+        (is (nil? (protocols/stop! server)))))
+
+    (testing "protocol functions work with server instance"
+      (let [server (stdio-server/create-server {})
+            handlers {"test" (fn [method params] {:test "result"})}]
+        (is (satisfies? protocols/JsonRpcServer server))
+        (protocols/set-handlers! server handlers)
+        (is (= handlers @(:handlers server)))
+        (protocols/stop! server)))))

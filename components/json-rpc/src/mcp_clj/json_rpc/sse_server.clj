@@ -5,7 +5,8 @@
    [mcp-clj.http :as http]
    [mcp-clj.http-server.adapter :as http-server]
    [mcp-clj.json-rpc.executor :as executor]
-   [mcp-clj.json-rpc.protocol :as protocol]
+   [mcp-clj.json-rpc.json-protocol :as json-protocol]
+   [mcp-clj.json-rpc.protocols :as protocols]
    [mcp-clj.log :as log]
    [mcp-clj.sse :as sse])
   (:import
@@ -38,7 +39,7 @@
   (log/info :rpc/invoke {:method method :params params})
   (when-let [response (handler request params)]
     (log/info :server/handler-response response)
-    (reply!-fn (protocol/json-rpc-result response id))))
+    (reply!-fn (json-protocol/json-rpc-result response id))))
 
 (defn- dispatch-rpc-call
   [executor handler rpc-call request reply!-fn]
@@ -58,9 +59,9 @@
       (log/info :rpc/json-request
                 {:json-request rpc-call
                  :session-id session-id})
-      (if-let [validation-error (protocol/validate-request rpc-call)]
+      (if-let [validation-error (json-protocol/validate-request rpc-call)]
         (http/json-response
-         (protocol/json-rpc-error
+         (json-protocol/json-rpc-error
           (:code (:error validation-error))
           (:message (:error validation-error)))
          http/BadRequest)
@@ -69,7 +70,7 @@
             (dispatch-rpc-call executor handler rpc-call request reply!-fn)
             (http/text-response "Accepted" http/Accepted))
           (http/json-response
-           (protocol/json-rpc-error
+           (json-protocol/json-rpc-error
             :method-not-found
             (str "Method not found: " (:method rpc-call))
             (:id rpc-call))
@@ -77,13 +78,13 @@
     (catch RejectedExecutionException _
       (log/warn :rpc/overload-rejection)
       (http/json-response
-       (protocol/json-rpc-error :overloaded "Server overloaded")
+       (json-protocol/json-rpc-error :overloaded "Server overloaded")
        http/Unavailable))
     (catch Exception e
       (.printStackTrace e)
       (log/error :rpc/error {:e e})
       (http/json-response
-       (protocol/json-rpc-error
+       (json-protocol/json-rpc-error
         :internal-error
         (.getMessage e))
        http/InternalServerError))))
@@ -186,11 +187,30 @@
   (log/info :rpc/notify-all! {:method method :params params})
   (doseq [{:keys [reply!-fn] :as session} (vals @(:session-id->session server))]
     (log/info :rpc/notify-all! {:session-id (:session-id session)})
-    (reply!-fn (protocol/json-rpc-notification method params))))
+    (reply!-fn (json-protocol/json-rpc-notification method params))))
 
 (defn notify!
   "Send a notification to all active sessions"
   [server id method params]
   (log/info :rpc/notify-all! {:id id :method method :params params})
   (when-let [{:keys [reply!-fn]} (@(:session-id->session server) id)]
-    (reply!-fn (protocol/json-rpc-notification method params))))
+    (reply!-fn (json-protocol/json-rpc-notification method params))))
+
+;;; Protocol Implementation
+
+(extend-type clojure.lang.PersistentArrayMap
+  protocols/JsonRpcServer
+  (set-handlers! [server handlers]
+    (when-not (map? handlers)
+      (throw (ex-info "Handlers must be a map"
+                      {:handlers handlers})))
+    (swap! (:handlers server) (constantly handlers)))
+
+  (notify-all! [server method params]
+    (log/info :rpc/notify-all! {:method method :params params})
+    (doseq [{:keys [reply!-fn] :as session} (vals @(:session-id->session server))]
+      (log/info :rpc/notify-all! {:session-id (:session-id session)})
+      (reply!-fn (json-protocol/json-rpc-notification method params))))
+
+  (stop! [server]
+    ((:stop server))))
