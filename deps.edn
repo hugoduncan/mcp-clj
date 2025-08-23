@@ -6,13 +6,15 @@
                  "components/http-server/test"
                  "components/json-rpc/test"
                  "components/log/test"
-                 "components/sse-server/test"]
+                 "components/sse-server/test"
+                 "components/tools/test"]
    :extra-deps
    {poly/http {:local/root "components/http"}
     poly/http-server {:local/root "components/http-server"}
     poly/json-rpc {:local/root "components/json-rpc"}
     poly/log {:local/root "components/log"}
     poly/sse-server {:local/root "components/sse-server"}
+    poly/tools {:local/root "components/tools"}
     lambdaisland/kaocha {:mvn/version "1.87.1366"}
     lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}
     org.clojure/clojure {:mvn/version "1.12.0"}}}
@@ -20,7 +22,8 @@
                        "components/http-server/test"
                        "components/json-rpc/test"
                        "components/log/test"
-                       "components/sse-server/test"]
+                       "components/sse-server/test"
+                       "components/tools/test"]
          :extra-deps
          {hato/hato {:mvn/version "1.0.0"}
           org.clojure/test.check {:mvn/version "1.1.1"}}
@@ -38,5 +41,6 @@
                       "-Dclojure.main.report=stderr"]
            :main-opts ["-m" "kaocha.runner"]}
 
-  :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.0.0"}}
+  :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.0.0"}
+                       org.clojure/clojure {:mvn/version "1.12.0"}}
           :main-opts ["-m" "nrepl.cmdline"]}}}

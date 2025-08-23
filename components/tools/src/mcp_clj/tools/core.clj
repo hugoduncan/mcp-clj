@@ -1,5 +1,5 @@
-(ns mcp-clj.sse-server.tools
-  "Tool definitions and validation for MCP server")
+(ns mcp-clj.tools.core
+  "Tool definitions and validation for MCP servers")
 
 (defn safe-eval
   "Safely evaluate Clojure code, returning a result map"

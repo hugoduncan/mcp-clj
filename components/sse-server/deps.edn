@@ -1,1 +1,6 @@
-{}
+{:paths ["src"]
+ :deps  {org.clojure/clojure {:mvn/version "1.12.0"}
+         poly/tools          {:local/root "../tools"}}
+ :aliases
+ {:test {:extra-paths ["test"]
+         :extra-deps  {}}}}

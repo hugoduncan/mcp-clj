@@ -5,7 +5,7 @@
    [mcp-clj.log :as log]
    [mcp-clj.sse-server.prompts :as prompts]
    [mcp-clj.sse-server.resources :as resources]
-   [mcp-clj.sse-server.tools :as tools]))
+   [mcp-clj.tools.core :as tools]))
 
 (def ^:private server-protocol-version "2024-11-05")
 (def ^:private required-client-version "2024-11-05")
