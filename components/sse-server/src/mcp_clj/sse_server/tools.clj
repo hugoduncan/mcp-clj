@@ -12,6 +12,7 @@
                    (try
                      (println (eval form))
                      (catch Throwable e
+                       (println "EVAL FAILED:")
                        (println (ex-message e) (pr-str (ex-data e)))
                        (.printStackTrace e)))))})
     (catch Throwable e
@@ -26,9 +27,13 @@
   "Implementation function for clj-eval tool"
   (fn [{:keys [code]}]
     (let [{:keys [success result error]} (safe-eval code)]
+      (binding [*out* *err*]
+        (prn :code code :success success :error error))
       (if success
-        {:content [{:type "text"
-                    :text result}]}
+        (cond-> {:content [{:type "text"
+                            :text result}]}
+          (re-find #"EVAL FAILED:" result)
+          (assoc :isError true))
         {:content [{:type "text"
                     :text (str "Error: " error)}]
          :isError true}))))

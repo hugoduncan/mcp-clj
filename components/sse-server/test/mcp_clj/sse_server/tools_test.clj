@@ -31,7 +31,6 @@
       (testing "divide by zero error"
         (let [result (implementation {:code "(/ 1 0)"})]
           (is (:isError result))
-          (is (nil? result))
           (is (= "text" (-> result :content first :type)))
           (is (.contains
                (-> result :content first :text)
@@ -40,7 +39,6 @@
       (testing "invalid syntax"
         (let [result (implementation {:code "(/ 1 0"})]
           (is (:isError result))
-          (is (nil? result))
           (is (= "text" (-> result :content first :type)))
           (is (.contains
                (-> result :content first :text)
