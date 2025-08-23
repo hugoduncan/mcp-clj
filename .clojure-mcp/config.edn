@@ -1,0 +1,4 @@
+{:cljfnt               false
+ :start-nrepl-cmd      "clj -M:nrepl:dev"
+ :read-nrepl-port-file true
+ :allowed-directories  ["." "/Users/duncan/src"]}
