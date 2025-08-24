@@ -93,3 +93,5 @@ clj -M:dev
 - All public functions should have docstrings with parameter descriptions
 - Prefer complete, unabbreviated names using kebab-case
 - Component isolation: changes to one component should not require changes to others unless interfaces change
+
+- mcp protocol specification is at https://github.com/modelcontextprotocol/modelcontextprotocol/tree/main/docs/specification
