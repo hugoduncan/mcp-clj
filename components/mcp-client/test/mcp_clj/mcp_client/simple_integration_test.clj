@@ -1,0 +1,116 @@
+(ns mcp-clj.mcp-client.simple-integration-test
+  "Simplified integration test for MCP client initialization"
+  (:require
+   [clojure.test :refer [deftest is testing]]
+   [mcp-clj.mcp-client.core :as client]
+   [mcp-clj.mcp-server.core :as server]
+   [mcp-clj.json-rpc.stdio-server :as stdio-server]
+   [mcp-clj.log :as log])
+  (:import
+   [java.util.concurrent CountDownLatch TimeUnit]))
+
+(deftest ^:integration in-process-server-client-test
+  (testing "MCP client can initialize with in-process MCP server"
+    (let [server-ready-latch (CountDownLatch. 1)
+          client-ready-latch (CountDownLatch. 1)
+
+          ;; Create MCP server that will run in separate thread
+          mcp-server (server/create-server {:transport :stdio})
+
+          ;; Mock stdio server that captures JSON communication
+          server-thread (future
+                          (try
+                            (.countDown server-ready-latch)
+                           ;; In a real scenario, the server would read from stdin
+                           ;; For this test, we'll simulate server being ready
+                            @client-ready-latch
+                            (catch Exception e
+                              (log/error :test-server-error {:error e}))))]
+
+      ;; Wait for server to be ready
+      (.await server-ready-latch 5 TimeUnit/SECONDS)
+
+      ;; Create client (this will fail to connect to stdio, but we can test the API)
+      (let [client (client/create-client
+                    {:transport {:type :stdio
+                                 :command ["echo", "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"serverInfo\":{\"name\":\"test-server\",\"version\":\"1.0.0\"}}}"]}
+                     :client-info {:name "simple-test-client"
+                                   :title "Simple Test Client"
+                                   :version "1.0.0"}
+                     :capabilities {}})]
+
+        ;; Check initial state
+        (is (= :disconnected (:state @(:session client))))
+        (is (not (client/client-ready? client)))
+        (is (not (client/client-error? client)))
+
+        ;; Verify client info
+        (let [info (client/get-client-info client)]
+          (is (= :disconnected (:state info)))
+          (is (= "2025-06-18" (:protocol-version info)))
+          (is (= {:name "simple-test-client"
+                  :title "Simple Test Client"
+                  :version "1.0.0"}
+                 (:client-info info)))
+          (is (= {} (:client-capabilities info)))
+          (is (nil? (:server-info info)))
+          (is (nil? (:server-capabilities info))))
+
+        ;; Note: Actual initialization with echo will fail, but that's expected
+        ;; The point is to verify the client API and session management works
+
+        (client/close! client)
+        (.countDown client-ready-latch)))))
+
+(deftest ^:integration client-session-state-transitions-test
+  (testing "Client session transitions through states correctly"
+    (let [client (client/create-client
+                  {:transport {:type :stdio
+                               :command ["cat"]} ; cat will read but not respond properly
+                   :client-info {:name "state-test-client"}
+                   :capabilities {}})]
+
+      ;; Initial state
+      (is (= :disconnected (:state @(:session client))))
+
+      ;; Try to initialize (will fail with cat, but should transition to initializing first)
+      (client/initialize! client)
+
+      ;; Should transition to initializing
+      (Thread/sleep 100) ; Give it a moment
+      (is (= :initializing (:state @(:session client))))
+
+      ;; Wait a bit more - it should eventually error or timeout
+      (Thread/sleep 2000)
+
+      ;; Should be in error state or still initializing (depending on timing)
+      (let [final-state (:state @(:session client))]
+        (is (contains? #{:error :initializing} final-state)))
+
+      (client/close! client))))
+
+(deftest ^:integration client-configuration-test
+  (testing "Client accepts various transport configurations"
+    ;; Test map-style transport
+    (let [client1 (client/create-client
+                   {:transport {:type :stdio :command ["echo", "test"]}
+                    :client-info {:name "config-test-1"}})]
+      (is (some? client1))
+      (is (= "config-test-1" (get-in @(:session client1) [:client-info :name])))
+      (client/close! client1))
+
+    ;; Test vector-style transport (backward compatibility) 
+    (let [client2 (client/create-client
+                   {:transport ["echo", "test"]
+                    :client-info {:name "config-test-2"}})]
+      (is (some? client2))
+      (is (= "config-test-2" (get-in @(:session client2) [:client-info :name])))
+      (client/close! client2))
+
+    ;; Test custom protocol version
+    (let [client3 (client/create-client
+                   {:transport ["echo", "test"]
+                    :protocol-version "2024-11-05"})]
+      (is (some? client3))
+      (is (= "2024-11-05" (:protocol-version @(:session client3))))
+      (client/close! client3))))

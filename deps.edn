@@ -6,6 +6,7 @@
                  "components/http-server/test"
                  "components/json-rpc/test"
                  "components/log/test"
+                 "components/mcp-client/test"
                  "components/mcp-server/test"
                  "components/tools/test"]
    :extra-deps
@@ -13,6 +14,7 @@
     poly/http-server {:local/root "components/http-server"}
     poly/json-rpc {:local/root "components/json-rpc"}
     poly/log {:local/root "components/log"}
+    poly/mcp-client {:local/root "components/mcp-client"}
     poly/mcp-server {:local/root "components/mcp-server"}
     poly/tools {:local/root "components/tools"}
     lambdaisland/kaocha {:mvn/version "1.87.1366"}
@@ -22,6 +24,7 @@
                        "components/http-server/test"
                        "components/json-rpc/test"
                        "components/log/test"
+                       "components/mcp-client/test"
                        "components/mcp-server/test"
                        "components/tools/test"]
          :extra-deps
