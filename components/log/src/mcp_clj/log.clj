@@ -62,11 +62,16 @@
 (defmacro debug [id & [data]] `(log :debug  ~id ~data))
 (defmacro trace [id & [data]] `(log :trace  ~id ~data))
 
+(enable! :debug "rpc")
+(enable! :debug "server")
+(enable! :debug "client")
+
 (comment
   (enable! :info "http")
   (enable! :info "sse")
-  (enable! :info "rpc")
-  (enable! :info "server")
+  (enable! :debug "rpc")
+  (enable! :debug "server")
+  (enable! :debug "client")
   (enable! :info "handle-error")
   (disable! :info "handle-error")
 

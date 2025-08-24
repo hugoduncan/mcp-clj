@@ -19,7 +19,12 @@
     poly/tools {:local/root "components/tools"}
     lambdaisland/kaocha {:mvn/version "1.87.1366"}
     lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}
-    org.clojure/clojure {:mvn/version "1.12.0"}}}
+    org.clojure/clojure {:mvn/version "1.12.0"}}
+   :jvm-opts ["-XX:-OmitStackTraceInFastThrow"
+              "-Dclojure.main.report=stderr"
+              ;; Next two for cider to be able to kill processes
+              "-Djdk.attach.allowAttachSelf"
+              "-XX:+EnableDynamicAgentLoading"]}
   :test {:extra-paths ["components/http/test"
                        "components/http-server/test"
                        "components/json-rpc/test"
@@ -29,11 +34,7 @@
                        "components/tools/test"]
          :extra-deps
          {hato/hato {:mvn/version "1.0.0"}
-          org.clojure/test.check {:mvn/version "1.1.1"}}
-         :exec-fn kaocha.runner/exec-fn
-         :exec-args {}
-         :jvm-opts ["-XX:-OmitStackTraceInFastThrow"
-                    "-Dclojure.main.report=stderr"]}
+          org.clojure/test.check {:mvn/version "1.1.1"}}}
   :kaocha {:extra-deps
            {lambdaisland/kaocha {:mvn/version "1.91.1392"}
             lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}
@@ -51,4 +52,5 @@
                :deps {poly/server {:local/root "projects/server"}}}
   :stdio-server {:main-opts ["-m" "mcp-clj.stdio-server.main"]
                  :exec-fn mcp-clj.stdio-server.main/start
-                 :deps {poly/server {:local/root "projects/server"}}}}}
+                 :deps {poly/server {:local/root "projects/server"}}
+                 :jvm-opts ["-Djdk.attach.allowAttachSelf"]}}}

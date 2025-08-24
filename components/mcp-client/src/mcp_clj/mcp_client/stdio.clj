@@ -4,12 +4,13 @@
    [clojure.data.json :as json]
    [clojure.java.process :as process]
    [mcp-clj.json-rpc.executor :as executor]
-   [mcp-clj.json-rpc.json-protocol :as json-protocol]
    [mcp-clj.log :as log])
   (:import
-   [java.io BufferedReader BufferedWriter]
-   [java.util.concurrent
-    CompletableFuture
+   [java.io BufferedReader
+    BufferedWriter
+    InputStreamReader
+    OutputStreamWriter]
+   [java.util.concurrent CompletableFuture
     ConcurrentHashMap
     TimeUnit]))
 
@@ -42,16 +43,20 @@
   "Start MCP server process with given configuration"
   [server-config]
   (let [{:keys [command env dir]} (build-process-command server-config)
-        process-opts (cond-> {:in :pipe :out :pipe :err :inherit}
-                       env (assoc :env env)
-                       dir (assoc :dir dir))
-        process (process/start command process-opts)]
+        process-opts              (cond-> {:in :pipe
+                                           :out :pipe
+                                           :err :inherit}
+                                    env (assoc :env env)
+                                    dir (assoc :dir dir))
+        _                         (log/debug :client/process
+                                    {:command command :env env :dir dir})
+        process                   (apply process/start process-opts command)]
 
     (log/debug :stdio/process-started {:command command :env env :dir dir})
 
     {:process process
-     :stdin (BufferedWriter. (:in process))
-     :stdout (BufferedReader. (:out process))}))
+     :stdin   (BufferedWriter. (OutputStreamWriter. (process/stdin process)))
+     :stdout  (BufferedReader. (InputStreamReader. (process/stdout process)))}))
 
 ;;; JSON I/O
 
@@ -60,13 +65,13 @@
   [writer message]
   (try
     (let [json-str (json/write-str message)]
-      (log/debug :stdio/send {:message message})
+      (log/debug :client/send {:message message})
       (locking writer
         (.write writer json-str)
         (.newLine writer)
         (.flush writer)))
     (catch Exception e
-      (log/error :stdio/write-error {:error e})
+      (log/error :client/write-error {:error e})
       (throw e))))
 
 (defn- read-json
@@ -75,10 +80,10 @@
   (try
     (when-let [line (.readLine reader)]
       (let [message (json/read-str line :key-fn keyword)]
-        (log/debug :stdio/receive {:message message})
+        (log/debug :client/receive {:message message})
         message))
     (catch Exception e
-      (log/error :stdio/read-error {:error e})
+      (log/error :client/read-error {:error e})
       (throw e))))
 
 ;;; Transport Implementation
@@ -129,33 +134,34 @@
 (defn create-transport
   "Create stdio transport by launching MCP server process"
   [server-command]
-  (let [process-info (start-server-process server-command)
-        executor (executor/create-executor 2)
-        pending-requests (ConcurrentHashMap.)
+  (let [process-info       (start-server-process server-command)
+        executor           (executor/create-executor 2)
+        pending-requests   (ConcurrentHashMap.)
         request-id-counter (atom 0)
-        running (atom true)
-        transport (->StdioTransport
-                   server-command
-                   process-info
-                   executor
-                   pending-requests
-                   request-id-counter
-                   nil
-                   running)]
-
-    ;; Start background message reader
-    (let [reader-future (executor/submit! executor #(message-reader-loop transport))]
-      (assoc transport :reader-future reader-future))))
+        running            (atom true)
+        transport          (->StdioTransport
+                            server-command
+                            process-info
+                            executor
+                            pending-requests
+                            request-id-counter
+                            nil
+                            running)
+        ;; Start background message reader
+        reader-future      (executor/submit!
+                            executor
+                            #(message-reader-loop transport))]
+    (assoc transport :reader-future reader-future)))
 
 (defn send-request!
   "Send JSON-RPC request and return CompletableFuture of response"
   [transport method params]
   (let [request-id (generate-request-id transport)
-        future (CompletableFuture.)
-        request {:jsonrpc "2.0"
-                 :id request-id
-                 :method method
-                 :params params}]
+        future     (CompletableFuture.)
+        request    {:jsonrpc "2.0"
+                    :id      request-id
+                    :method  method
+                    :params  params}]
 
     ;; Register pending request
     (.put (:pending-requests transport) request-id future)
@@ -187,22 +193,26 @@
   (reset! (:running transport) false)
 
   ;; Cancel all pending requests
+  (log/warn :client/cancel-pending-futures)
   (doseq [[_id future] (:pending-requests transport)]
     (.cancel future true))
 
   ;; Close streams
+  (log/warn :client/closing-streams)
   (let [{:keys [stdin stdout]} (:process-info transport)]
+    (log/warn :client/closing-streams {:stdin stdin :stdout stdout})
     (try (.close stdin) (catch Exception _))
-    (try (.close stdout) (catch Exception _)))
+    #_(try (.close stdout) (catch Exception _)))
 
   ;; Terminate process
-  (let [process (get-in transport [:process-info :process])]
+  (log/warn :client/killing-process)
+  (let [^Process process (get-in transport [:process-info :process])]
     (try
-      (process/destroy-tree process)
-      (when-not (process/await process 5000)
-        (log/warn :stdio/process-force-kill))
+      (.destroy process)
+      (when-not (.waitFor process 5000 TimeUnit/MILLISECONDS)
+        (log/warn :client/process-force-kill))
       (catch Exception e
-        (log/error :stdio/process-close-error {:error e}))))
+        (log/error :client/process-close-error {:error e}))))
 
   ;; Shutdown executor
   (executor/shutdown-executor (:executor transport)))
@@ -211,4 +221,4 @@
   "Check if transport process is still alive"
   [transport]
   (and @(:running transport)
-       (process/alive? (get-in transport [:process-info :process]))))
+       (.isAlive ^Process (get-in transport [:process-info :process]))))

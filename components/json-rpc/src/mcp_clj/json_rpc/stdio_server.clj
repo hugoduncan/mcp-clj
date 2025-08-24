@@ -42,7 +42,8 @@
           (flush))))
     (catch Exception e
       (binding [*out* *err*]
-        (println "JSON write error:" (.getMessage e))))))
+        (log/error :rpc/write {:msg       "JSON write error:"
+                               :exception (.getMessage e)})))))
 
 ;;; JSON-RPC Request Handling
 
@@ -52,7 +53,8 @@
   (log/info :rpc/invoke {:method method :params params})
   (when-let [response (handler method params)]
     (log/info :server/handler-response response)
-    (write-json! *out* (json-protocol/json-rpc-result response id))))
+    (when response
+      (write-json! *out* (json-protocol/json-rpc-result response id)))))
 
 (defn- dispatch-rpc-call
   "Dispatch RPC call with timeout handling"
@@ -87,12 +89,14 @@
         (:id rpc-call)))
       (if-let [handler (get handlers (:method rpc-call))]
         (dispatch-rpc-call executor handler rpc-call)
-        (write-json!
-         *out*
-         (json-protocol/json-rpc-error
-          :method-not-found
-          (str "Method not found: " (:method rpc-call))
-          (:id rpc-call)))))
+        (do
+          (log/warn :rpc/no-such-method {:method (:method rpc-call)})
+          (write-json!
+           *out*
+           (json-protocol/json-rpc-error
+            :method-not-found
+            (str "Method not found: " (:method rpc-call))
+            (:id rpc-call))))))
     (catch RejectedExecutionException _
       (log/warn :rpc/overload-rejection)
       (write-json!
@@ -126,6 +130,7 @@
   [{:keys [num-threads handlers]
     :or   {num-threads (* 2 (.availableProcessors (Runtime/getRuntime)))
            handlers    {}}}]
+  (log/debug :server/starting {:msg "Starting"})
   (let [executor (executor/create-executor num-threads)
         handlers (atom handlers)
         running  (atom true)
@@ -138,9 +143,11 @@
         (future
           (binding [*out* out]
             (try
+              (log/debug :server/started {:msg "Running"})
               (loop []
                 (when @running
                   (let [[rpc-call ex :as resp] (read-json in)
+                        _                      (log/debug :rpc/call {:call rpc-call})
                         v
                         (cond
                           (nil? resp)
@@ -191,6 +198,7 @@
     (reset! (:handlers server) handlers))
 
   (notify-all! [server method params]
+    (log/debug :server/notify-all! {:method method :params params})
     (write-json!
      (:out server)
      (json-protocol/json-rpc-notification method params)))

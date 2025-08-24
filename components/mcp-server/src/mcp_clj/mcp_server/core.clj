@@ -26,7 +26,7 @@
             resource-registry])
 
 (defn- request-session-id [request]
-  (get ((:query-params request)) "session_id"))
+  (get (:query-params request) "session_id"))
 
 (defn- request-session
   [server request]
@@ -182,7 +182,14 @@
           (do
             (response session)
             nil)
-          (log/error "missing mcp session")))
+          (do
+            (log/warn
+                :server/error
+              {:msg     "missing mcp session"
+               :request request
+               :params  params})
+            (response nil)
+            nil)))
       response)))
 
 (defn- create-handlers
@@ -342,4 +349,5 @@
         handlers            (create-handlers server)]
     (json-rpc-protocols/set-handlers! json-rpc-server handlers)
     (deliver rpc-server-prom json-rpc-server)
+    (log/info :server/started {})
     server))

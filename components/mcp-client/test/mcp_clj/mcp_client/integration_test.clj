@@ -1,27 +1,23 @@
 (ns mcp-clj.mcp-client.integration-test
   "Integration tests for MCP client connecting to real MCP server"
   (:require
-   [clojure.test :refer [deftest is testing use-fixtures]]
-   [mcp-clj.mcp-client.core :as client]
-   [mcp-clj.mcp-server.core :as server]
-   [mcp-clj.log :as log])
-  (:import
-   [java.util.concurrent TimeUnit]
-   [java.lang ProcessBuilder$Redirect]))
+   [clojure.test :refer [deftest is testing]]
+   [mcp-clj.mcp-client.core :as client]))
 
 ;;; Integration Tests
 
 (deftest ^:integration client-server-initialization-test
   (testing "MCP client can initialize with real MCP server"
-    (when *server*
-      (let [client (client/create-client
-                    {:transport    {:type    :stdio
-                                    :command ["clojure" "-M:dev" "-m" "mcp-clj.stdio-server.main"]}
-                     :client-info  {:name    "integration-test-client"
-                                    :title   "Integration Test Client"
-                                    :version "1.0.0"}
-                     :capabilities {}})]
+    (let [client (client/create-client
+                  {:server       {:type    :stdio
+                                  :command "clojure"
+                                  :args    ["-M:stdio-server"]}
+                   :client-info  {:name    "integration-test-client"
+                                  :title   "Integration Test Client"
+                                  :version "1.0.0"}
+                   :capabilities {}})]
 
+      (try
         ;; Client should start in disconnected state
         (is (= :disconnected (:state @(:session client))))
         (is (not (client/client-ready? client)))
@@ -32,9 +28,14 @@
           ;; Should transition to initializing
           (is (= :initializing (:state @(:session client))))
 
-          ;; Wait for initialization to complete
           (try
-            (client/wait-for-ready client 10000) ; 10 second timeout
+            (prn :waiting-for-init)
+            ;; Wait for initialization to complete
+            ;; TODO add timeout
+            @init-future
+            ;; (client/wait-for-ready client 10000) ; 10 second timeout
+
+            (prn :init-complete @init-future)
 
             ;; Client should now be ready
             (is (client/client-ready? client))
@@ -58,9 +59,11 @@
                 (is (not (str "Client initialization failed: "
                               (.getMessage e)
                               " Session: " session-info))))))
-
+          (prn :test-done))
+        (finally
           ;; Clean up
-          (client/close! client))))))
+          (client/close! client)))))
+  (prn :test-completed))
 
 (deftest ^:integration client-server-error-handling-test
   (testing "MCP client handles server connection errors gracefully"
