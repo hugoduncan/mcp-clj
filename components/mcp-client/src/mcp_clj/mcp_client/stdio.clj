@@ -30,33 +30,29 @@
      :env (:env server-config)
      :dir (:cwd server-config)}
 
-    ;; Legacy format: vector of command + args
-    (vector? server-config)
-    {:command server-config}
-
     :else
     (throw (ex-info "Invalid server configuration"
                     {:config server-config
-                     :expected "Map with :command and :args, or vector of command parts"}))))
+                     :expected "Map with :command and :args"}))))
 
 (defn- start-server-process
   "Start MCP server process with given configuration"
   [server-config]
   (let [{:keys [command env dir]} (build-process-command server-config)
-        process-opts              (cond-> {:in :pipe
-                                           :out :pipe
-                                           :err :inherit}
-                                    env (assoc :env env)
-                                    dir (assoc :dir dir))
-        _                         (log/debug :client/process
-                                    {:command command :env env :dir dir})
-        process                   (apply process/start process-opts command)]
+        process-opts (cond-> {:in :pipe
+                              :out :pipe
+                              :err :inherit}
+                       env (assoc :env env)
+                       dir (assoc :dir dir))
+        _ (log/debug :client/process
+                     {:command command :env env :dir dir})
+        process (apply process/start process-opts command)]
 
     (log/debug :stdio/process-started {:command command :env env :dir dir})
 
     {:process process
-     :stdin   (BufferedWriter. (OutputStreamWriter. (process/stdin process)))
-     :stdout  (BufferedReader. (InputStreamReader. (process/stdout process)))}))
+     :stdin (BufferedWriter. (OutputStreamWriter. (process/stdin process)))
+     :stdout (BufferedReader. (InputStreamReader. (process/stdout process)))}))
 
 ;;; JSON I/O
 
@@ -134,34 +130,34 @@
 (defn create-transport
   "Create stdio transport by launching MCP server process"
   [server-command]
-  (let [process-info       (start-server-process server-command)
-        executor           (executor/create-executor 2)
-        pending-requests   (ConcurrentHashMap.)
+  (let [process-info (start-server-process server-command)
+        executor (executor/create-executor 2)
+        pending-requests (ConcurrentHashMap.)
         request-id-counter (atom 0)
-        running            (atom true)
-        transport          (->StdioTransport
-                            server-command
-                            process-info
-                            executor
-                            pending-requests
-                            request-id-counter
-                            nil
-                            running)
+        running (atom true)
+        transport (->StdioTransport
+                   server-command
+                   process-info
+                   executor
+                   pending-requests
+                   request-id-counter
+                   nil
+                   running)
         ;; Start background message reader
-        reader-future      (executor/submit!
-                            executor
-                            #(message-reader-loop transport))]
+        reader-future (executor/submit!
+                       executor
+                       #(message-reader-loop transport))]
     (assoc transport :reader-future reader-future)))
 
 (defn send-request!
   "Send JSON-RPC request and return CompletableFuture of response"
   [transport method params]
   (let [request-id (generate-request-id transport)
-        future     (CompletableFuture.)
-        request    {:jsonrpc "2.0"
-                    :id      request-id
-                    :method  method
-                    :params  params}]
+        future (CompletableFuture.)
+        request {:jsonrpc "2.0"
+                 :id request-id
+                 :method method
+                 :params params}]
 
     ;; Register pending request
     (.put (:pending-requests transport) request-id future)

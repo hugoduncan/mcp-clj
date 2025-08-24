@@ -19,6 +19,7 @@ A Clojure implementation of an MCP (Model Context Protocol) client with stdio tr
 
 ;; Create client with Claude Code MCP server configuration
 ;; This matches the format used in Claude Code's .mcp.json
+;; Client automatically begins initialization upon creation
 (def client
   (client/create-client
    {:server {:command "python"
@@ -29,10 +30,7 @@ A Clojure implementation of an MCP (Model Context Protocol) client with stdio tr
                   :version "1.0.0"}
     :capabilities {}}))
 
-;; Initialize connection
-(client/initialize! client)
-
-;; Wait for ready state (with timeout)
+;; Wait for ready state (with timeout) - defaults to 30 seconds
 (client/wait-for-ready client 5000)
 
 ;; Check if ready
@@ -91,7 +89,8 @@ The client maintains session state through these transitions:
 
 ### Key Design Decisions
 
-- **Async-only API**: Uses executors from json-rpc component
+- **Automatic Initialization**: Clients automatically begin initialization upon creation
+- **Future-based API**: Uses CompletableFuture for non-blocking initialization
 - **Minimal capabilities**: Starts with empty capabilities for initialization-only
 - **Process lifecycle**: Simple launch/terminate (no auto-restart)
 - **Server configuration**: Supports Claude Code MCP server format with `:server` key

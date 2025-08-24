@@ -6,7 +6,7 @@
    [mcp-clj.mcp-client.session :as session]))
 
 (deftest create-client-test
-  (testing "Create client with Claude Code MCP server configuration"
+  (testing "should create client with Claude Code MCP server configuration and automatic initialization"
     (let [config {:server {:command "echo"
                            :args ["test"]
                            :env {"TEST_VAR" "test_value"}}
@@ -18,42 +18,49 @@
       (is (some? client))
       (is (some? (:transport client)))
       (is (some? (:session client)))
+      (is (some? (:initialization-future client)))
 
-      ;; Check initial session state
+      ;; Check initial session state - should be initializing due to automatic initialization
       (let [session @(:session client)]
-        (is (= :disconnected (:state session)))
+        (is (= :initializing (:state session)))
         (is (= "2025-06-18" (:protocol-version session)))
         (is (= {} (:capabilities session))))
 
       ;; Cleanup
       (core/close! client)))
 
-  (testing "Create client with vector server (backward compatibility)"
-    (let [config {:server ["echo", "test"]
-                  :client-info {:name "vector-test-client"}
+  (testing "should create client with minimal server configuration"
+    (let [config {:server {:command "echo" :args ["test"]}
+                  :client-info {:name "minimal-test-client"}
                   :capabilities {}}
           client (core/create-client config)]
 
       (is (some? client))
       (is (some? (:transport client)))
       (is (some? (:session client)))
+      (is (some? (:initialization-future client)))
 
       ;; Cleanup
       (core/close! client)))
 
-  (testing "Invalid server configuration throws exception"
+  (testing "should throw exception for invalid server configuration"
     (is (thrown? Exception
-                 (core/create-client {:server {:type :invalid}})))))
+                 (core/create-client {:server {:type :invalid}})))
+    (is (thrown? Exception
+                 (core/create-client {:server ["echo", "test"]})))))
 
 (deftest client-state-test
-  (testing "Client state predicates"
-    (let [client (core/create-client {:server ["echo", "test"]})]
+  (testing "should provide correct client state predicates"
+    (let [client (core/create-client {:server {:command "echo" :args ["test"]}})]
 
-      ;; Initially not ready and not in error
+      ;; Initially might be initializing due to automatic initialization
       (is (not (core/client-ready? client)))
       (is (not (core/client-error? client)))
 
-      ;; Transition to error state
+      ;; Wait a moment for initialization to potentially complete or fail
+      (Thread/sleep 100)
+
+      ;; Transition to error state manually for testing
       (swap! (:session client)
              #(session/transition-state! % :error
                                          :error-info {:type :test-error}))
@@ -65,14 +72,15 @@
       (core/close! client))))
 
 (deftest get-client-info-test
-  (testing "Get client information"
+  (testing "should return correct client information"
     (let [client (core/create-client
                   {:server {:command "echo" :args ["test"]}
                    :client-info {:name "test-client" :version "1.0.0"}
                    :capabilities {:test true}})
           info (core/get-client-info client)]
 
-      (is (= :disconnected (:state info)))
+      ;; Client starts initializing automatically, so state might be :initializing or :error
+      (is (contains? #{:disconnected :initializing :error} (:state info)))
       (is (= "2025-06-18" (:protocol-version info)))
       (is (= {:name "test-client" :version "1.0.0"} (:client-info info)))
       (is (= {:test true} (:client-capabilities info)))
@@ -81,16 +89,21 @@
       ;; Cleanup
       (core/close! client))))
 
-(deftest initialize-invalid-state-test
-  (testing "Initialize throws exception when not in disconnected state"
-    (let [client (core/create-client {:server ["echo", "test"]})]
+(deftest wait-for-ready-test
+  (testing "should timeout when waiting for ready with short timeout"
+    (let [client (core/create-client {:server {:command "echo" :args ["test"]}})]
 
-      ;; Transition to initializing state
-      (swap! (:session client)
-             #(session/transition-state! % :initializing))
+      ;; Should timeout quickly since echo won't respond with proper MCP protocol
+      (is (thrown? Exception (core/wait-for-ready client 50)))
 
-      ;; Should throw exception
-      (is (thrown? Exception (core/initialize! client)))
+      ;; Cleanup
+      (core/close! client)))
+
+  (testing "should timeout when waiting for ready with default timeout"
+    (let [client (core/create-client {:server {:command "echo" :args ["test"]}})]
+
+      ;; Should timeout with default timeout (use shorter timeout for testing)
+      (is (thrown? Exception (core/wait-for-ready client 50)))
 
       ;; Cleanup
       (core/close! client))))
