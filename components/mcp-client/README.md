@@ -57,12 +57,8 @@ A Clojure implementation of an MCP (Model Context Protocol) client with stdio tr
           :env {"NODE_ENV" "production"}
           :cwd "/path/to/working/dir"}}
 
-;; Legacy transport configuration (still supported)
-{:transport {:type :stdio 
-             :command ["python", "-m", "mcp_server", "--stdio"]}}
-
 ;; Vector-style configuration (backward compatibility)
-{:transport ["python", "-m", "mcp_server", "--stdio"]}
+{:server ["python", "-m", "mcp_server", "--stdio"]}
 ```
 
 ### Session State Management

@@ -28,20 +28,10 @@
       ;; Cleanup
       (core/close! client)))
 
-  (testing "Create client with legacy stdio transport"
-    (let [config {:transport {:type :stdio
-                              :command ["echo", "test"]}}
-          client (core/create-client config)]
-
-      (is (some? client))
-      (is (some? (:transport client)))
-      (is (some? (:session client)))
-
-      ;; Cleanup
-      (core/close! client)))
-
-  (testing "Create client with vector transport (backward compatibility)"
-    (let [config {:transport ["echo", "test"]}
+  (testing "Create client with vector server (backward compatibility)"
+    (let [config {:server ["echo", "test"]
+                  :client-info {:name "vector-test-client"}
+                  :capabilities {}}
           client (core/create-client config)]
 
       (is (some? client))
@@ -57,7 +47,7 @@
 
 (deftest client-state-test
   (testing "Client state predicates"
-    (let [client (core/create-client {:transport ["echo", "test"]})]
+    (let [client (core/create-client {:server ["echo", "test"]})]
 
       ;; Initially not ready and not in error
       (is (not (core/client-ready? client)))
@@ -77,7 +67,7 @@
 (deftest get-client-info-test
   (testing "Get client information"
     (let [client (core/create-client
-                  {:transport {:type :stdio :command ["echo", "test"]}
+                  {:server {:command "echo" :args ["test"]}
                    :client-info {:name "test-client" :version "1.0.0"}
                    :capabilities {:test true}})
           info (core/get-client-info client)]
@@ -93,7 +83,7 @@
 
 (deftest initialize-invalid-state-test
   (testing "Initialize throws exception when not in disconnected state"
-    (let [client (core/create-client {:transport ["echo", "test"]})]
+    (let [client (core/create-client {:server ["echo", "test"]})]
 
       ;; Transition to initializing state
       (swap! (:session client)

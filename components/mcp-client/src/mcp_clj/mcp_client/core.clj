@@ -19,25 +19,20 @@
 
 (defn- create-transport
   "Create transport based on configuration"
-  [{:keys [transport server] :as _config}]
-  (let [server-config (or server transport)]
-    (cond
-      ;; Claude Code MCP server configuration (map with :command)
-      (and (map? server-config) (:command server-config))
-      (stdio/create-transport server-config)
+  [{:keys [server] :as _config}]
+  (cond
+    ;; Claude Code MCP server configuration (map with :command)
+    (and (map? server) (:command server))
+    (stdio/create-transport server)
 
-      ;; Legacy stdio configuration (map with :type :stdio)
-      (and (map? server-config) (= (:type server-config) :stdio))
-      (stdio/create-transport (:command server-config))
+    ;; Backward compatibility: vector = stdio command
+    (vector? server)
+    (stdio/create-transport server)
 
-      ;; Backward compatibility: vector = stdio command
-      (vector? server-config)
-      (stdio/create-transport server-config)
-
-      :else
-      (throw (ex-info "Unsupported server configuration"
-                      {:config server-config
-                       :supported "Map with :command and :args, or vector of command parts"})))))
+    :else
+    (throw (ex-info "Unsupported server configuration"
+                    {:config server
+                     :supported "Map with :command and :args, or vector of command parts"}))))
 
 ;;; Initialization Protocol
 
