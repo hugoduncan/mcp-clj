@@ -6,9 +6,13 @@
    [mcp-clj.mcp-client.session :as session]))
 
 (deftest create-client-test
-  (testing "Create client with stdio transport"
-    (let [config {:transport {:type :stdio
-                              :command ["echo", "test"]}}
+  (testing "Create client with Claude Code MCP server configuration"
+    (let [config {:server {:command "echo"
+                           :args ["test"]
+                           :env {"TEST_VAR" "test_value"}}
+                  :client-info {:name "test-client"
+                                :version "1.0.0"}
+                  :capabilities {}}
           client (core/create-client config)]
 
       (is (some? client))
@@ -24,6 +28,18 @@
       ;; Cleanup
       (core/close! client)))
 
+  (testing "Create client with legacy stdio transport"
+    (let [config {:transport {:type :stdio
+                              :command ["echo", "test"]}}
+          client (core/create-client config)]
+
+      (is (some? client))
+      (is (some? (:transport client)))
+      (is (some? (:session client)))
+
+      ;; Cleanup
+      (core/close! client)))
+
   (testing "Create client with vector transport (backward compatibility)"
     (let [config {:transport ["echo", "test"]}
           client (core/create-client config)]
@@ -35,9 +51,9 @@
       ;; Cleanup
       (core/close! client)))
 
-  (testing "Invalid transport type throws exception"
+  (testing "Invalid server configuration throws exception"
     (is (thrown? Exception
-                 (core/create-client {:transport {:type :invalid}})))))
+                 (core/create-client {:server {:type :invalid}})))))
 
 (deftest client-state-test
   (testing "Client state predicates"

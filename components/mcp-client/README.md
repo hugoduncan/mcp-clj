@@ -17,11 +17,13 @@ A Clojure implementation of an MCP (Model Context Protocol) client with stdio tr
 ```clojure
 (require '[mcp-clj.mcp-client.core :as client])
 
-;; Create client with stdio transport
+;; Create client with Claude Code MCP server configuration
+;; This matches the format used in Claude Code's .mcp.json
 (def client
   (client/create-client
-   {:transport {:type :stdio 
-                :command ["python", "-m", "mcp_server", "--stdio"]}
+   {:server {:command "python"
+            :args ["-m", "mcp_server", "--stdio"]
+            :env {"PYTHONPATH" "/path/to/server"}}
     :client-info {:name "my-clojure-client"
                   :title "My Clojure MCP Client"
                   :version "1.0.0"}
@@ -45,12 +47,19 @@ A Clojure implementation of an MCP (Model Context Protocol) client with stdio tr
 (client/close! client)
 ```
 
-### Transport Configuration
+### Server Configuration
 
 ```clojure
-;; Map-style configuration (recommended)
+;; Claude Code MCP server configuration (recommended)
+;; Matches the format used in Claude Code's .mcp.json
+{:server {:command "uvx"
+          :args ["mcp-server-git", "--repository", "/path/to/repo"]
+          :env {"NODE_ENV" "production"}
+          :cwd "/path/to/working/dir"}}
+
+;; Legacy transport configuration (still supported)
 {:transport {:type :stdio 
-             :command ["uvx", "mcp-server-git", "--repository", "/path/to/repo"]}}
+             :command ["python", "-m", "mcp_server", "--stdio"]}}
 
 ;; Vector-style configuration (backward compatibility)
 {:transport ["python", "-m", "mcp_server", "--stdio"]}
@@ -89,7 +98,8 @@ The client maintains session state through these transitions:
 - **Async-only API**: Uses executors from json-rpc component
 - **Minimal capabilities**: Starts with empty capabilities for initialization-only
 - **Process lifecycle**: Simple launch/terminate (no auto-restart)
-- **Transport abstraction**: Supports `:transport` option key like mcp-server
+- **Server configuration**: Supports Claude Code MCP server format with `:server` key
+- **Process management**: Uses `clojure.java.process` for robust process handling
 
 ## Testing
 

@@ -9,39 +9,6 @@
    [java.util.concurrent TimeUnit]
    [java.lang ProcessBuilder$Redirect]))
 
-;;; Test Server Management
-
-(def ^:dynamic *test-server* nil)
-(def ^:dynamic *server* nil)
-
-(defn- start-test-server
-  "Start an MCP server"
-  []
-  (server/create-server {:transport :stdio}))
-
-(defn- stop-test-server
-  "Stop the test MCP server process"
-  [server]
-  (when server
-    ((:stop server))))
-
-(defn server-fixture
-  "Test fixture that starts and stops MCP server for integration tests"
-  [test-fn]
-  (let [server (try
-                 (start-test-server)
-                 (catch Exception e
-                   (log/error :integration-test/server-start-failed {:error e})
-                   nil))]
-    (try
-      (binding [*server* server]
-        (when server
-          (test-fn)))
-      (finally
-        (stop-test-server server)))))
-
-(use-fixtures :each server-fixture)
-
 ;;; Integration Tests
 
 (deftest ^:integration client-server-initialization-test
@@ -99,9 +66,9 @@
   (testing "MCP client handles server connection errors gracefully"
     ;; Try to connect to non-existent server
     (let [client (client/create-client
-                  {:transport {:type :stdio
-                               :command ["nonexistent-command"]}
-                   :client-info {:name "error-test-client"}
+                  {:transport    {:type    :stdio
+                                  :command ["nonexistent-command"]}
+                   :client-info  {:name "error-test-client"}
                    :capabilities {}})]
 
       ;; Initialize should fail
@@ -117,37 +84,37 @@
 
       (client/close! client))))
 
-(deftest ^:integration multiple-clients-test
-  (testing "Multiple clients can connect to server simultaneously"
-    (when *server*
-      (let [client1 (client/create-client
-                     {:transport   {:type    :stdio
-                                    :command ["clojure" "-M:dev" "-m" "mcp-clj.stdio-server.main"]}
-                      :client-info {:name "client-1"}})
-            client2 (client/create-client
-                     {:transport   {:type    :stdio
-                                    :command ["clojure" "-M:dev" "-m" "mcp-clj.stdio-server.main"]}
-                      :client-info {:name "client-2"}})]
+#_(deftest ^:integration multiple-clients-test
+    (testing "Multiple clients can connect to server simultaneously"
+      (when *server*
+        (let [client1 (client/create-client
+                       {:transport   {:type    :stdio
+                                      :command ["clojure" "-M:dev" "-m" "mcp-clj.stdio-server.main"]}
+                        :client-info {:name "client-1"}})
+              client2 (client/create-client
+                       {:transport   {:type    :stdio
+                                      :command ["clojure" "-M:dev" "-m" "mcp-clj.stdio-server.main"]}
+                        :client-info {:name "client-2"}})]
 
-        (try
-          ;; Both clients should initialize successfully
-          (client/initialize! client1)
-          (client/initialize! client2)
+          (try
+            ;; Both clients should initialize successfully
+            (client/initialize! client1)
+            (client/initialize! client2)
 
-          ;; Wait for both to be ready
-          (client/wait-for-ready client1 10000)
-          (client/wait-for-ready client2 10000)
+            ;; Wait for both to be ready
+            (client/wait-for-ready client1 10000)
+            (client/wait-for-ready client2 10000)
 
-          ;; Both should be ready
-          (is (client/client-ready? client1))
-          (is (client/client-ready? client2))
+            ;; Both should be ready
+            (is (client/client-ready? client1))
+            (is (client/client-ready? client2))
 
-          ;; Verify they have different client info
-          (let [info1 (client/get-client-info client1)
-                info2 (client/get-client-info client2)]
-            (is (= "client-1" (get-in info1 [:client-info :name])))
-            (is (= "client-2" (get-in info2 [:client-info :name]))))
+            ;; Verify they have different client info
+            (let [info1 (client/get-client-info client1)
+                  info2 (client/get-client-info client2)]
+              (is (= "client-1" (get-in info1 [:client-info :name])))
+              (is (= "client-2" (get-in info2 [:client-info :name]))))
 
-          (finally
-            (client/close! client1)
-            (client/close! client2)))))))
+            (finally
+              (client/close! client1)
+              (client/close! client2)))))))

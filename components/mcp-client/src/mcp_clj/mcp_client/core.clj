@@ -19,18 +19,25 @@
 
 (defn- create-transport
   "Create transport based on configuration"
-  [{:keys [transport] :as _config}]
-  (cond
-    (and (map? transport) (= (:type transport) :stdio))
-    (stdio/create-transport (:command transport))
+  [{:keys [transport server] :as _config}]
+  (let [server-config (or server transport)]
+    (cond
+      ;; Claude Code MCP server configuration (map with :command)
+      (and (map? server-config) (:command server-config))
+      (stdio/create-transport server-config)
 
-    (vector? transport) ; Backward compatibility: vector = stdio command
-    (stdio/create-transport transport)
+      ;; Legacy stdio configuration (map with :type :stdio)
+      (and (map? server-config) (= (:type server-config) :stdio))
+      (stdio/create-transport (:command server-config))
 
-    :else
-    (throw (ex-info "Unsupported transport type"
-                    {:transport transport
-                     :supported [:stdio]}))))
+      ;; Backward compatibility: vector = stdio command
+      (vector? server-config)
+      (stdio/create-transport server-config)
+
+      :else
+      (throw (ex-info "Unsupported server configuration"
+                      {:config server-config
+                       :supported "Map with :command and :args, or vector of command parts"})))))
 
 ;;; Initialization Protocol
 
@@ -169,7 +176,7 @@
 (defn wait-for-ready
   "Wait for client to be ready, with timeout"
   [client timeout-ms]
-  (let [start-time   (System/currentTimeMillis)
+  (let [start-time (System/currentTimeMillis)
         session-atom (:session client)]
     (loop []
       (let [session @session-atom
@@ -184,8 +191,8 @@
 
           (> elapsed timeout-ms)
           (throw (ex-info "Client initialization timeout"
-                          {:timeout-ms    timeout-ms
-                           :elapsed-ms    elapsed
+                          {:timeout-ms timeout-ms
+                           :elapsed-ms elapsed
                            :session-state (:state session)}))
 
           :else

@@ -2,15 +2,12 @@
   "MCP client stdio transport - launches server process and communicates via stdin/stdout"
   (:require
    [clojure.data.json :as json]
+   [clojure.java.process :as process]
    [mcp-clj.json-rpc.executor :as executor]
    [mcp-clj.json-rpc.json-protocol :as json-protocol]
    [mcp-clj.log :as log])
   (:import
-   [java.io BufferedReader
-    BufferedWriter
-    InputStreamReader
-    OutputStreamWriter]
-   [java.lang ProcessBuilder$Redirect]
+   [java.io BufferedReader BufferedWriter]
    [java.util.concurrent
     CompletableFuture
     ConcurrentHashMap
@@ -22,15 +19,39 @@
 
 ;;; Process Management
 
+(defn- build-process-command
+  "Build process command from server configuration"
+  [server-config]
+  (cond
+    ;; Claude Code MCP server configuration format
+    (and (map? server-config) (:command server-config))
+    {:command (into [(:command server-config)] (:args server-config []))
+     :env (:env server-config)
+     :dir (:cwd server-config)}
+
+    ;; Legacy format: vector of command + args
+    (vector? server-config)
+    {:command server-config}
+
+    :else
+    (throw (ex-info "Invalid server configuration"
+                    {:config server-config
+                     :expected "Map with :command and :args, or vector of command parts"}))))
+
 (defn- start-server-process
-  "Start MCP server process with given command"
-  [server-command]
-  (let [process-builder (ProcessBuilder. (into-array String server-command))
-        _ (.redirectError process-builder ProcessBuilder$Redirect/INHERIT)
-        process (.start process-builder)]
+  "Start MCP server process with given configuration"
+  [server-config]
+  (let [{:keys [command env dir]} (build-process-command server-config)
+        process-opts (cond-> {:in :pipe :out :pipe :err :inherit}
+                       env (assoc :env env)
+                       dir (assoc :dir dir))
+        process (process/start command process-opts)]
+
+    (log/debug :stdio/process-started {:command command :env env :dir dir})
+
     {:process process
-     :stdin (BufferedWriter. (OutputStreamWriter. (.getOutputStream process)))
-     :stdout (BufferedReader. (InputStreamReader. (.getInputStream process)))}))
+     :stdin (BufferedWriter. (:in process))
+     :stdout (BufferedReader. (:out process))}))
 
 ;;; JSON I/O
 
@@ -176,9 +197,12 @@
 
   ;; Terminate process
   (let [process (get-in transport [:process-info :process])]
-    (.destroy process)
-    (when-not (.waitFor process 5 TimeUnit/SECONDS)
-      (.destroyForcibly process)))
+    (try
+      (process/destroy-tree process)
+      (when-not (process/await process 5000)
+        (log/warn :stdio/process-force-kill))
+      (catch Exception e
+        (log/error :stdio/process-close-error {:error e}))))
 
   ;; Shutdown executor
   (executor/shutdown-executor (:executor transport)))
@@ -187,4 +211,4 @@
   "Check if transport process is still alive"
   [transport]
   (and @(:running transport)
-       (.isAlive (get-in transport [:process-info :process]))))
+       (process/alive? (get-in transport [:process-info :process]))))

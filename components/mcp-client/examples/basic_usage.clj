@@ -6,13 +6,13 @@
 (comment
   ;; Example usage of MCP client
 
-  ;; Create a client with stdio transport
-  ;; This would typically be a real MCP server command like:
-  ;; ["uvx", "mcp-server-git", "--repository", "/path/to/repo"]
+  ;; Create a client with Claude Code MCP server configuration
+  ;; This matches the format used in Claude Code's .mcp.json
   (def client
     (client/create-client
-     {:transport {:type :stdio
-                  :command ["cat"]} ; cat will echo JSON for testing
+     {:server {:command "cat"
+               :args []
+               :env {}} ; cat will echo JSON for testing
       :client-info {:name "example-client"
                     :version "1.0.0"}
       :capabilities {}}))
@@ -39,8 +39,9 @@
 
   (def real-client
     (client/create-client
-     {:transport {:type :stdio
-                  :command ["python", "-m", "mcp_server", "--stdio"]}
+     {:server {:command "python"
+               :args ["-m", "mcp_server", "--stdio"]
+               :env {"PYTHONPATH" "/path/to/server"}}
       :client-info {:name "my-clojure-client"
                     :title "My Clojure MCP Client"
                     :version "1.0.0"}
