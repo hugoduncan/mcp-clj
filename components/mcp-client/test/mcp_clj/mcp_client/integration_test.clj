@@ -8,77 +8,65 @@
 
 (deftest ^:integration client-server-initialization-test
   (testing "MCP client can initialize with real MCP server"
-    (let [client (client/create-client
-                  {:server       {:type    :stdio
-                                  :command "clojure"
-                                  :args    ["-M:stdio-server"]}
-                   :client-info  {:name    "integration-test-client"
-                                  :title   "Integration Test Client"
-                                  :version "1.0.0"}
-                   :capabilities {}})]
+    (with-open [client (client/create-client
+                        {:server       {:type    :stdio
+                                        :command "clojure"
+                                        :args    ["-M:stdio-server"]}
+                         :client-info  {:name    "integration-test-client"
+                                        :title   "Integration Test Client"
+                                        :version "1.0.0"}
+                         :capabilities {}})]
 
-      (try
-        ;; Client should start in disconnected state
-        (is (= :disconnected (:state @(:session client))))
-        (is (not (client/client-ready? client)))
+      ;; Client should start in disconnected state
+      (is (= :disconnected (:state @(:session client))))
+      (is (not (client/client-ready? client)))
 
-        ;; Initialize the client
-        (let [init-future (client/initialize! client)]
+      ;; Initialize the client
+      (let [init-future (client/initialize! client)]
 
-          ;; Should transition to initializing
-          (is (= :initializing (:state @(:session client))))
+        ;; Should transition to initializing
+        (is (= :initializing (:state @(:session client))))
 
-          (try
-            (prn :waiting-for-init)
-            ;; Wait for initialization to complete
-            ;; TODO add timeout
-            @init-future
-            ;; (client/wait-for-ready client 10000) ; 10 second timeout
+        (try
+          ;; Wait for initialization to complete
+          ;; TODO add timeout
+          @init-future
+          ;; (client/wait-for-ready client 10000) ; 10 second timeout
 
-            (prn :init-complete @init-future)
+          ;; Client should now be ready
+          (is (client/client-ready? client))
+          (is (not (client/client-error? client)))
 
-            ;; Client should now be ready
-            (is (client/client-ready? client))
-            (is (not (client/client-error? client)))
+          ;; Check session details
+          (let [info (client/get-client-info client)]
+            (is (= :ready (:state info)))
+            (is (= "2025-06-18" (:protocol-version info)))
+            (is (= {:name    "integration-test-client"
+                    :title   "Integration Test Client"
+                    :version "1.0.0"}
+                   (:client-info info)))
+            (is (= {} (:client-capabilities info)))
+            (is (some? (:server-info info))) ; Server should provide info
+            (is (map? (:server-capabilities info))) ; Server should declare capabilities
+            (is (:transport-alive? info)))
 
-            ;; Check session details
-            (let [info (client/get-client-info client)]
-              (is (= :ready (:state info)))
-              (is (= "2025-06-18" (:protocol-version info)))
-              (is (= {:name    "integration-test-client"
-                      :title   "Integration Test Client"
-                      :version "1.0.0"}
-                     (:client-info info)))
-              (is (= {} (:client-capabilities info)))
-              (is (some? (:server-info info))) ; Server should provide info
-              (is (map? (:server-capabilities info))) ; Server should declare capabilities
-              (is (:transport-alive? info)))
-
-            (catch Exception e
-              (let [session-info (client/get-client-info client)]
-                (is (not (str "Client initialization failed: "
-                              (.getMessage e)
-                              " Session: " session-info))))))
-          (prn :test-done))
-        (finally
-          ;; Clean up
-          (client/close! client)))))
-  (prn :test-completed))
+          (catch Exception e
+            (let [session-info (client/get-client-info client)]
+              (is (not (str "Client initialization failed: "
+                            (.getMessage e)
+                            " Session: " session-info))))))))))
 
 (deftest ^:integration client-server-error-handling-test
   (testing "MCP client handles server connection errors gracefully"
     ;; Try to connect to non-existent server
-    (let [client (client/create-client
-                  {:transport    {:type    :stdio
-                                  :command ["nonexistent-command"]}
-                   :client-info  {:name "error-test-client"}
-                   :capabilities {}})]
+    (with-open [client (client/create-client
+                        {:server       {:type    :stdio
+                                        :command "cat"}
+                         :client-info  {:name "error-test-client"}
+                         :capabilities {}})]
 
       ;; Initialize should fail
-      (client/initialize! client)
-
-      ;; Give it time to fail
-      (Thread/sleep 2000)
+      @(client/initialize! client)
 
       ;; Should be in error state
       (let [info (client/get-client-info client)]

@@ -3,13 +3,20 @@
   (:require
    [mcp-clj.log :as log]
    [mcp-clj.mcp-client.session :as session]
-   [mcp-clj.mcp-client.stdio :as stdio]))
+   [mcp-clj.mcp-client.stdio :as stdio])
+  (:import
+   [java.lang
+    AutoCloseable]))
 
 ;;; Client Record
 
+(declare close!)
+
 (defrecord MCPClient
-           [transport ; Transport implementation (stdio)
-            session]) ; Session state (atom)
+    [transport ; Transport implementation (stdio)
+     session]
+  AutoCloseable
+  (close [this] (close! this))) ; Session state (atom)
 
 ;;; Transport Creation
 
