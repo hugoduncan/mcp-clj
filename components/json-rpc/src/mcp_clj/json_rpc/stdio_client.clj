@@ -8,7 +8,8 @@
    [java.io BufferedReader
     BufferedWriter]
    [java.util.concurrent CompletableFuture
-    ConcurrentHashMap]))
+    ConcurrentHashMap
+    TimeUnit]))
 
 ;;; JSONRPClient Record
 
@@ -90,6 +91,40 @@
       (do
         (log/debug :client/receive {:message message})
         message))))
+
+(defn send-request!
+  "Send JSON-RPC request using JSONRPClient and writer function"
+  [json-rpc-client writer-fn method params timeout-ms]
+  (let [request-id (generate-request-id json-rpc-client)
+        future (java.util.concurrent.CompletableFuture.)
+        request {:jsonrpc "2.0"
+                 :id request-id
+                 :method method
+                 :params params}]
+
+    ;; Register pending request
+    (.put (:pending-requests json-rpc-client) request-id future)
+
+    ;; Send request using provided writer function
+    (try
+      (writer-fn request)
+
+      ;; Set timeout
+      (.orTimeout future timeout-ms TimeUnit/MILLISECONDS)
+
+      future
+      (catch Exception e
+        (.remove (:pending-requests json-rpc-client) request-id)
+        (.completeExceptionally future e)
+        future))))
+
+(defn send-notification!
+  "Send JSON-RPC notification using JSONRPClient and writer function"
+  [json-rpc-client writer-fn method params]
+  (let [notification {:jsonrpc "2.0"
+                      :method method
+                      :params params}]
+    (writer-fn notification)))
 
 (defn close-json-rpc-client!
   "Close the JSON-RPC client and cancel all pending requests"

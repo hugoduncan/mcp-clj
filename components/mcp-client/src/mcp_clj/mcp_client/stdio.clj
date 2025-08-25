@@ -10,8 +10,7 @@
     BufferedWriter
     InputStreamReader
     OutputStreamWriter]
-   [java.util.concurrent CompletableFuture
-    ConcurrentHashMap
+   [java.util.concurrent
     TimeUnit]))
 
 ;;; Configuration
@@ -61,11 +60,6 @@
   [writer message]
   (log/debug :client/send {:message message})
   (stdio-client/write-json-with-locking! writer message))
-
-(defn- read-json
-  "Read JSON message from process stdout"
-  [reader]
-  (stdio-client/read-json-with-logging reader))
 
 ;;; Transport Implementation
 
@@ -118,37 +112,16 @@
 (defn send-request!
   "Send JSON-RPC request and return CompletableFuture of response"
   [transport method params]
-  (let [request-id (generate-request-id transport)
-        future (CompletableFuture.)
-        request {:jsonrpc "2.0"
-                 :id request-id
-                 :method method
-                 :params params}
-        pending-requests (:pending-requests (:json-rpc-client transport))]
-
-    ;; Register pending request
-    (.put pending-requests request-id future)
-
-    ;; Send request
-    (try
-      (write-json! (get-in transport [:process-info :stdin]) request)
-
-      ;; Set timeout
-      (.orTimeout future request-timeout-ms TimeUnit/MILLISECONDS)
-
-      future
-      (catch Exception e
-        (.remove pending-requests request-id)
-        (.completeExceptionally future e)
-        future))))
+  (let [json-rpc-client (:json-rpc-client transport)
+        writer-fn #(write-json! (get-in transport [:process-info :stdin]) %)]
+    (stdio-client/send-request! json-rpc-client writer-fn method params request-timeout-ms)))
 
 (defn send-notification!
   "Send JSON-RPC notification (no response expected)"
   [transport method params]
-  (let [notification {:jsonrpc "2.0"
-                      :method method
-                      :params params}]
-    (write-json! (get-in transport [:process-info :stdin]) notification)))
+  (let [json-rpc-client (:json-rpc-client transport)
+        writer-fn #(write-json! (get-in transport [:process-info :stdin]) %)]
+    (stdio-client/send-notification! json-rpc-client writer-fn method params)))
 
 (defn close!
   "Close transport and terminate server process"

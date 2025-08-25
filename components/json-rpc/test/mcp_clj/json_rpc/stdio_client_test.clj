@@ -243,9 +243,9 @@
   (testing "JSONRPClient integration scenarios"
 
     (testing "complete request-response cycle simulation"
-      (let [client     (stdio-client/create-json-rpc-client)
+      (let [client (stdio-client/create-json-rpc-client)
             request-id (stdio-client/generate-request-id client)
-            future     (CompletableFuture.)]
+            future (CompletableFuture.)]
 
         ;; Simulate registering a request
         (.put (:pending-requests client) request-id future)
@@ -261,14 +261,14 @@
         (stdio-client/close-json-rpc-client! client)))
 
     (testing "multiple concurrent operations"
-      (let [client         (stdio-client/create-json-rpc-client)
+      (let [client (stdio-client/create-json-rpc-client)
             num-operations 50
-            futures        (atom [])]
+            futures (atom [])]
 
         ;; Create multiple pending requests
         (doseq [i (range num-operations)]
           (let [request-id (stdio-client/generate-request-id client)
-                future     (CompletableFuture.)]
+                future (CompletableFuture.)]
             (.put (:pending-requests client) request-id future)
             (swap! futures conj {:id request-id :future future})))
 
@@ -285,3 +285,81 @@
         (is (= 0 (.size (:pending-requests client))))
 
         (stdio-client/close-json-rpc-client! client)))))
+
+(deftest send-request-test
+  (testing "JSONRPClient send-request! functionality"
+    (let [client (stdio-client/create-json-rpc-client)
+          sent-requests (atom [])
+          writer-fn #(swap! sent-requests conj %)]
+
+      (testing "successful request sending"
+        (let [future (stdio-client/send-request! client writer-fn "test-method" {:param "value"} 5000)]
+
+          ;; Verify request was sent
+          (is (= 1 (count @sent-requests)))
+          (let [request (first @sent-requests)]
+            (is (= "2.0" (:jsonrpc request)))
+            (is (= "test-method" (:method request)))
+            (is (= {:param "value"} (:params request)))
+            (is (= 1 (:id request))))
+
+          ;; Verify future is pending
+          (is (not (.isDone future)))
+
+          ;; Simulate response
+          (let [response {:id 1 :result "success"}]
+            (stdio-client/handle-response client response))
+
+          ;; Verify future completed
+          (is (.isDone future))
+          (is (= "success" (.get future 100 TimeUnit/MILLISECONDS)))))
+
+      (testing "request timeout handling"
+        (let [future (stdio-client/send-request! client writer-fn "timeout-method" {} 50)]
+
+          ;; Wait for timeout
+          (Thread/sleep 100)
+
+          ;; Verify future completed with timeout
+          (is (.isDone future))
+          (is (.isCompletedExceptionally future))))
+
+      (testing "writer function error handling"
+        (let [failing-writer-fn #(throw (RuntimeException. "Write failed"))
+              future (stdio-client/send-request! client failing-writer-fn "error-method" {} 5000)]
+
+          ;; Verify future completed exceptionally
+          (is (.isDone future))
+          (is (.isCompletedExceptionally future))))
+
+      (stdio-client/close-json-rpc-client! client))))
+
+(deftest send-notification-test
+  (testing "JSONRPClient send-notification! functionality"
+    (let [client (stdio-client/create-json-rpc-client)
+          sent-notifications (atom [])
+          writer-fn #(swap! sent-notifications conj %)]
+
+      (testing "notification sending"
+        (stdio-client/send-notification! client writer-fn "notify-method" {:data "test"})
+
+        ;; Verify notification was sent
+        (is (= 1 (count @sent-notifications)))
+        (let [notification (first @sent-notifications)]
+          (is (= "2.0" (:jsonrpc notification)))
+          (is (= "notify-method" (:method notification)))
+          (is (= {:data "test"} (:params notification)))
+          (is (nil? (:id notification)))))
+
+      (testing "multiple notifications"
+        (stdio-client/send-notification! client writer-fn "notify-1" {})
+        (stdio-client/send-notification! client writer-fn "notify-2" {:value 42})
+
+        ;; Verify all notifications sent
+        (is (= 3 (count @sent-notifications)))
+        (let [notifications @sent-notifications]
+          (is (= "notify-1" (:method (nth notifications 1))))
+          (is (= "notify-2" (:method (nth notifications 2))))
+          (is (= {:value 42} (:params (nth notifications 2))))))
+
+      (stdio-client/close-json-rpc-client! client))))
