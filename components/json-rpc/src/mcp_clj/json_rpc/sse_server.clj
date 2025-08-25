@@ -178,8 +178,9 @@
 (defn close!
   [server id]
   (let [session (@(:session-id->session server) id)]
-    ((:close!-fn session))
-    (swap! (:session-id->session server) dissoc id)))
+    (when session
+      ((:close!-fn session))
+      (swap! (:session-id->session server) dissoc id))))
 
 (defn notify-all!
   "Send a notification to all active sessions"

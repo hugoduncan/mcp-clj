@@ -5,10 +5,13 @@
    [mcp-clj.json-rpc.executor :as executor]
    [mcp-clj.json-rpc.json-protocol :as json-protocol]
    [mcp-clj.json-rpc.protocols :as protocols]
+   [mcp-clj.json-rpc.stdio :as stdio]
    [mcp-clj.log :as log])
   (:import
    [java.io BufferedReader
-    InputStreamReader]
+    BufferedWriter
+    InputStreamReader
+    OutputStreamWriter]
    [java.util.concurrent RejectedExecutionException]))
 
 ;;; Configuration
@@ -18,31 +21,23 @@
 ;;; JSON I/O
 
 (defn- read-json
+  "Read JSON from reader using unified stdio implementation"
   [reader]
-  (try
-    (binding [*in* reader]
-      (let [line     (read-line)
-            json-str (when line
-                       (json/read-str line :key-fn keyword))]
-        (when json-str
-          [json-str nil])))
-    (catch java.io.EOFException _
-      nil)
-    (catch Exception e
-      [:error e])))
+  (stdio/read-json reader))
 
 (defn- write-json!
-  "Write JSON response to output stream"
+  "Write JSON response to output stream with locking and error handling"
   [output-stream response]
   (try
-    (let [json-str (json/write-str response)]
-      (locking output-stream
-        (binding [*out* output-stream]
+    (locking output-stream
+      (binding [*out* output-stream]
+        ;; Use the original approach that worked with PrintWriter/*out*
+        (let [json-str (json/write-str response)]
           (println json-str)
           (flush))))
     (catch Exception e
       (binding [*out* *err*]
-        (log/error :rpc/write {:msg       "JSON write error:"
+        (log/error :rpc/write {:msg "JSON write error:"
                                :exception (.getMessage e)})))))
 
 ;;; JSON-RPC Request Handling
@@ -114,11 +109,11 @@
 ;;; Server
 
 (defrecord StdioServer
-    [executor
-     handlers
-     out
-     server-future
-     stop-fn])
+           [executor
+            handlers
+            out
+            server-future
+            stop-fn])
 
 (defn- input-reader
   []
@@ -128,16 +123,16 @@
 (defn create-server
   "Create JSON-RPC server over stdio."
   [{:keys [num-threads handlers]
-    :or   {num-threads (* 2 (.availableProcessors (Runtime/getRuntime)))
-           handlers    {}}}]
+    :or {num-threads (* 2 (.availableProcessors (Runtime/getRuntime)))
+         handlers {}}}]
   (log/debug :server/starting {:msg "Starting"})
   (let [executor (executor/create-executor num-threads)
         handlers (atom handlers)
-        running  (atom true)
-        out      *out*
-        in       (input-reader)
-        #_       (PushbackReader.
-                  (InputStreamReader. System/in) 1024)
+        running (atom true)
+        out *out*
+        in (input-reader)
+        #_(PushbackReader.
+           (InputStreamReader. System/in) 1024)
 
         server-future
         (future
@@ -147,7 +142,7 @@
               (loop []
                 (when @running
                   (let [[rpc-call ex :as resp] (read-json in)
-                        _                      (log/debug :rpc/call {:call rpc-call})
+                        _ (log/debug :rpc/call {:call rpc-call})
                         v
                         (cond
                           (nil? resp)

@@ -14,9 +14,9 @@
 (declare close!)
 
 (defrecord MCPClient
-           [transport ; Transport implementation (stdio)
-            session ; Session state (atom)
-            initialization-future] ; CompletableFuture for initialization process
+    [transport ; Transport implementation (stdio)
+     session ; Session state (atom)
+     initialization-future] ; CompletableFuture for initialization process
   AutoCloseable
   (close [this] (close! this))) ; Session state (atom)
 
@@ -196,7 +196,7 @@
 
 (defn list-tools
   "Discover available tools from the server.
-  
+
   Returns a map with :tools key containing vector of tool definitions.
   Each tool has :name, :description, and :inputSchema."
   [client]
@@ -204,7 +204,7 @@
 
 (defn call-tool
   "Execute a tool with the given name and arguments.
-  
+
   Returns a ToolResult record with :content and :isError fields.
   Content can be text, images, audio, or resource references."
   [client tool-name arguments]
@@ -212,7 +212,7 @@
 
 (defn available-tools?
   "Check if any tools are available from the server.
-  
+
   Returns true if tools are available, false otherwise.
   Uses cached tools if available, otherwise queries the server."
   [client]

@@ -21,8 +21,8 @@
           server-thread (future
                           (try
                             (.countDown server-ready-latch)
-                           ;; In a real scenario, the server would read from stdin
-                           ;; For this test, we'll simulate server being ready
+                            ;; In a real scenario, the server would read from stdin
+                            ;; For this test, we'll simulate server being ready
                             @client-ready-latch
                             (catch Exception e
                               (log/error :test-server-error {:error e}))))]
@@ -32,24 +32,26 @@
 
       ;; Create client (this will fail to connect to stdio, but we can test the API)
       (let [client (client/create-client
-                    {:transport {:type :stdio
-                                 :command ["echo", "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"serverInfo\":{\"name\":\"test-server\",\"version\":\"1.0.0\"}}}"]}
-                     :client-info {:name "simple-test-client"
-                                   :title "Simple Test Client"
-                                   :version "1.0.0"}
+                    {:server
+                     {:type    :stdio
+                      :command "echo"
+                      :args    [ "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"serverInfo\":{\"name\":\"test-server\",\"version\":\"1.0.0\"}}}"]}
+                     :client-info  {:name    "simple-test-client"
+                                    :title   "Simple Test Client"
+                                    :version "1.0.0"}
                      :capabilities {}})]
 
         ;; Check initial state
-        (is (= :disconnected (:state @(:session client))))
+        (is (= :initializing (:state @(:session client))))
         (is (not (client/client-ready? client)))
         (is (not (client/client-error? client)))
 
         ;; Verify client info
         (let [info (client/get-client-info client)]
-          (is (= :disconnected (:state info)))
+          (is (= :initializing (:state info)))
           (is (= "2025-06-18" (:protocol-version info)))
-          (is (= {:name "simple-test-client"
-                  :title "Simple Test Client"
+          (is (= {:name    "simple-test-client"
+                  :title   "Simple Test Client"
                   :version "1.0.0"}
                  (:client-info info)))
           (is (= {} (:client-capabilities info)))
@@ -65,19 +67,19 @@
 (deftest ^:integration client-session-state-transitions-test
   (testing "Client session transitions through states correctly"
     (let [client (client/create-client
-                  {:transport {:type :stdio
-                               :command ["cat"]} ; cat will read but not respond properly
-                   :client-info {:name "state-test-client"}
+                  {:server       {:type    :stdio
+                                  :command "cat"} ; cat will read but not respond properly
+                   :client-info  {:name "state-test-client"}
                    :capabilities {}})]
 
       ;; Initial state
-      (is (= :disconnected (:state @(:session client))))
-
       ;; Try to initialize (will fail with cat, but should transition to initializing first)
-
-;; Should transition to initializing
-      (Thread/sleep 100) ; Give it a moment
       (is (= :initializing (:state @(:session client))))
+
+
+      ;; Should transition to erro
+      (Thread/sleep 100) ; Give it a moment
+      (is (= :error (:state @(:session client))))
 
       ;; Wait a bit more - it should eventually error or timeout
       (Thread/sleep 2000)
@@ -92,23 +94,17 @@
   (testing "Client accepts various transport configurations"
     ;; Test map-style transport
     (let [client1 (client/create-client
-                   {:transport {:type :stdio :command ["echo", "test"]}
+                   {:server      {:type :stdio :command "echo" :args ["test"]}
                     :client-info {:name "config-test-1"}})]
       (is (some? client1))
       (is (= "config-test-1" (get-in @(:session client1) [:client-info :name])))
       (client/close! client1))
 
-    ;; Test vector-style transport (backward compatibility) 
-    (let [client2 (client/create-client
-                   {:transport ["echo", "test"]
-                    :client-info {:name "config-test-2"}})]
-      (is (some? client2))
-      (is (= "config-test-2" (get-in @(:session client2) [:client-info :name])))
-      (client/close! client2))
-
     ;; Test custom protocol version
     (let [client3 (client/create-client
-                   {:transport ["echo", "test"]
+                   {:server           {:type    :stdio
+                                       :command "echo"
+                                       :args    ["test"]}
                     :protocol-version "2024-11-05"})]
       (is (some? client3))
       (is (= "2024-11-05" (:protocol-version @(:session client3))))

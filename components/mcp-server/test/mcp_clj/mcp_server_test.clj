@@ -54,12 +54,12 @@
   "Test fixture for server lifecycle"
   [f]
   (let [server (mcp/create-server
-                {:port 0
-                 :threads 2
+                {:port       0
+                 :threads    2
                  :queue-size 10
-                 :tools {"test-tool" test-tool
-                         "error-test-tool" error-test-tool}
-                 :prompts {"test-prompt" test-prompt}})]
+                 :tools      {"test-tool"       test-tool
+                              "error-test-tool" error-test-tool}
+                 :prompts    {"test-prompt" test-prompt}})]
     (try
       (binding [*server* server]
         (f))
