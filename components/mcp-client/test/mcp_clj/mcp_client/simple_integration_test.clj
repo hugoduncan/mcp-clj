@@ -74,9 +74,8 @@
       (is (= :disconnected (:state @(:session client))))
 
       ;; Try to initialize (will fail with cat, but should transition to initializing first)
-      (client/initialize! client)
 
-      ;; Should transition to initializing
+;; Should transition to initializing
       (Thread/sleep 100) ; Give it a moment
       (is (= :initializing (:state @(:session client))))
 

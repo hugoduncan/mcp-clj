@@ -3,7 +3,8 @@
   (:require
    [mcp-clj.log :as log]
    [mcp-clj.mcp-client.session :as session]
-   [mcp-clj.mcp-client.stdio :as stdio])
+   [mcp-clj.mcp-client.stdio :as stdio]
+   [mcp-clj.mcp-client.tools :as tools])
   (:import
    [java.lang AutoCloseable]
    [java.util.concurrent CompletableFuture ExecutionException TimeUnit TimeoutException]))
@@ -190,3 +191,29 @@
                         :session-state (:state @(:session client))})))
      (catch ExecutionException e
        (throw (.getCause e))))))
+
+;;; Tool Calling API
+
+(defn list-tools
+  "Discover available tools from the server.
+  
+  Returns a map with :tools key containing vector of tool definitions.
+  Each tool has :name, :description, and :inputSchema."
+  [client]
+  (tools/list-tools-impl client))
+
+(defn call-tool
+  "Execute a tool with the given name and arguments.
+  
+  Returns a ToolResult record with :content and :isError fields.
+  Content can be text, images, audio, or resource references."
+  [client tool-name arguments]
+  (tools/call-tool-impl client tool-name arguments))
+
+(defn available-tools?
+  "Check if any tools are available from the server.
+  
+  Returns true if tools are available, false otherwise.
+  Uses cached tools if available, otherwise queries the server."
+  [client]
+  (tools/available-tools?-impl client))
