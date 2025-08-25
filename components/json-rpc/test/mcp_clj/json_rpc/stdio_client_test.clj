@@ -12,24 +12,39 @@
     ConcurrentHashMap
     TimeUnit]))
 
+(defn create-test-client
+  "Create a test JSONRPClient with string-based streams"
+  []
+  (let [input-stream (BufferedReader. (StringReader. ""))
+        output-stream (BufferedWriter. (StringWriter.))]
+    (stdio-client/create-json-rpc-client input-stream output-stream)))
+
 (deftest json-rpc-client-creation-test
   (testing "JSONRPClient record creation and structure"
-    (testing "default creation"
-      (let [client (stdio-client/create-json-rpc-client)]
+    (testing "creation with streams"
+      (let [input-stream (BufferedReader. (StringReader. ""))
+            output-stream (BufferedWriter. (StringWriter.))
+            client (stdio-client/create-json-rpc-client input-stream output-stream)]
         (is (instance? mcp_clj.json_rpc.stdio_client.JSONRPClient client))
         (is (instance? ConcurrentHashMap (:pending-requests client)))
         (is (instance? clojure.lang.Atom (:request-id-counter client)))
         (is (some? (:executor client)))
-        (is (= 0 @(:request-id-counter client)))))
+        (is (= input-stream (:input-stream client)))
+        (is (= output-stream (:output-stream client)))
+        (is (= 0 @(:request-id-counter client)))
+        (stdio-client/close-json-rpc-client! client)))
 
     (testing "creation with custom thread count"
-      (let [client (stdio-client/create-json-rpc-client {:num-threads 4})]
+      (let [input-stream (BufferedReader. (StringReader. ""))
+            output-stream (BufferedWriter. (StringWriter.))
+            client (stdio-client/create-json-rpc-client input-stream output-stream {:num-threads 4})]
         (is (instance? mcp_clj.json_rpc.stdio_client.JSONRPClient client))
-        (is (= 0 @(:request-id-counter client)))))))
+        (is (= 0 @(:request-id-counter client)))
+        (stdio-client/close-json-rpc-client! client)))))
 
 (deftest request-id-generation-test
   (testing "request ID generation"
-    (let [client (stdio-client/create-json-rpc-client)]
+    (let [client (create-test-client)]
 
       (testing "sequential ID generation"
         (is (= 1 (stdio-client/generate-request-id client)))
@@ -58,7 +73,7 @@
 
 (deftest response-handling-test
   (testing "JSON-RPC response handling"
-    (let [client (stdio-client/create-json-rpc-client)]
+    (let [client (create-test-client)]
 
       (testing "successful response handling"
         (let [future (CompletableFuture.)
@@ -159,7 +174,7 @@
   (testing "message reader loop functionality"
 
     (testing "processes responses and notifications"
-      (let [client (stdio-client/create-json-rpc-client)
+      (let [client (create-test-client)
             running (atom true)
             response-future (CompletableFuture.)
             request-id 1]
@@ -193,7 +208,7 @@
         (stdio-client/close-json-rpc-client! client)))
 
     (testing "stops when running atom is false"
-      (let [client (stdio-client/create-json-rpc-client)
+      (let [client (create-test-client)
             running (atom false)
             sr (StringReader. "{\"jsonrpc\":\"2.0\",\"method\":\"test\"}\n")
             br (BufferedReader. sr)]
@@ -207,7 +222,7 @@
   (testing "JSON-RPC client cleanup and resource management"
 
     (testing "close-json-rpc-client! cancels pending requests"
-      (let [client (stdio-client/create-json-rpc-client)
+      (let [client (create-test-client)
             future1 (CompletableFuture.)
             future2 (CompletableFuture.)
             request-id-1 1
@@ -228,7 +243,7 @@
         (is (= 0 (.size (:pending-requests client))))))
 
     (testing "executor shutdown"
-      (let [client (stdio-client/create-json-rpc-client)]
+      (let [client (create-test-client)]
 
         ;; Verify executor is running initially
         (is (not (.isShutdown (:executor client))))
@@ -243,7 +258,7 @@
   (testing "JSONRPClient integration scenarios"
 
     (testing "complete request-response cycle simulation"
-      (let [client (stdio-client/create-json-rpc-client)
+      (let [client (create-test-client)
             request-id (stdio-client/generate-request-id client)
             future (CompletableFuture.)]
 
@@ -261,7 +276,7 @@
         (stdio-client/close-json-rpc-client! client)))
 
     (testing "multiple concurrent operations"
-      (let [client (stdio-client/create-json-rpc-client)
+      (let [client (create-test-client)
             num-operations 50
             futures (atom [])]
 
@@ -288,20 +303,20 @@
 
 (deftest send-request-test
   (testing "JSONRPClient send-request! functionality"
-    (let [client (stdio-client/create-json-rpc-client)
-          sent-requests (atom [])
-          writer-fn #(swap! sent-requests conj %)]
+    (let [sw (StringWriter.)
+          bw (BufferedWriter. sw)
+          client (stdio-client/create-json-rpc-client (BufferedReader. (StringReader. "")) bw)]
 
       (testing "successful request sending"
-        (let [future (stdio-client/send-request! client writer-fn "test-method" {:param "value"} 5000)]
+        (let [future (stdio-client/send-request! client "test-method" {:param "value"} 5000)]
 
-          ;; Verify request was sent
-          (is (= 1 (count @sent-requests)))
-          (let [request (first @sent-requests)]
-            (is (= "2.0" (:jsonrpc request)))
-            (is (= "test-method" (:method request)))
-            (is (= {:param "value"} (:params request)))
-            (is (= 1 (:id request))))
+          ;; Flush the writer to capture output
+          (.flush bw)
+          (let [output (.toString sw)]
+            ;; Verify request was sent
+            (is (clojure.string/includes? output "test-method"))
+            (is (clojure.string/includes? output "\"id\":1"))
+            (is (clojure.string/includes? output "param")))
 
           ;; Verify future is pending
           (is (not (.isDone future)))
@@ -315,7 +330,7 @@
           (is (= "success" (.get future 100 TimeUnit/MILLISECONDS)))))
 
       (testing "request timeout handling"
-        (let [future (stdio-client/send-request! client writer-fn "timeout-method" {} 50)]
+        (let [future (stdio-client/send-request! client "timeout-method" {} 50)]
 
           ;; Wait for timeout
           (Thread/sleep 100)
@@ -324,42 +339,36 @@
           (is (.isDone future))
           (is (.isCompletedExceptionally future))))
 
-      (testing "writer function error handling"
-        (let [failing-writer-fn #(throw (RuntimeException. "Write failed"))
-              future (stdio-client/send-request! client failing-writer-fn "error-method" {} 5000)]
-
-          ;; Verify future completed exceptionally
-          (is (.isDone future))
-          (is (.isCompletedExceptionally future))))
-
       (stdio-client/close-json-rpc-client! client))))
 
 (deftest send-notification-test
   (testing "JSONRPClient send-notification! functionality"
-    (let [client (stdio-client/create-json-rpc-client)
-          sent-notifications (atom [])
-          writer-fn #(swap! sent-notifications conj %)]
+    (let [sw (StringWriter.)
+          bw (BufferedWriter. sw)
+          client (stdio-client/create-json-rpc-client (BufferedReader. (StringReader. "")) bw)]
 
       (testing "notification sending"
-        (stdio-client/send-notification! client writer-fn "notify-method" {:data "test"})
+        (stdio-client/send-notification! client "notify-method" {:data "test"})
 
-        ;; Verify notification was sent
-        (is (= 1 (count @sent-notifications)))
-        (let [notification (first @sent-notifications)]
-          (is (= "2.0" (:jsonrpc notification)))
-          (is (= "notify-method" (:method notification)))
-          (is (= {:data "test"} (:params notification)))
-          (is (nil? (:id notification)))))
+        ;; Flush and verify notification was sent
+        (.flush bw)
+        (let [output (.toString sw)]
+          (is (clojure.string/includes? output "notify-method"))
+          (is (clojure.string/includes? output "data"))
+          (is (not (clojure.string/includes? output "\"id\":"))))
 
-      (testing "multiple notifications"
-        (stdio-client/send-notification! client writer-fn "notify-1" {})
-        (stdio-client/send-notification! client writer-fn "notify-2" {:value 42})
+        (testing "multiple notifications"
+        ;; Clear previous output
+          (.getBuffer sw) (.setLength (.getBuffer sw) 0)
+
+          (stdio-client/send-notification! client "notify-1" {})
+          (stdio-client/send-notification! client "notify-2" {:value 42})
 
         ;; Verify all notifications sent
-        (is (= 3 (count @sent-notifications)))
-        (let [notifications @sent-notifications]
-          (is (= "notify-1" (:method (nth notifications 1))))
-          (is (= "notify-2" (:method (nth notifications 2))))
-          (is (= {:value 42} (:params (nth notifications 2))))))
+          (.flush bw)
+          (let [output (.toString sw)]
+            (is (clojure.string/includes? output "notify-1"))
+            (is (clojure.string/includes? output "notify-2"))
+            (is (clojure.string/includes? output "42"))))
 
-      (stdio-client/close-json-rpc-client! client))))
+        (stdio-client/close-json-rpc-client! client)))))

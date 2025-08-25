@@ -16,20 +16,24 @@
 (defrecord JSONRPClient
            [pending-requests ; ConcurrentHashMap of request-id -> CompletableFuture  
             request-id-counter ; atom for generating unique request IDs
-            executor]) ; executor for async operations
+            executor ; executor for async operations
+            input-stream ; BufferedReader for reading responses
+            output-stream]) ; BufferedWriter for sending requests
 
 ;;; JSONRPClient Functions
 
 (defn create-json-rpc-client
   "Create a JSON-RPC client for managing requests and responses"
-  ([]
-   (create-json-rpc-client {}))
-  ([{:keys [num-threads]
-     :or {num-threads 2}}]
+  ([input-stream output-stream]
+   (create-json-rpc-client input-stream output-stream {}))
+  ([input-stream output-stream {:keys [num-threads]
+                                :or {num-threads 2}}]
    (->JSONRPClient
     (ConcurrentHashMap.)
     (atom 0)
-    (executor/create-executor num-threads))))
+    (executor/create-executor num-threads)
+    input-stream
+    output-stream)))
 
 (defn generate-request-id
   "Generate unique request ID using JSONRPClient counter"
@@ -93,10 +97,10 @@
         message))))
 
 (defn send-request!
-  "Send JSON-RPC request using JSONRPClient and writer function"
-  [json-rpc-client writer-fn method params timeout-ms]
+  "Send JSON-RPC request using JSONRPClient's output stream"
+  [json-rpc-client method params timeout-ms]
   (let [request-id (generate-request-id json-rpc-client)
-        future (java.util.concurrent.CompletableFuture.)
+        future (CompletableFuture.)
         request {:jsonrpc "2.0"
                  :id request-id
                  :method method
@@ -105,9 +109,9 @@
     ;; Register pending request
     (.put (:pending-requests json-rpc-client) request-id future)
 
-    ;; Send request using provided writer function
+    ;; Send request using JSONRPClient's output stream
     (try
-      (writer-fn request)
+      (write-json-with-locking! (:output-stream json-rpc-client) request)
 
       ;; Set timeout
       (.orTimeout future timeout-ms TimeUnit/MILLISECONDS)
@@ -119,12 +123,12 @@
         future))))
 
 (defn send-notification!
-  "Send JSON-RPC notification using JSONRPClient and writer function"
-  [json-rpc-client writer-fn method params]
+  "Send JSON-RPC notification using JSONRPClient's output stream"
+  [json-rpc-client method params]
   (let [notification {:jsonrpc "2.0"
                       :method method
                       :params params}]
-    (writer-fn notification)))
+    (write-json-with-locking! (:output-stream json-rpc-client) notification)))
 
 (defn close-json-rpc-client!
   "Close the JSON-RPC client and cancel all pending requests"
@@ -133,6 +137,10 @@
   (doseq [[_id future] (:pending-requests json-rpc-client)]
     (.cancel ^CompletableFuture future true))
   (.clear ^ConcurrentHashMap (:pending-requests json-rpc-client))
+
+  ;; Close streams
+  (try (.close ^BufferedReader (:input-stream json-rpc-client)) (catch Exception _))
+  (try (.close ^BufferedWriter (:output-stream json-rpc-client)) (catch Exception _))
 
   ;; Shutdown executor
   (executor/shutdown-executor (:executor json-rpc-client)))

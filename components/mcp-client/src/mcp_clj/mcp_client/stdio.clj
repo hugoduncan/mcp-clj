@@ -55,12 +55,6 @@
 
 ;;; JSON I/O
 
-(defn- write-json!
-  "Write JSON message to process stdin"
-  [writer message]
-  (log/debug :client/send {:message message})
-  (stdio-client/write-json-with-locking! writer message))
-
 ;;; Transport Implementation
 
 (defrecord StdioTransport
@@ -95,7 +89,8 @@
   "Create stdio transport by launching MCP server process"
   [server-command]
   (let [process-info (start-server-process server-command)
-        json-rpc-client (stdio-client/create-json-rpc-client)
+        {:keys [stdin stdout]} process-info
+        json-rpc-client (stdio-client/create-json-rpc-client stdout stdin)
         running (atom true)
         transport (->StdioTransport
                    server-command
@@ -112,31 +107,20 @@
 (defn send-request!
   "Send JSON-RPC request and return CompletableFuture of response"
   [transport method params]
-  (let [json-rpc-client (:json-rpc-client transport)
-        writer-fn #(write-json! (get-in transport [:process-info :stdin]) %)]
-    (stdio-client/send-request! json-rpc-client writer-fn method params request-timeout-ms)))
+  (stdio-client/send-request! (:json-rpc-client transport) method params request-timeout-ms))
 
 (defn send-notification!
   "Send JSON-RPC notification (no response expected)"
   [transport method params]
-  (let [json-rpc-client (:json-rpc-client transport)
-        writer-fn #(write-json! (get-in transport [:process-info :stdin]) %)]
-    (stdio-client/send-notification! json-rpc-client writer-fn method params)))
+  (stdio-client/send-notification! (:json-rpc-client transport) method params))
 
 (defn close!
   "Close transport and terminate server process"
   [transport]
   (reset! (:running transport) false)
 
-  ;; Close JSON-RPC client (cancels pending requests and shuts down executor)
+  ;; Close JSON-RPC client (cancels pending requests, closes streams, shuts down executor)
   (stdio-client/close-json-rpc-client! (:json-rpc-client transport))
-
-  ;; Close streams
-  (log/warn :client/closing-streams)
-  (let [{:keys [stdin stdout]} (:process-info transport)]
-    (log/warn :client/closing-streams {:stdin stdin :stdout stdout})
-    (try (.close stdin) (catch Exception _))
-    #_(try (.close stdout) (catch Exception _)))
 
   ;; Terminate process
   (log/warn :client/killing-process)
