@@ -30,15 +30,21 @@
              (ex-info "No mock response configured"
                       {:method method :params params}))))))))
 
-(deftest tool-result-test
-  (testing "ToolResult creation and access"
-    (let [result (tools/->ToolResult "test content" false)]
-      (is (= "test content" (:content result)))
-      (is (= false (:isError result))))
+(deftest call-tool-success-test
+  (testing "successful tool execution returns content directly"
+    (let [client (create-mock-client {"tools/call" {:content "success result" :isError false}})]
+      (is (= "success result" (tools/call-tool-impl client "test-tool" {})))))
 
-    (let [error-result (tools/->ToolResult "error message" true)]
-      (is (= "error message" (:content error-result)))
-      (is (= true (:isError error-result))))))
+  (testing "tool execution with JSON content parsing"
+    (let [client (create-mock-client {"tools/call" {:content "{\"key\": \"value\"}" :isError false}})]
+      (is (= {"key" "value"} (tools/call-tool-impl client "test-tool" {}))))))
+
+(deftest call-tool-error-test
+  (testing "tool execution throws on error"
+    (let [client (create-mock-client {"tools/call" {:content "error message" :isError true}})]
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                            #"Tool execution failed: test-tool"
+                            (tools/call-tool-impl client "test-tool" {}))))))
 
 (deftest tools-cache-test
   (testing "tools cache creation and access"
@@ -61,7 +67,7 @@
                         :transport {:send-request! mock-transport})]
 
       ;; Mock stdio/send-request! to return our mock transport response
-      (with-redefs [mcp-clj.mcp-client.stdio/send-request!
+      (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
                     (fn [transport method params]
                       (CompletableFuture/completedFuture
                        {:tools mock-tools}))]
@@ -72,7 +78,7 @@
 
   (testing "error handling in tools list"
     (let [client (create-mock-client {})]
-      (with-redefs [mcp-clj.mcp-client.stdio/send-request!
+      (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
                     (fn [transport method params]
                       (throw (ex-info "Connection failed" {})))]
         (is (thrown-with-msg?
@@ -82,19 +88,17 @@
 (deftest call-tool-impl-test
   (testing "successful tool call"
     (let [client (create-mock-client {})]
-      (with-redefs [mcp-clj.mcp-client.stdio/send-request!
+      (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
                     (fn [transport method params]
                       (CompletableFuture/completedFuture
                        {:content "tool result"
                         :isError false}))]
         (let [result (tools/call-tool-impl client "test-tool" {:input "test"})]
-          (is (instance? mcp_clj.mcp_client.tools.ToolResult result))
-          (is (= "tool result" (:content result)))
-          (is (= false (:isError result)))))))
+          (is (= "tool result" result))))))
 
   (testing "tool call with error response"
     (let [client (create-mock-client {})]
-      (with-redefs [mcp-clj.mcp-client.stdio/send-request!
+      (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
                     (fn [transport method params]
                       (CompletableFuture/completedFuture
                        {:content "Tool execution failed"
@@ -105,7 +109,7 @@
 
   (testing "tool call with transport error"
     (let [client (create-mock-client {})]
-      (with-redefs [mcp-clj.mcp-client.stdio/send-request!
+      (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
                     (fn [transport method params]
                       (throw (ex-info "Transport error" {})))]
         (is (thrown-with-msg?
