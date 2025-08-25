@@ -1,6 +1,7 @@
 (ns mcp-clj.mcp-client.core
   "MCP client implementation with initialization support"
   (:require
+   [mcp-clj.json-rpc.stdio-client :as stdio-client]
    [mcp-clj.log :as log]
    [mcp-clj.mcp-client.session :as session]
    [mcp-clj.mcp-client.stdio :as stdio]
@@ -14,9 +15,9 @@
 (declare close!)
 
 (defrecord MCPClient
-    [transport ; Transport implementation (stdio)
-     session ; Session state (atom)
-     initialization-future] ; CompletableFuture for initialization process
+           [transport ; Transport implementation (stdio)
+            session ; Session state (atom)
+            initialization-future] ; CompletableFuture for initialization process
   AutoCloseable
   (close [this] (close! this))) ; Session state (atom)
 
@@ -76,7 +77,7 @@
   "Send initialized notification after successful initialization"
   [transport]
   (try
-    (stdio/send-notification! transport "notifications/initialized" {})
+    (stdio-client/send-notification! (:json-rpc-client transport) "notifications/initialized" {})
     (log/info :client/initialized-sent)
     (catch Exception e
       (log/error :client/client {:error e})
@@ -107,10 +108,11 @@
         (let [init-params {:protocolVersion (:protocol-version session)
                            :capabilities (:capabilities session)
                            :clientInfo (:client-info session)}
-              response-future (stdio/send-request!
-                               transport
+              response-future (stdio-client/send-request!
+                               (:json-rpc-client transport)
                                "initialize"
-                               init-params)]
+                               init-params
+                               30000)]
 
           (log/info :mcp/initialize-sent {:params init-params})
 

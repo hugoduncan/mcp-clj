@@ -18,7 +18,9 @@
             request-id-counter ; atom for generating unique request IDs
             executor ; executor for async operations
             input-stream ; BufferedReader for reading responses
-            output-stream]) ; BufferedWriter for sending requests
+            output-stream ; BufferedWriter for sending requests
+            running ; atom for controlling message reader loop
+            reader-future]) ; future for background message reader
 
 ;;; JSONRPClient Functions
 
@@ -28,12 +30,20 @@
    (create-json-rpc-client input-stream output-stream {}))
   ([input-stream output-stream {:keys [num-threads]
                                 :or {num-threads 2}}]
-   (->JSONRPClient
-    (ConcurrentHashMap.)
-    (atom 0)
-    (executor/create-executor num-threads)
-    input-stream
-    output-stream)))
+   (let [running (atom true)
+         client (->JSONRPClient
+                 (ConcurrentHashMap.)
+                 (atom 0)
+                 (executor/create-executor num-threads)
+                 input-stream
+                 output-stream
+                 running
+                 nil)
+         ;; Start background message reader
+         reader-future (executor/submit!
+                        (:executor client)
+                        #(message-reader-loop input-stream running client))]
+     (assoc client :reader-future reader-future))))
 
 (defn generate-request-id
   "Generate unique request ID using JSONRPClient counter"
@@ -55,7 +65,7 @@
   (log/info :stdio/notification {:notification notification}))
 
 (defn message-reader-loop
-  "Background loop to read messages from reader and dispatch to response/notification handlers"
+  "Background loop to read messages from JSONRPClient's input stream and dispatch to response/notification handlers"
   [^BufferedReader reader running-atom json-rpc-client]
   (try
     (loop []
@@ -133,6 +143,13 @@
 (defn close-json-rpc-client!
   "Close the JSON-RPC client and cancel all pending requests"
   [json-rpc-client]
+  ;; Stop the message reader loop
+  (reset! (:running json-rpc-client) false)
+
+  ;; Cancel the reader future if it exists
+  (when-let [reader-future (:reader-future json-rpc-client)]
+    (.cancel reader-future true))
+
   ;; Cancel all pending requests
   (doseq [[_id future] (:pending-requests json-rpc-client)]
     (.cancel ^CompletableFuture future true))

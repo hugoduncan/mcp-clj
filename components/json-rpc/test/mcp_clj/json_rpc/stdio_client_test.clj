@@ -2,6 +2,7 @@
   "Tests for JSON-RPC stdio client functionality"
   (:require
    [clojure.test :refer [deftest is testing]]
+   [mcp-clj.json-rpc.executor :as executor]
    [mcp-clj.json-rpc.stdio-client :as stdio-client])
   (:import
    [java.io BufferedReader
@@ -18,6 +19,21 @@
   (let [input-stream (BufferedReader. (StringReader. ""))
         output-stream (BufferedWriter. (StringWriter.))]
     (stdio-client/create-json-rpc-client input-stream output-stream)))
+
+(defn create-test-client-no-loop
+  "Create a test JSONRPClient without starting the message reader loop"
+  []
+  (let [input-stream (BufferedReader. (StringReader. ""))
+        output-stream (BufferedWriter. (StringWriter.))
+        running (atom true)]
+    (mcp_clj.json_rpc.stdio_client.JSONRPClient.
+     (ConcurrentHashMap.)
+     (atom 0)
+     (executor/create-executor 2)
+     input-stream
+     output-stream
+     running
+     nil)))
 
 (deftest json-rpc-client-creation-test
   (testing "JSONRPClient record creation and structure"

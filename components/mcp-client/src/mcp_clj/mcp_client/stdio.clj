@@ -2,7 +2,6 @@
   "MCP client stdio transport - launches server process and communicates via stdin/stdout"
   (:require
    [clojure.java.process :as process]
-   [mcp-clj.json-rpc.executor :as executor]
    [mcp-clj.json-rpc.stdio-client :as stdio-client]
    [mcp-clj.log :as log])
   (:import
@@ -60,65 +59,22 @@
 (defrecord StdioTransport
            [server-command
             process-info
-            json-rpc-client ; JSONRPClient instance
-            reader-future
-            running])
-
-(defn- generate-request-id
-  "Generate unique request ID"
-  [transport]
-  (stdio-client/generate-request-id (:json-rpc-client transport)))
-
-(defn- handle-response
-  "Handle JSON-RPC response by completing the corresponding future"
-  [transport {:keys [id result error] :as response}]
-  (stdio-client/handle-response (:json-rpc-client transport) response))
-
-(defn- handle-notification
-  "Handle JSON-RPC notification (no response expected)"
-  [transport notification]
-  (stdio-client/handle-notification notification))
-
-(defn- message-reader-loop
-  "Background loop to read messages from server"
-  [transport]
-  (let [{:keys [stdout]} (:process-info transport)]
-    (stdio-client/message-reader-loop stdout (:running transport) (:json-rpc-client transport))))
+            json-rpc-client]) ; JSONRPClient instance
 
 (defn create-transport
   "Create stdio transport by launching MCP server process"
   [server-command]
   (let [process-info (start-server-process server-command)
         {:keys [stdin stdout]} process-info
-        json-rpc-client (stdio-client/create-json-rpc-client stdout stdin)
-        running (atom true)
-        transport (->StdioTransport
-                   server-command
-                   process-info
-                   json-rpc-client
-                   nil
-                   running)
-        ;; Start background message reader
-        reader-future (executor/submit!
-                       (:executor json-rpc-client)
-                       #(message-reader-loop transport))]
-    (assoc transport :reader-future reader-future)))
-
-(defn send-request!
-  "Send JSON-RPC request and return CompletableFuture of response"
-  [transport method params]
-  (stdio-client/send-request! (:json-rpc-client transport) method params request-timeout-ms))
-
-(defn send-notification!
-  "Send JSON-RPC notification (no response expected)"
-  [transport method params]
-  (stdio-client/send-notification! (:json-rpc-client transport) method params))
+        json-rpc-client (stdio-client/create-json-rpc-client stdout stdin)]
+    (->StdioTransport
+     server-command
+     process-info
+     json-rpc-client)))
 
 (defn close!
   "Close transport and terminate server process"
   [transport]
-  (reset! (:running transport) false)
-
   ;; Close JSON-RPC client (cancels pending requests, closes streams, shuts down executor)
   (stdio-client/close-json-rpc-client! (:json-rpc-client transport))
 
@@ -135,5 +91,5 @@
 (defn transport-alive?
   "Check if transport process is still alive"
   [transport]
-  (and @(:running transport)
+  (and @(:running (:json-rpc-client transport))
        (.isAlive ^Process (get-in transport [:process-info :process]))))
