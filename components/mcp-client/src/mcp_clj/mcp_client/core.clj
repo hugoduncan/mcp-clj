@@ -207,7 +207,7 @@
 (defn call-tool
   "Execute a tool with the given name and arguments.
 
-  Returns a ToolResult record with :content and :isError fields.
+  Returns the value of the tool call, or throws on error.
   Content can be text, images, audio, or resource references."
   [client tool-name arguments]
   (tools/call-tool-impl client tool-name arguments))

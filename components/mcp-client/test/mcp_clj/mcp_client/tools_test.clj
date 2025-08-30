@@ -35,19 +35,38 @@
 
 (deftest call-tool-success-test
   (testing "successful tool execution returns content directly"
-    (let [client (create-mock-client {"tools/call" {:content "success result" :isError false}})]
-      (is (= "success result" (tools/call-tool-impl client "test-tool" {})))))
+    (let [client (create-mock-client {})]
+      (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
+                    (fn [json-rpc-client method params timeout-ms]
+                      (CompletableFuture/completedFuture
+                       {:content "success result" :isError false}))]
+        (is (= "success result" (tools/call-tool-impl client "test-tool" {}))))))
 
   (testing "tool execution with JSON content parsing"
-    (let [client (create-mock-client {"tools/call" {:content "{\"key\": \"value\"}" :isError false}})]
-      (is (= {"key" "value"} (tools/call-tool-impl client "test-tool" {}))))))
+    (let [client (create-mock-client {})]
+      (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
+                    (fn [json-rpc-client method params timeout-ms]
+                      (CompletableFuture/completedFuture
+                       {:content [{:type "text" :text "{\"key\": \"value\"}"}] :isError false}))]
+        ;; Should return the parsed content - access the data field from first item
+        (let [result (tools/call-tool-impl client "test-tool" {})]
+          (is (vector? result))
+          (is (= 1 (count result)))
+          (let [first-item (first result)]
+            (is (= "text" (:type first-item)))
+            (is (nil? (:text first-item))) ; text should be nil after parsing
+            (is (= {:key "value"} (:data first-item)))))))))
 
 (deftest call-tool-error-test
   (testing "tool execution throws on error"
-    (let [client (create-mock-client {"tools/call" {:content "error message" :isError true}})]
-      (is (thrown-with-msg? clojure.lang.ExceptionInfo
-                            #"Tool call failed: test-tool"
-                            (tools/call-tool-impl client "test-tool" {}))))))
+    (let [client (create-mock-client {})]
+      (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
+                    (fn [json-rpc-client method params timeout-ms]
+                      (CompletableFuture/completedFuture
+                       {:content "error message" :isError true}))]
+        (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                              #"Tool execution failed: test-tool"
+                              (tools/call-tool-impl client "test-tool" {})))))))
 
 (deftest tools-cache-test
   (testing "tools cache creation and access"

@@ -88,38 +88,43 @@
   [client tool-name arguments]
   (log/info :client/call-tool-start {:tool-name tool-name})
   (try
-    (let [transport       (:transport client)
+    (let [transport (:transport client)
           json-rpc-client (:json-rpc-client transport)
-          params          {:name tool-name :arguments (or arguments {})}
-          response        (stdio-client/send-request!
+          params {:name tool-name :arguments (or arguments {})}
+          response (stdio-client/send-request!
                     json-rpc-client
                     "tools/call"
                     params
                     30000)
-          result          @response
-          is-error        (:isError result false)
-          parsed-content  (parse-tool-content (:content result))]
+          result (deref response 30000 ::timeout)]
 
-      (if is-error
-        (do
-          (log/error :client/call-tool-error {:tool-name tool-name
-                                              :content   parsed-content})
-          (throw (ex-info (str "Tool execution failed: " tool-name)
-                          {:tool-name tool-name
-                           :content   parsed-content})))
-        (do
-          (log/info :client/call-tool-success {:tool-name tool-name})
-          parsed-content)))
+      (when (= result ::timeout)
+        (throw (ex-info (str "Tool call timed out: " tool-name)
+                        {:tool-name tool-name
+                         :timeout 30000})))
+
+      (let [is-error (:isError result false)
+            parsed-content (parse-tool-content (:content result))]
+        (if is-error
+          (do
+            (log/error :client/call-tool-error {:tool-name tool-name
+                                                :content parsed-content})
+            (throw (ex-info (str "Tool execution failed: " tool-name)
+                            {:tool-name tool-name
+                             :content parsed-content})))
+          (do
+            (log/info :client/call-tool-success {:tool-name tool-name})
+            parsed-content))))
     (catch Exception e
       (if (instance? clojure.lang.ExceptionInfo e)
         (throw e) ; Re-throw tool errors
         (do
           (log/error :client/call-tool-error {:tool-name tool-name
-                                              :error     (.getMessage e)
-                                              :ex        e})
+                                              :error (.getMessage e)
+                                              :ex e})
           (throw (ex-info (str "Tool call failed: " tool-name)
                           {:tool-name tool-name
-                           :error     (.getMessage e)}
+                           :error (.getMessage e)}
                           e)))))))
 
 (defn available-tools?-impl
