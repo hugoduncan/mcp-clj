@@ -46,7 +46,7 @@
   (testing "tool execution throws on error"
     (let [client (create-mock-client {"tools/call" {:content "error message" :isError true}})]
       (is (thrown-with-msg? clojure.lang.ExceptionInfo
-                            #"Tool execution failed: test-tool"
+                            #"Tool call failed: test-tool"
                             (tools/call-tool-impl client "test-tool" {}))))))
 
 (deftest tools-cache-test
