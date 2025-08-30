@@ -8,11 +8,14 @@
 (defn- create-mock-client
   "Create a mock client for testing"
   [transport-responses]
-  (let [session (atom {})]
+  (let [session (atom {})
+        string-writer (java.io.StringWriter.)
+        buffered-writer (java.io.BufferedWriter. string-writer)
+        mock-json-rpc-client {:request-id-counter (atom 0)
+                              :pending-requests (java.util.concurrent.ConcurrentHashMap.)
+                              :output-stream buffered-writer}]
     {:session session
-     :transport (reify
-                  Object
-                  (toString [_] "MockTransport"))}))
+     :transport {:json-rpc-client mock-json-rpc-client}}))
 
 (defn- create-mock-transport
   "Create a mock transport that returns predefined responses"
@@ -68,7 +71,7 @@
 
       ;; Mock stdio/send-request! to return our mock transport response
       (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
-                    (fn [transport method params]
+                    (fn [json-rpc-client method params timeout-ms]
                       (CompletableFuture/completedFuture
                        {:tools mock-tools}))]
         (let [result (tools/list-tools-impl client)]
@@ -79,7 +82,7 @@
   (testing "error handling in tools list"
     (let [client (create-mock-client {})]
       (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
-                    (fn [transport method params]
+                    (fn [json-rpc-client method params timeout-ms]
                       (throw (ex-info "Connection failed" {})))]
         (is (thrown-with-msg?
              Exception #"Connection failed"
@@ -89,7 +92,7 @@
   (testing "successful tool call"
     (let [client (create-mock-client {})]
       (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
-                    (fn [transport method params]
+                    (fn [json-rpc-client method params timeout-ms]
                       (CompletableFuture/completedFuture
                        {:content "tool result"
                         :isError false}))]
@@ -99,18 +102,18 @@
   (testing "tool call with error response"
     (let [client (create-mock-client {})]
       (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
-                    (fn [transport method params]
+                    (fn [json-rpc-client method params timeout-ms]
                       (CompletableFuture/completedFuture
                        {:content "Tool execution failed"
                         :isError true}))]
-        (let [result (tools/call-tool-impl client "failing-tool" {})]
-          (is (= "Tool execution failed" (:content result)))
-          (is (= true (:isError result)))))))
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo #"Tool execution failed"
+             (tools/call-tool-impl client "failing-tool" {}))))))
 
   (testing "tool call with transport error"
     (let [client (create-mock-client {})]
       (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
-                    (fn [transport method params]
+                    (fn [json-rpc-client method params timeout-ms]
                       (throw (ex-info "Transport error" {})))]
         (is (thrown-with-msg?
              Exception #"Transport error"

@@ -14,31 +14,33 @@
 ;;; JSONRPClient Record
 
 (defrecord JSONRPClient
-           [pending-requests ; ConcurrentHashMap of request-id -> CompletableFuture  
-            request-id-counter ; atom for generating unique request IDs
-            executor ; executor for async operations
-            input-stream ; BufferedReader for reading responses
-            output-stream ; BufferedWriter for sending requests
-            running ; atom for controlling message reader loop
-            reader-future]) ; future for background message reader
+    [pending-requests ; ConcurrentHashMap of request-id -> CompletableFuture
+     request-id-counter ; atom for generating unique request IDs
+     executor ; executor for async operations
+     input-stream ; BufferedReader for reading responses
+     output-stream ; BufferedWriter for sending requests
+     running ; atom for controlling message reader loop
+     reader-future]) ; future for background message reader
 
 ;;; JSONRPClient Functions
+
+(declare message-reader-loop)
 
 (defn create-json-rpc-client
   "Create a JSON-RPC client for managing requests and responses"
   ([input-stream output-stream]
    (create-json-rpc-client input-stream output-stream {}))
   ([input-stream output-stream {:keys [num-threads]
-                                :or {num-threads 2}}]
-   (let [running (atom true)
-         client (->JSONRPClient
-                 (ConcurrentHashMap.)
-                 (atom 0)
-                 (executor/create-executor num-threads)
-                 input-stream
-                 output-stream
-                 running
-                 nil)
+                                :or   {num-threads 2}}]
+   (let [running       (atom true)
+         client        (->JSONRPClient
+                        (ConcurrentHashMap.)
+                        (atom 0)
+                        (executor/create-executor num-threads)
+                        input-stream
+                        output-stream
+                        running
+                        nil)
          ;; Start background message reader
          reader-future (executor/submit!
                         (:executor client)
@@ -57,12 +59,12 @@
     (if error
       (.completeExceptionally ^CompletableFuture future (ex-info "JSON-RPC error" error))
       (.complete ^CompletableFuture future result))
-    (log/warn :stdio/orphan-response {:response response})))
+    (log/warn :rpc/orphan-response {:response response})))
 
 (defn handle-notification
   "Handle JSON-RPC notification (no response expected)"
   [notification]
-  (log/info :stdio/notification {:notification notification}))
+  (log/info :rpc/notification {:notification notification}))
 
 (defn message-reader-loop
   "Background loop to read messages from JSONRPClient's input stream and dispatch to response/notification handlers"
@@ -73,7 +75,7 @@
         (when-let [[message error :as result] (stdio/read-json reader)]
           (cond
             error
-            (log/error :stdio/read-error {:error error})
+            (log/error :rpc/read-error {:error error})
 
             (:id message)
             (handle-response json-rpc-client message)
@@ -82,7 +84,7 @@
             (handle-notification message))
           (recur))))
     (catch Exception e
-      (log/error :stdio/reader-error {:error e}))))
+      (log/error :rpc/reader-error {:error e}))))
 
 (defn write-json-with-locking!
   "Write JSON message with locking for thread safety"
@@ -91,7 +93,7 @@
     (try
       (stdio/write-json! writer message)
       (catch Exception e
-        (log/error :stdio/write-error {:error e})
+        (log/error :rpc/write-error {:error e})
         (throw e)))))
 
 (defn read-json-with-logging
@@ -100,10 +102,10 @@
   (when-let [[message error :as result] (stdio/read-json reader)]
     (if error
       (do
-        (log/error :client/read-error {:error error})
+        (log/error :rpc/read-error {:error error})
         (throw error))
       (do
-        (log/debug :client/receive {:message message})
+        (log/debug :rpc/receive {:message message})
         message))))
 
 (defn send-request!
@@ -143,6 +145,7 @@
 (defn close-json-rpc-client!
   "Close the JSON-RPC client and cancel all pending requests"
   [json-rpc-client]
+  (log/debug :rpc/close-json-rpc-client)
   ;; Stop the message reader loop
   (reset! (:running json-rpc-client) false)
 
@@ -155,9 +158,7 @@
     (.cancel ^CompletableFuture future true))
   (.clear ^ConcurrentHashMap (:pending-requests json-rpc-client))
 
-  ;; Close streams
-  (try (.close ^BufferedReader (:input-stream json-rpc-client)) (catch Exception _))
-  (try (.close ^BufferedWriter (:output-stream json-rpc-client)) (catch Exception _))
-
   ;; Shutdown executor
-  (executor/shutdown-executor (:executor json-rpc-client)))
+  (log/debug :rpc/close-json-rpc-client {:state :shutdown-exec})
+  (executor/shutdown-executor (:executor json-rpc-client))
+  (log/debug :rpc/close-json-rpc-client {:state :done}))

@@ -10,7 +10,8 @@
    {}
    levels))
 
-(def ^:private aspects #{"sse" "http" "rpc" "client" "server" "stdio-server"})
+(def ^:private aspects
+  #{"sse" "http" "rpc" "client" "server" "stdio-server" "tool"})
 
 (defonce ^:private config (atom {}))
 

@@ -1,11 +1,10 @@
 (ns mcp-clj.tools.ls
   "File listing tool for MCP servers"
-  (:require [clojure.java.io :as io]
-            [clojure.string :as str]
-            [clojure.data.json :as json])
-  (:import [java.io File]
-           [java.nio.file Files Paths LinkOption]
-           [java.nio.file.attribute BasicFileAttributes]))
+  (:require
+   [clojure.data.json :as json]
+   [clojure.java.io :as io]
+   [clojure.string :as str]
+   [mcp-clj.log :as log]))
 
 (def ^:private allowed-roots
   "Allowed directory roots for security"
@@ -115,10 +114,11 @@
 
 (defn- ls-impl
   "Implementation function for ls tool"
-  [{:keys [path max-depth max-files] :or {max-depth 10 max-files 100}}]
+  [{:keys [path max-depth max-files] :or {max-depth 10 max-files 100} :as args}]
+  (log/error :tool/ls {:args args})
   (try
     (let [normalized-path (normalize-path path)
-          path-file (io/file normalized-path)]
+          path-file       (io/file normalized-path)]
 
       (cond
         (not (.exists path-file))
@@ -128,9 +128,9 @@
 
         (.isFile path-file)
         {:content [{:type "text"
-                    :text (json/write-str {:files [normalized-path]
-                                           :truncated false
-                                           :total-files 1
+                    :text (json/write-str {:files             [normalized-path]
+                                           :truncated         false
+                                           :total-files       1
                                            :max-depth-reached false
                                            :max-files-reached false})}]
          :isError false}
@@ -153,16 +153,16 @@
 
 (def ls-tool
   "File listing tool with recursive traversal and security restrictions"
-  {:name "ls"
-   :description "List files recursively with depth and count limits. Respects .gitignore and excludes .DS_Store files."
-   :inputSchema {:type "object"
-                 :properties {"path" {:type "string"
-                                      :description "Path to list (absolute or relative)"}
-                              "max-depth" {:type "integer"
-                                           :description "Maximum recursive depth (default: 10)"
-                                           :minimum 1}
-                              "max-files" {:type "integer"
-                                           :description "Maximum number of files to return (default: 100)"
-                                           :minimum 1}}
-                 :required ["path"]}
+  {:name           "ls"
+   :description    "List files recursively with depth and count limits. Respects .gitignore and excludes .DS_Store files."
+   :inputSchema    {:type       "object"
+                    :properties {"path"      {:type        "string"
+                                              :description "Path to list (absolute or relative)"}
+                                 "max-depth" {:type        "integer"
+                                              :description "Maximum recursive depth (default: 10)"
+                                              :minimum     1}
+                                 "max-files" {:type        "integer"
+                                              :description "Maximum number of files to return (default: 100)"
+                                              :minimum     1}}
+                    :required   ["path"]}
    :implementation ls-impl})
