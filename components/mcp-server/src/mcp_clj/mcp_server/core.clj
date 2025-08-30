@@ -7,16 +7,15 @@
    [mcp-clj.log :as log]
    [mcp-clj.mcp-server.prompts :as prompts]
    [mcp-clj.mcp-server.resources :as resources]
+   [mcp-clj.mcp-server.version :as version]
    [mcp-clj.tools.core :as tools]))
 
-(def ^:private server-protocol-version "2025-06-18")
-(def ^:private required-client-version "2025-06-18")
-
 (defrecord ^:private Session
-    [^String session-id
-     initialized?
-     client-info
-     client-capabilities])
+           [^String session-id
+            initialized?
+            client-info
+            client-capabilities
+            protocol-version])
 
 (defrecord ^:private MCPServer
            [json-rpc-server
@@ -73,34 +72,47 @@
 (defn- text-map [msg]
   {:type "text" :text msg})
 
-(defn- validate-initialization!
-  "Validate initialization request"
-  [{:keys [protocolVersion capabilities]}]
-  (when (not= protocolVersion required-client-version)
-    {:isError true
-     :content [(text-map "Unsupported MCP protocol version")
-               (text-map (str "Expected: " required-client-version))
-               (text-map (str "Client: " protocolVersion))]})
-  #_(when-not (get-in capabilities [:tools])
-      (throw (ex-info "Client must support tools capability"
-                      {:code -32001
-                       :data {:missing [:tools]}}))))
+(defn- negotiate-initialization
+  "Negotiate initialization request according to MCP specification"
+  [{:keys [protocolVersion capabilities clientInfo] :as params}]
+  (let [negotiation (version/negotiate-version protocolVersion)
+        {:keys [negotiated-version client-was-supported? supported-versions]} negotiation
+        warnings (when-not client-was-supported?
+                   [(str "Client version " protocolVersion " not supported. "
+                         "Using " negotiated-version ". "
+                         "Supported versions: " (pr-str supported-versions))])]
+    {:negotiation negotiation
+     :client-info clientInfo
+     :response {:serverInfo {:name "mcp-clj"
+                             :title "MCP Clojure Server"
+                             :version "0.1.0"}
+                :protocolVersion negotiated-version
+                :capabilities {;; :logging   {} needs to implement logging/setLevel
+                               :tools {:listChanged true}
+                               :resources {:listChanged false
+                                           :subscribe false}
+                               :prompts {:listChanged true}}
+                :instructions "mcp-clj is used to interact with a clojure REPL."
+                :warnings warnings}}))
 
 (defn- handle-initialize
   "Handle initialize request from client"
-  [_server params]
-  (log/info :server/initialize)
-  (or (validate-initialization! params)
-      {:serverInfo {:name "mcp-clj"
-                    :title "MCP Clojure Server"
-                    :version "0.1.0"}
-       :protocolVersion server-protocol-version
-       :capabilities    {;; :logging   {} needs to implement logging/setLevel
-                         :tools     {:listChanged true}
-                         :resources {:listChanged false
-                                     :subscribe   false}
-                         :prompts   {:listChanged true}}
-       :instructions    "mcp-clj is used to interact with a clojure REPL."}))
+  [server params]
+  (log/info :server/initialize params)
+  (let [{:keys [negotiation client-info response]} (negotiate-initialization params)
+        {:keys [negotiated-version]} negotiation]
+    (when-not (:client-was-supported? negotiation)
+      (log/warn :server/version-fallback
+                {:client-version (:protocolVersion params)
+                 :negotiated-version negotiated-version}))
+    ;; Return session update function along with response
+    (with-meta
+      response
+      {:session-update (fn [session]
+                         (assoc session
+                                :client-info client-info
+                                :client-capabilities (:capabilities params)
+                                :protocol-version negotiated-version))})))
 
 (defn- handle-initialized
   "Handle initialized notification"
@@ -173,10 +185,23 @@
   (prompts/get-prompt (:prompt-registry server) params))
 
 (defn- request-handler
-  "Wrap a handler to support async responses"
+  "Wrap a handler to support async responses and session updates"
   [server handler request params]
-  (let [response (handler server params)]
-    (if (fn? response)
+  (let [response (handler server params)
+        session-update-fn (-> response meta :session-update)]
+    (cond
+      ;; Handle responses with session updates (like initialize)
+      session-update-fn
+      (let [session (request-session server request)]
+        (when session
+          (let [updated-session (session-update-fn session)]
+            (swap! (:session-id->session server)
+                   assoc (:session-id session) updated-session)))
+        ;; Return response without metadata
+        (with-meta response {}))
+
+      ;; Handle async responses (functions)
+      (fn? response)
       (let [session (request-session server request)]
         (if session
           (do
@@ -184,13 +209,15 @@
             nil)
           (do
             (log/warn
-                :server/error
-              {:msg     "missing mcp session"
-               :request request
-               :params  params})
+             :server/error
+             {:msg "missing mcp session"
+              :request request
+              :params params})
             (response nil)
             nil)))
-      response)))
+
+      ;; Handle regular responses
+      :else response)))
 
 (defn- create-handlers
   "Create request handlers with server reference"
@@ -248,7 +275,7 @@
 
 (defn- on-sse-connect
   [server id]
-  (let [session (->Session id false nil nil)]
+  (let [session (->Session id false nil nil nil)]
     (log/info :server/sse-connect {:session-id id})
     (swap! (:session-id->session server) assoc id session)))
 
@@ -315,38 +342,38 @@
   - :prompts - Map of prompt name to prompt definition
   - :resources - Map of resource name to resource definition"
   [{:keys [transport port num-threads tools prompts resources]
-    :or   {tools     tools/default-tools
-           prompts   prompts/default-prompts
-           resources resources/default-resources}
-    :as   opts}]
+    :or {tools tools/default-tools
+         prompts prompts/default-prompts
+         resources resources/default-resources}
+    :as opts}]
   (doseq [tool (vals tools)]
     (when-not (tools/valid-tool? tool)
       (throw (ex-info "Invalid tool in constructor" {:tool tool}))))
   (doseq [prompt (vals prompts)]
     (when-not (prompts/valid-prompt? prompt)
       (throw (ex-info "Invalid prompt in constructor" {:prompt prompt}))))
-  (let [actual-transport    (determine-transport opts)
+  (let [actual-transport (determine-transport opts)
         session-id->session (atom {})
-        tool-registry       (atom tools)
-        prompt-registry     (atom prompts)
-        resource-registry   (atom resources)
-        rpc-server-prom     (promise)
-        server              (->MCPServer
-                             rpc-server-prom
-                             session-id->session
-                             tool-registry
-                             prompt-registry
-                             resource-registry)
-        json-rpc-server     (create-json-rpc-server
-                             actual-transport
-                             {:port           port
-                              :num-threads    num-threads
-                              :on-sse-connect (partial on-sse-connect server)
-                              :on-sse-close   (partial on-sse-close server)})
-        server              (assoc server
-                                   :stop #(do (stop! server)
-                                              (json-rpc-protocols/stop! json-rpc-server)))
-        handlers            (create-handlers server)]
+        tool-registry (atom tools)
+        prompt-registry (atom prompts)
+        resource-registry (atom resources)
+        rpc-server-prom (promise)
+        server (->MCPServer
+                rpc-server-prom
+                session-id->session
+                tool-registry
+                prompt-registry
+                resource-registry)
+        json-rpc-server (create-json-rpc-server
+                         actual-transport
+                         {:port port
+                          :num-threads num-threads
+                          :on-sse-connect (partial on-sse-connect server)
+                          :on-sse-close (partial on-sse-close server)})
+        server (assoc server
+                      :stop #(do (stop! server)
+                                 (json-rpc-protocols/stop! json-rpc-server)))
+        handlers (create-handlers server)]
     (json-rpc-protocols/set-handlers! json-rpc-server handlers)
     (deliver rpc-server-prom json-rpc-server)
     (log/info :server/started {})
