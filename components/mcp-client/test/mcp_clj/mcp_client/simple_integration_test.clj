@@ -33,12 +33,12 @@
       ;; Create client (this will fail to connect to stdio, but we can test the API)
       (let [client (client/create-client
                     {:server
-                     {:type    :stdio
+                     {:type :stdio
                       :command "echo"
-                      :args    [ "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"serverInfo\":{\"name\":\"test-server\",\"version\":\"1.0.0\"}}}"]}
-                     :client-info  {:name    "simple-test-client"
-                                    :title   "Simple Test Client"
-                                    :version "1.0.0"}
+                      :args ["{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"serverInfo\":{\"name\":\"test-server\",\"version\":\"1.0.0\"}}}"]}
+                     :client-info {:name "simple-test-client"
+                                   :title "Simple Test Client"
+                                   :version "1.0.0"}
                      :capabilities {}})]
 
         ;; Check initial state
@@ -50,8 +50,8 @@
         (let [info (client/get-client-info client)]
           (is (= :initializing (:state info)))
           (is (= "2025-06-18" (:protocol-version info)))
-          (is (= {:name    "simple-test-client"
-                  :title   "Simple Test Client"
+          (is (= {:name "simple-test-client"
+                  :title "Simple Test Client"
                   :version "1.0.0"}
                  (:client-info info)))
           (is (= {} (:client-capabilities info)))
@@ -67,26 +67,24 @@
 (deftest ^:integration client-session-state-transitions-test
   (testing "Client session transitions through states correctly"
     (let [client (client/create-client
+                  ;; cat will read but not respond properly
                   {:server       {:type    :stdio
-                                  :command "cat"} ; cat will read but not respond properly
+                                  :command "cat"}
                    :client-info  {:name "state-test-client"}
                    :capabilities {}})]
 
-      ;; Initial state
-      ;; Try to initialize (will fail with cat, but should transition to initializing first)
-      (is (= :initializing (:state @(:session client))))
+      ;; Client starts initializing
+      (is (contains? #{:initializing :error} (:state @(:session client))))
 
+      ;; wait-for-ready should throw an exception since cat can't handle MCP
+      ;; protocol
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Client initialization failed"
+           (client/wait-for-ready client 2000)))
 
-      ;; Should transition to erro
-      (Thread/sleep 100) ; Give it a moment
+      ;; Should be in error state after failed initialization
       (is (= :error (:state @(:session client))))
-
-      ;; Wait a bit more - it should eventually error or timeout
-      (Thread/sleep 2000)
-
-      ;; Should be in error state or still initializing (depending on timing)
-      (let [final-state (:state @(:session client))]
-        (is (contains? #{:error :initializing} final-state)))
 
       (client/close! client))))
 
@@ -94,7 +92,7 @@
   (testing "Client accepts various transport configurations"
     ;; Test map-style transport
     (let [client1 (client/create-client
-                   {:server      {:type :stdio :command "echo" :args ["test"]}
+                   {:server {:type :stdio :command "echo" :args ["test"]}
                     :client-info {:name "config-test-1"}})]
       (is (some? client1))
       (is (= "config-test-1" (get-in @(:session client1) [:client-info :name])))
@@ -102,9 +100,9 @@
 
     ;; Test custom protocol version
     (let [client3 (client/create-client
-                   {:server           {:type    :stdio
-                                       :command "echo"
-                                       :args    ["test"]}
+                   {:server {:type :stdio
+                             :command "echo"
+                             :args ["test"]}
                     :protocol-version "2024-11-05"})]
       (is (some? client3))
       (is (= "2024-11-05" (:protocol-version @(:session client3))))

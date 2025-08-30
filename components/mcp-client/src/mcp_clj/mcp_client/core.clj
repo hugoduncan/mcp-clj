@@ -181,16 +181,23 @@
            :transport-alive? (stdio/transport-alive? (:transport client)))))
 
 (defn wait-for-ready
-  "Wait for client to be ready, with optional timeout (defaults to 30 seconds)"
+  "Wait for client to be ready, with optional timeout (defaults to 30 seconds).
+
+  Returns true when client is ready.
+  Throws exception if client transitions to :error state or times out waiting."
   ([client] (wait-for-ready client 30000))
   ([client timeout-ms]
    (try
      (.get (:initialization-future client) timeout-ms TimeUnit/MILLISECONDS)
      true
      (catch TimeoutException _
-       (throw (ex-info "Client initialization timeout"
-                       {:timeout-ms timeout-ms
-                        :session-state (:state @(:session client))})))
+       (let [session-state (:state @(:session client))]
+         (if (= :error session-state)
+           (throw (ex-info "Client initialization failed"
+                           {:session-state session-state}))
+           (throw (ex-info "Client initialization timeout"
+                           {:timeout-ms timeout-ms
+                            :session-state session-state})))))
      (catch ExecutionException e
        (throw (.getCause e))))))
 
