@@ -83,9 +83,10 @@
                          "Supported versions: " (pr-str supported-versions))])]
     {:negotiation negotiation
      :client-info clientInfo
-     :response {:serverInfo {:name "mcp-clj"
-                             :title "MCP Clojure Server"
-                             :version "0.1.0"}
+     :response {:serverInfo (cond-> {:name    "mcp-clj"
+                                     :version "0.1.0"}
+                              (>= negotiated-version "2025-06-18")
+                              (assoc :title "MCP Clojure Server"))
                 :protocolVersion negotiated-version
                 :capabilities {;; :logging   {} needs to implement logging/setLevel
                                :tools {:listChanged true}
@@ -371,8 +372,11 @@
                           :on-sse-connect (partial on-sse-connect server)
                           :on-sse-close (partial on-sse-close server)})
         server (assoc server
-                      :stop #(do (stop! server)
-                                 (json-rpc-protocols/stop! json-rpc-server)))
+                      :stop #(do
+                               (log/info :server/stopping {})
+                               (stop! server)
+                               (json-rpc-protocols/stop! json-rpc-server)
+                               (log/info :server/stopped {})))
         handlers (create-handlers server)]
     (json-rpc-protocols/set-handlers! json-rpc-server handlers)
     (deliver rpc-server-prom json-rpc-server)

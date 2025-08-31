@@ -52,13 +52,13 @@
 
     (testing "supported version with capabilities"
       (let [context {:capabilities {:tools {:listChanged true}}}
-            result (version/handle-version-specific-behavior
+            result  (version/handle-version-specific-behavior
                     "2025-06-18" :capabilities context)]
         (is (= (:capabilities context) result))))
 
     (testing "older supported version with capabilities"
       (let [context {:capabilities {:tools {:listChanged true}}}
-            result (version/handle-version-specific-behavior
+            result  (version/handle-version-specific-behavior
                     "2024-11-05" :capabilities context)]
         (is (= (:capabilities context) result))))
 

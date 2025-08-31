@@ -17,14 +17,14 @@
 
 (defn negotiate-version
   "Negotiate protocol version according to MCP specification.
-  
+
   Per MCP spec:
   - If server supports client's version, respond with same version
   - Otherwise, respond with server's latest supported version
-  
+
   Args:
     client-requested-version - The protocol version requested by client
-    
+
   Returns:
     Map with keys:
     - :negotiated-version - The version to use for the session
@@ -42,14 +42,14 @@
 
 (defmulti handle-version-specific-behavior
   "Handle version-specific protocol behavior
-  
+
   Dispatch on the protocol version for features that differ between versions.
-  
+
   Args:
     protocol-version - The negotiated protocol version string
     feature-type - Keyword identifying the feature (e.g. :capabilities, :message-format)
     context - Context map with feature-specific data
-    
+
   Returns:
     Feature-specific result based on the protocol version"
   (fn [protocol-version feature-type context]

@@ -66,6 +66,7 @@
 (enable! :debug "rpc")
 (enable! :debug "server")
 (enable! :debug "client")
+(enable! :debug "http")
 
 (comment
   (enable! :info "http")
