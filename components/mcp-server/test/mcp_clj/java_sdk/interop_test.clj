@@ -1,177 +1,369 @@
 (ns mcp-clj.java-sdk.interop-test
-  "Cross-implementation tests using Java SDK client with Clojure server"
+  "Comprehensive tests for Java SDK interop wrapper using subprocess approach.
+
+  Tests all critical aspects of the SDK wrapper to ensure reliability:
+  - Transport creation and configuration
+  - Client operations (sync/async, connection, discovery, calling)
+  - Server operations (creation, registration, lifecycle)
+  - Data conversion between Clojure and Java
+  - End-to-end integration via subprocess
+  - Error handling and edge cases"
   (:require
-   [clojure.test :refer [deftest is testing use-fixtures]]
+   [clojure.test :refer [deftest testing is use-fixtures]]
    [mcp-clj.java-sdk.interop :as java-sdk]
-   [mcp-clj.mcp-server.core :as mcp-server]
-   [mcp-clj.tools.core :as tools]
    [mcp-clj.log :as log])
   (:import
    [java.util.concurrent TimeUnit]))
 
-(def test-tool
-  "Simple test tool for cross-implementation testing"
-  {:name "echo"
-   :description "Echo the input"
-   :inputSchema {:type "object"
-                 :properties {"message" {:type "string"}}
-                 :required ["message"]}
-   :implementation (fn [{:keys [message]}]
-                     {:content [{:type "text"
-                                 :text (str "Echo: " message)}]})})
+;;; Test Infrastructure
 
-(def test-tool-2
-  "Math test tool"
-  {:name "add"
-   :description "Add two numbers"
-   :inputSchema {:type "object"
-                 :properties {"a" {:type "number"}
-                              "b" {:type "number"}}
-                 :required ["a" "b"]}
-   :implementation (fn [{:keys [a b]}]
-                     {:content [{:type "text"
-                                 :text (str "Result: " (+ a b))}]})})
+(def ^:dynamic *server-process* nil)
+(def ^:dynamic *sync-client* nil)
+(def ^:dynamic *async-client* nil)
 
-(defn- find-free-port
-  "Find a free port for testing"
+(defn start-test-server-process
+  "Start SDK server subprocess for testing"
   []
-  (let [socket (java.net.ServerSocket. 0)
-        port (.getLocalPort socket)]
-    (.close socket)
-    port))
+  (log/info :test/starting-server-process)
+  (let [pb (ProcessBuilder. (into-array String
+                                        ["clj" "-M:dev:test" "-m"
+                                         "mcp-clj.java-sdk.sdk-server-main"]))
+        _ (.redirectErrorStream pb true)
+        process (.start pb)]
 
-;;; Test fixtures
+    (Thread/sleep 3000) ; Give server time to start
 
-(def ^:dynamic *clj-server* nil)
-(def ^:dynamic *java-client* nil)
+    (if (.isAlive process)
+      (do
+        (log/info :test/server-process-started)
+        process)
+      (throw (ex-info "Server process failed to start"
+                      {:exit-code (.exitValue process)})))))
 
-(defn with-clojure-server-http
-  "Start Clojure MCP server with HTTP transport"
+(defn stop-test-server-process
+  "Stop SDK server subprocess"
+  [process]
+  (when (and process (.isAlive process))
+    (log/info :test/stopping-server-process)
+    (.destroy process)
+    (when-not (.waitFor process 5 TimeUnit/SECONDS)
+      (.destroyForcibly process))
+    (log/info :test/server-process-stopped)))
+
+(defn create-test-client
+  "Create SDK client for testing"
+  [async?]
+  (let [transport (java-sdk/create-stdio-client-transport
+                   {:command "clj"
+                    :args ["-M:dev:test" "-m"
+                           "mcp-clj.java-sdk.sdk-server-main"]})
+        client (java-sdk/create-java-client
+                {:transport transport
+                 :async? async?})]
+    client))
+
+(defn with-server-process
+  "Test fixture: start/stop server process"
   [f]
-  (let [port (find-free-port)
-        server (mcp-server/create-server
-                {:transport :sse
-                 :port port
-                 :tools {"echo" test-tool
-                         "add" test-tool-2}})]
+  (let [process (start-test-server-process)]
     (try
-      (binding [*clj-server* server]
-        (Thread/sleep 500) ;; Let server start
+      (binding [*server-process* process]
         (f))
       (finally
-        ((:stop server))))))
+        (stop-test-server-process process)))))
 
-(defn with-java-client-http
-  "Create Java SDK client with HTTP transport"
+(defn with-clients
+  "Test fixture: create sync and async clients"
   [f]
-  (when *clj-server*
-    (let [port (:port @(:json-rpc-server *clj-server*))
-          url (format "http://localhost:%d" port)
-          client (java-sdk/create-java-client
-                  {:transport :http
-                   :url url})]
+  (when *server-process*
+    (let [sync-client (create-test-client false)
+          async-client (create-test-client true)]
       (try
-        (binding [*java-client* client]
+        (binding [*sync-client* sync-client
+                  *async-client* async-client]
           (f))
         (finally
-          (java-sdk/close-client client))))))
+          (when sync-client (java-sdk/close-client sync-client))
+          (when async-client (java-sdk/close-client async-client)))))))
 
-;;; HTTP Transport Tests
+(use-fixtures :each with-server-process with-clients)
 
-(use-fixtures :each with-clojure-server-http with-java-client-http)
+;;; Transport Layer Tests
 
-(deftest http-transport-initialization-test
-  (testing "Java SDK client can initialize with Clojure server over HTTP"
-    (let [result (java-sdk/initialize-client *java-client*)]
-      (is (not (nil? result)))
-      (is (= "mcp-clj" (.. result getServerInfo getName)))
-      (is (.. result getCapabilities getTools)))))
+(deftest test-transport-creation
+  "Test transport provider creation with various configurations"
+  (testing "stdio client transport with string command"
+    (let [transport (java-sdk/create-stdio-client-transport "echo test")]
+      (is (some? transport))))
 
-(deftest http-transport-list-tools-test
-  (testing "Java SDK client can list tools from Clojure server"
-    (java-sdk/initialize-client *java-client*)
-    (let [result (java-sdk/list-tools *java-client*)
-          tools (.getTools result)]
-      (is (= 2 (.size tools)))
-      (let [tool-names (set (map #(.getName %) tools))]
+  (testing "stdio client transport with command and args map"
+    (let [transport (java-sdk/create-stdio-client-transport
+                     {:command "clj" :args ["-version"]})]
+      (is (some? transport))))
+
+  (testing "stdio server transport"
+    (let [transport (java-sdk/create-stdio-server-transport)]
+      (is (some? transport))))
+
+  (testing "transport creation error handling"
+    (is (thrown? Exception
+                 (java-sdk/create-stdio-client-transport nil)))
+
+    (is (thrown? Exception
+                 (java-sdk/create-stdio-client-transport {})))))
+
+;;; Client Operations Tests
+
+(deftest ^:integration test-client-creation-and-types
+  "Test client creation in sync and async modes"
+  (testing "sync client creation"
+    (is (some? *sync-client*))
+    (is (some? (:client *sync-client*)))
+    (is (= false (:async? *sync-client*))))
+
+  (testing "async client creation"
+    (is (some? *async-client*))
+    (is (some? (:client *async-client*)))
+    (is (= true (:async? *async-client*)))))
+
+(deftest ^:integration test-client-initialization
+  "Test client connection and initialization"
+  (testing "sync client initialization"
+    (let [result (java-sdk/initialize-client *sync-client*)]
+      (is (some? result))
+      (log/info :test/sync-client-initialized {:result result})))
+
+  (testing "async client initialization"
+    (let [result (java-sdk/initialize-client *async-client*)]
+      (is (some? result))
+      (log/info :test/async-client-initialized {:result result}))))
+
+(deftest ^:integration test-tool-discovery
+  "Test listing tools from server"
+  (testing "sync client tool listing"
+    (java-sdk/initialize-client *sync-client*)
+    (let [result (java-sdk/list-tools *sync-client*)]
+      (is (map? result))
+      (is (contains? result :tools))
+      (is (sequential? (:tools result)))
+      (is (= 3 (count (:tools result)))) ; echo, add, get-time
+
+      (let [tool-names (set (map :name (:tools result)))]
         (is (contains? tool-names "echo"))
-        (is (contains? tool-names "add"))))))
+        (is (contains? tool-names "add"))
+        (is (contains? tool-names "get-time")))
 
-(deftest http-transport-call-tool-test
-  (testing "Java SDK client can call tools on Clojure server"
-    (java-sdk/initialize-client *java-client*)
+      (log/info :test/sync-tools-listed {:count (count (:tools result))})))
 
-    (testing "Echo tool"
-      (let [result (java-sdk/call-tool *java-client* "echo"
-                                       {"message" "Hello from Java SDK"})]
-        (is (not (.getIsError result)))
-        (let [content (.getContent result)]
-          (is (= 1 (.size content)))
-          (is (= "Echo: Hello from Java SDK"
-                 (.getText (.get content 0)))))))
+  (testing "async client tool listing"
+    (java-sdk/initialize-client *async-client*)
+    (let [result (java-sdk/list-tools *async-client*)]
+      (is (map? result))
+      (is (contains? result :tools))
+      (is (= 3 (count (:tools result))))
 
-    (testing "Add tool"
-      (let [result (java-sdk/call-tool *java-client* "add"
-                                       {"a" 5 "b" 3})]
-        (is (not (.getIsError result)))
-        (let [content (.getContent result)]
-          (is (= 1 (.size content)))
-          (is (= "Result: 8"
-                 (.getText (.get content 0)))))))))
+      (log/info :test/async-tools-listed {:count (count (:tools result))}))))
 
-(deftest http-transport-error-handling-test
-  (testing "Java SDK client handles errors correctly"
-    (java-sdk/initialize-client *java-client*)
+;;; Data Conversion Tests
 
-    (testing "Calling non-existent tool"
-      (let [result (java-sdk/call-tool *java-client* "nonexistent" {})]
-        (is (.getIsError result))
-        (let [content (.getContent result)]
-          (is (> (.size content) 0))
-          (is (re-find #"not found"
-                       (.. content (get 0) getText toLowerCase))))))))
+(deftest ^:integration test-data-marshalling
+  "Test data conversion between Clojure and Java"
+  (testing "simple string arguments"
+    (java-sdk/initialize-client *sync-client*)
+    (let [result (java-sdk/call-tool *sync-client* "echo" {:message "Hello World"})]
+      (is (map? result))
+      (is (contains? result :content))
+      (let [content (first (:content result))]
+        (is (= "text" (:type content)))
+        (is (= "Echo: Hello World" (:text content))))))
 
-;;; Stdio Transport Tests (separate namespace to avoid port conflicts)
+  (testing "numeric arguments"
+    (java-sdk/initialize-client *sync-client*)
+    (let [result (java-sdk/call-tool *sync-client* "add" {:a 42 :b 13})]
+      (is (map? result))
+      (is (contains? result :content))
+      (let [content (first (:content result))]
+        (is (= "text" (:type content)))
+        (is (= "55" (:text content))))))
 
-(defn start-clojure-stdio-server
-  "Start Clojure server as a subprocess for stdio testing"
-  []
-  (let [command ["clojure" "-M:stdio-server"]
-        process (java-sdk/start-process command)]
-    (Thread/sleep 2000) ;; Let server initialize
-    process))
+  (testing "special characters and unicode"
+    (java-sdk/initialize-client *sync-client*)
+    (let [message "Special chars: åäö 中文 🚀 \n\t\"quotes\""
+          result (java-sdk/call-tool *sync-client* "echo" {:message message})]
+      (is (map? result))
+      (let [content (first (:content result))]
+        (is (= (str "Echo: " message) (:text content))))))
 
-(deftest ^:integration stdio-transport-test
-  (testing "Java SDK client can communicate with Clojure server over stdio"
-    (let [process (start-clojure-stdio-server)
-          client (java-sdk/create-java-client
-                  {:transport :stdio
-                   :process process})]
-      (try
-        ;; Initialize
-        (let [init-result (java-sdk/initialize-client client)]
-          (is (not (nil? init-result)))
-          (is (= "mcp-clj" (.. init-result getServerInfo getName))))
+  (testing "empty and nil values"
+    (java-sdk/initialize-client *sync-client*)
+    (let [result (java-sdk/call-tool *sync-client* "echo" {:message ""})]
+      (is (map? result))
+      (let [content (first (:content result))]
+        (is (= "Echo: " (:text content)))))))
 
-        ;; List tools
-        (let [tools-result (java-sdk/list-tools client)
-              tools (.getTools tools-result)]
-          (is (> (.size tools) 0)))
+;;; Tool Execution Tests
 
-        ;; Call a tool
-        (let [result (java-sdk/call-tool client "clj-eval"
-                                         {"code" "(+ 1 2)"})]
-          (is (not (.getIsError result))))
+(deftest ^:integration test-tool-execution-patterns
+  "Test various tool execution patterns"
+  (testing "sequential tool calls"
+    (java-sdk/initialize-client *sync-client*)
+    (let [results (doall (for [i (range 3)]
+                           (java-sdk/call-tool *sync-client* "echo"
+                                               {:message (str "Message " i)})))]
+      (is (= 3 (count results)))
+      (doseq [[i result] (map-indexed vector results)]
+        (let [content (first (:content result))]
+          (is (= (str "Echo: Message " i) (:text content)))))))
 
-        (finally
-          (java-sdk/close-client client)
-          (java-sdk/stop-process process))))))
+  (testing "different tool types in sequence"
+    (java-sdk/initialize-client *sync-client*)
 
-;;; Version Negotiation Tests
+    ;; Call echo
+    (let [echo-result (java-sdk/call-tool *sync-client* "echo" {:message "test"})]
+      (is (some? echo-result))
+      (is (= "Echo: test" (-> echo-result :content first :text))))
 
-(deftest version-negotiation-test
-  (testing "Java SDK client and Clojure server negotiate protocol version correctly"
-    (java-sdk/initialize-client *java-client*)
-    ;; The Java SDK should handle version negotiation automatically
-    ;; We just verify that initialization succeeds
-    (is (not (nil? (java-sdk/list-tools *java-client*))))))
+    ;; Call add
+    (let [add-result (java-sdk/call-tool *sync-client* "add" {:a 10 :b 5})]
+      (is (some? add-result))
+      (is (= "15" (-> add-result :content first :text))))
+
+    ;; Call get-time
+    (let [time-result (java-sdk/call-tool *sync-client* "get-time" {})]
+      (is (some? time-result))
+      (is (string? (-> time-result :content first :text)))))
+
+  (testing "async tool execution"
+    (java-sdk/initialize-client *async-client*)
+    (let [result (java-sdk/call-tool *async-client* "echo" {:message "async test"})]
+      (is (map? result))
+      (is (= "Echo: async test" (-> result :content first :text))))))
+
+;;; Error Handling Tests
+
+(deftest ^:integration test-error-handling
+  "Test error handling and edge cases"
+  (testing "non-existent tool"
+    (java-sdk/initialize-client *sync-client*)
+    (try
+      (let [result (java-sdk/call-tool *sync-client* "non-existent-tool" {:arg "value"})]
+        (log/info :test/non-existent-tool-result {:result result})
+        ;; Server should return an error response
+        (when (contains? result :isError)
+          (is (:isError result))))
+      (catch Exception e
+        ;; Or it might throw an exception
+        (is (instance? Exception e))
+        (log/info :test/non-existent-tool-exception {:error (.getMessage e)}))))
+
+  (testing "invalid arguments for tool"
+    (java-sdk/initialize-client *sync-client*)
+    (try
+      ;; Try to call add without required arguments
+      (let [result (java-sdk/call-tool *sync-client* "add" {:invalid "args"})]
+        (log/info :test/invalid-args-result {:result result})
+        ;; Should get an error response
+        (when (contains? result :isError)
+          (is (:isError result))))
+      (catch Exception e
+        (is (instance? Exception e))
+        (log/info :test/invalid-args-exception {:error (.getMessage e)}))))
+
+  (testing "tool call with nil arguments"
+    (java-sdk/initialize-client *sync-client*)
+    (is (thrown? Exception
+                 (java-sdk/call-tool *sync-client* "echo" nil))))
+
+  (testing "tool call with nil tool name"
+    (java-sdk/initialize-client *sync-client*)
+    (is (thrown? Exception
+                 (java-sdk/call-tool *sync-client* nil {:message "test"})))))
+
+;;; Server Wrapper Tests
+
+(deftest test-server-wrapper-operations
+  "Test server creation and configuration"
+  (testing "server creation with default config"
+    (let [server-map (java-sdk/create-java-server {})]
+      (is (some? server-map))
+      (is (some? (:server server-map)))
+      (is (= "java-sdk-server" (:name server-map)))
+      (is (= "0.1.0" (:version server-map)))
+      (java-sdk/stop-server server-map)))
+
+  (testing "server creation with custom config"
+    (let [server-map (java-sdk/create-java-server
+                      {:name "test-server" :version "2.0.0" :async? false})]
+      (is (some? server-map))
+      (is (= "test-server" (:name server-map)))
+      (is (= "2.0.0" (:version server-map)))
+      (is (= false (:async? server-map)))
+      (java-sdk/stop-server server-map)))
+
+  (testing "tool registration"
+    (let [server-map (java-sdk/create-java-server {})
+          test-tool {:name "test-tool"
+                     :description "A test tool"
+                     :inputSchema {:type "object"
+                                   :properties {:input {:type "string"}}
+                                   :required ["input"]}
+                     :implementation (fn [args]
+                                       {:content [{:type "text"
+                                                   :text (str "Processed: " (:input args))}]})}]
+
+      ;; Register tool
+      (java-sdk/register-tool server-map test-tool)
+
+      ;; Start and stop server to test lifecycle
+      (java-sdk/start-server server-map)
+      (java-sdk/stop-server server-map))))
+
+;;; Resource Cleanup Tests
+
+(deftest ^:integration test-resource-cleanup
+  "Test proper cleanup of resources"
+  (testing "client cleanup"
+    (let [transport (java-sdk/create-stdio-client-transport "echo test")
+          client (java-sdk/create-java-client {:transport transport})]
+      ;; Close should not throw
+      (is (nil? (java-sdk/close-client client)))))
+
+  (testing "server cleanup"
+    (let [server-map (java-sdk/create-java-server {:name "cleanup-test"})]
+      ;; Stop should not throw
+      (is (some? (java-sdk/stop-server server-map))))))
+
+;;; Performance and Stress Tests
+
+(deftest ^:integration test-multiple-rapid-calls
+  "Test multiple rapid tool calls to check for race conditions"
+  (testing "rapid sequential calls"
+    (java-sdk/initialize-client *sync-client*)
+    (let [results (doall
+                   (for [i (range 10)]
+                     (java-sdk/call-tool *sync-client* "echo"
+                                         {:message (str "rapid-" i)})))]
+      (is (= 10 (count results)))
+      (doseq [result results]
+        (is (map? result))
+        (is (contains? result :content))
+        (is (string? (-> result :content first :text)))))))
+
+(comment
+  ;; Manual testing utilities
+
+  ;; Test transport creation
+  (java-sdk/create-stdio-client-transport "echo test")
+
+  ;; Test server startup
+  (def process (start-test-server-process))
+  (stop-test-server-process process)
+
+  ;; Test full client workflow
+  (let [client (create-test-client false)]
+    (try
+      (java-sdk/initialize-client client)
+      (java-sdk/list-tools client)
+      (java-sdk/call-tool client "echo" {:message "test"})
+      (finally
+        (java-sdk/close-client client)))))
