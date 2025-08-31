@@ -55,9 +55,9 @@
   "Establish an SSE connection and return session information"
   [port]
   (let [sse-url  (format "http://localhost:%d/sse" port)
-        response (hato/post sse-url
-                            {:headers {"Accept" "text/event-stream"}
-                             :as      :stream})
+        response (hato/get sse-url
+                           {:headers {"Accept" "text/event-stream"}
+                            :as      :stream})
         reader   (java.io.BufferedReader.
                   (java.io.InputStreamReader.
                    (:body response)))]

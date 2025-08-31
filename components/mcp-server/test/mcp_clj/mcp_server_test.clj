@@ -223,25 +223,25 @@
 
 (deftest lifecycle-test
   (testing "server lifecycle with SSE"
-    (let [port (port)
-          url (format "http://localhost:%d" port)
-          queue (LinkedBlockingQueue.)
-          state {:url url
-                 :queue queue
-                 :failed false}
-          response (hato/post (str url "/sse")
-                              {:headers {"Accept" "text/event-stream"}
-                               :as :stream})]
+    (let [port     (port)
+          url      (format "http://localhost:%d" port)
+          queue    (LinkedBlockingQueue.)
+          state    {:url    url
+                    :queue  queue
+                    :failed false}
+          response (hato/get (str url "/sse")
+                             {:headers {"Accept" "text/event-stream"}
+                              :as      :stream})]
       (with-open [reader (io/reader (:body response))]
         (let [done (volatile! nil)
-              f (future
-                  (try
-                    (wait-for-sse-events reader queue done)
-                    (catch Throwable e
-                      (prn :error e)
-                      (flush))))]
+              f    (future
+                     (try
+                       (wait-for-sse-events reader queue done)
+                       (catch Throwable e
+                         (prn :error e)
+                         (flush))))]
           (testing "initialisation"
-            (let [state (assoc state :plan (initialisation-plan))
+            (let [state           (assoc state :plan (initialisation-plan))
                   [state' result] (run-plan state)]
               (is (= :passed result))
               (is (not (:failed state')))))

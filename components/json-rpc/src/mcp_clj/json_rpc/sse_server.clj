@@ -125,7 +125,7 @@
                      @handlers
                      request)
 
-                    [:post "/sse"]
+                    [:get "/sse"]
                     (let [id (uuid->hex (random-uuid))
                           uri (str "/messages?session_id=" id)
                           {:keys [reply! close! response]}
@@ -151,11 +151,8 @@
                                    {:event "endpoint" :data uri})
                                   (on-sse-connect id)))))
                     (do
-                      (log/warn :rpc/invalid
-                                {:method request-method :uri uri})
-                      (http/text-response
-                       "Not Found"
-                       http/NotFound))))
+                      (log/warn :rpc/invalid {:method request-method :uri uri})
+                      (http/text-response "Not Found" http/NotFound))))
 
         {:keys [server port stop]}
         (http-server/run-server handler {:executor executor :port port})
