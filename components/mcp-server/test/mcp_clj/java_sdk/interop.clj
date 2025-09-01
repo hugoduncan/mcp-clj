@@ -13,7 +13,8 @@
     McpAsyncClient
     McpSyncClient]
    [io.modelcontextprotocol.client.transport
-    StdioClientTransport]
+    StdioClientTransport
+    ServerParameters]
    [io.modelcontextprotocol.server
     McpServer
     McpAsyncServer
@@ -106,12 +107,12 @@
   [tools]
   (try
     {:tools (mapv (fn [^McpSchema$Tool tool]
-                    {:name          (.name tool)
-                     :title         (.title tool)
-                     :description   (.description tool)
-                     :input-schema  (into {} (.inputSchema tool))
+                    {:name (.name tool)
+                     :title (.title tool)
+                     :description (.description tool)
+                     :input-schema (into {} (.inputSchema tool))
                      :output-schema (into {} (.outputSchema tool))
-                     :meta          (into {} (._meta tool))})
+                     :meta (into {} (._meta tool))})
                   tools)}
     (catch Exception e
       (log/error :java-sdk/tools-result-conversion-error {:error e})
@@ -154,12 +155,15 @@
                      :else
                      (throw (ex-info "Invalid command spec" {:command-spec command-spec})))
 
-        ;; Combine command and args into a single command array
-        command-array (if args
-                        (into-array String (cons cmd args))
-                        (into-array String [cmd]))]
+        ;; Build ServerParameters using the builder pattern
+        builder (ServerParameters/builder cmd)
+        server-params (if args
+                        (-> builder
+                            (.args (into-array String args))
+                            (.build))
+                        (.build builder))]
 
-    (StdioClientTransport. command-array (ObjectMapper.))))
+    (StdioClientTransport. server-params (ObjectMapper.))))
 
 (defn create-stdio-server-transport
   "Create a stdio transport provider for the server."
@@ -206,12 +210,12 @@
             (.build))]
     (if (:async? client-record)
       (let [^McpAsyncClient client (:client client-record)
-            result                 (await-future
-                                    (.callTool client request)
-                                    30)]
+            result (await-future
+                    (.callTool client request)
+                    30)]
         (java-tool-result->clj result))
       (let [^McpSyncClient client (:client client-record)
-            result                (.callTool client request)]
+            result (.callTool client request)]
         (java-tool-result->clj result)))))
 
 (defn close-client
@@ -247,7 +251,8 @@
                      (.capabilities
                       (-> (McpSchema$ServerCapabilities$Builder.)
                           (.tools true)
-                          (.build)))))]
+                          (.build)))
+                     (.build)))]
     (->JavaSdkServer server name version async?)))
 
 ;;; Process management for stdio transport
@@ -279,45 +284,46 @@
 
   Args:
   - server-record: JavaSdkServer record
-  - tool-spec: Map with :name, :description, :inputSchema, :implementation keys
+  - tool-spec: Map with :name, :description, :input-schema, :implementation keys
 
   Returns the updated server record."
-  [^JavaSdkServer server
-   {:keys [name description ^String input-schema implementation] :as tool-spec}]
-  (when-not (:server server)
-    (throw (ex-info "Invalid server record" {:server-record server})))
+  [^JavaSdkServer server-record
+   {:keys [name description input-schema implementation] :as tool-spec}]
+  (when-not (:server server-record)
+    (throw (ex-info "Invalid server record" {:server-record server-record})))
   (log/info :java-sdk/registering-tool {:name name})
-  ;; Build Tool object
-  (let [tool              (-> (McpSchema$Tool/builder)
-                              (.name name)
-                              (.description description)
-                              (.inputSchema input-schema)
-                              (.build))
-        ^McpServer server (:server server)]
-    (if (:sync? server)
-      (let [f                     (fn ^McpSchema$CallToolResult
-                                    [exchange
-                                     ^McpSchema$CallToolRequest call-tool-request]
-                                    (implementation))
-            tool-spec             (-> (McpServerFeatures$SyncToolSpecification$Builder.)
-                                      (.tool tool)
-                                      (.callHandler f)
-                                      (.build))
-            ^McpSyncServer server (:server server)]
+  ;; Convert input-schema map to JSON string for Java SDK
+  (let [schema-json (if (string? input-schema)
+                      input-schema
+                      (.writeValueAsString (ObjectMapper.) input-schema))
+        tool (-> (McpSchema$Tool/builder)
+                 (.name name)
+                 (.description description)
+                 (.inputSchema schema-json)
+                 (.build))
+        ^McpServer java-server (:server server-record)]
+    (if (:async? server-record)
+      (let [f (fn ^McpSchema$CallToolResult
+                [exchange ^McpSchema$CallToolRequest call-tool-request]
+                (implementation (.arguments call-tool-request)))
+            tool-spec (-> (McpServerFeatures$AsyncToolSpecification$Builder.)
+                          (.tool tool)
+                          (.callHandler f)
+                          (.build))
+            ^McpAsyncServer async-server java-server]
         ;; Add tool to server
-        (.addTool server tool-spec))
-      (let [f                      (fn ^McpSchema$CallToolResult
-                                     [exchange
-                                      ^McpSchema$CallToolRequest call-tool-request]
-                                     (implementation))
-            tool-spec              (-> (McpServerFeatures$AsyncToolSpecification$Builder.)
-                                       (.tool tool)
-                                       (.callHandler f)
-                                       (.build))
-            ^McpAsyncServer server (:server server)]
+        (.addTool async-server tool-spec))
+      (let [f (fn ^McpSchema$CallToolResult
+                [exchange ^McpSchema$CallToolRequest call-tool-request]
+                (implementation (.arguments call-tool-request)))
+            tool-spec (-> (McpServerFeatures$SyncToolSpecification$Builder.)
+                          (.tool tool)
+                          (.callHandler f)
+                          (.build))
+            ^McpSyncServer sync-server java-server]
         ;; Add tool to server
-        (.addTool server tool-spec))))
-  server)
+        (.addTool sync-server tool-spec))))
+  server-record)
 
 (defn start-server
   "Start the Java SDK server.

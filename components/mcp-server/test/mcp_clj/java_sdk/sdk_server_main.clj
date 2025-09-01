@@ -14,9 +14,9 @@
   []
   [{:name "echo"
     :description "Echo the input message"
-    :inputSchema {:type "object"
-                  :properties {:message {:type "string"}}
-                  :required ["message"]}
+    :input-schema {:type "object"
+                   :properties {:message {:type "string"}}
+                   :required ["message"]}
     :implementation (fn [args]
                       (log/info :sdk-server/echo-called {:args args})
                       {:content [{:type "text"
@@ -24,10 +24,10 @@
 
    {:name "add"
     :description "Add two numbers"
-    :inputSchema {:type "object"
-                  :properties {:a {:type "number"}
-                               :b {:type "number"}}
-                  :required ["a" "b"]}
+    :input-schema {:type "object"
+                   :properties {:a {:type "number"}
+                                :b {:type "number"}}
+                   :required ["a" "b"]}
     :implementation (fn [args]
                       (log/info :sdk-server/add-called {:args args})
                       (let [result (+ (:a args) (:b args))]
@@ -36,8 +36,8 @@
 
    {:name "get-time"
     :description "Get current time"
-    :inputSchema {:type "object"
-                  :properties {}}
+    :input-schema {:type "object"
+                   :properties {}}
     :implementation (fn [_args]
                       (log/info :sdk-server/get-time-called)
                       {:content [{:type "text"
@@ -54,10 +54,10 @@
   (try
     ;; Create SDK server with stdio transport
     (with-open [server (java-sdk/create-java-server
-                        {:name    "java-sdk-test-server"
+                        {:name "java-sdk-test-server"
                          :version "1.0.0"
                          ;; Use sync for simpler subprocess handling
-                         :async?  false})]
+                         :async? false})]
       (let [tools (create-test-tools)]
 
         (log/info :sdk-server-main/server-created {:name (:name server)})
