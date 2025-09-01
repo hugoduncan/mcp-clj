@@ -6,62 +6,91 @@
   (:require
    [mcp-clj.log :as log])
   (:import
-   ;; Core MCP SDK classes
+   [com.fasterxml.jackson.databind
+    ObjectMapper] ;; Types
    [io.modelcontextprotocol.client
-    McpClient]
+    McpClient
+    McpAsyncClient
+    McpSyncClient]
    [io.modelcontextprotocol.client.transport
     StdioClientTransport]
    [io.modelcontextprotocol.server
-    McpServer]
+    McpServer
+    McpAsyncServer
+    McpSyncServer
+    McpServerFeatures
+    McpServerFeatures$SyncToolSpecification
+    McpServerFeatures$SyncToolSpecification$Builder
+    McpServerFeatures$AsyncToolSpecification$Builder]
    [io.modelcontextprotocol.server.transport
-    StdioServerTransportProvider]
-
-   ;; Jackson for JSON
-   [com.fasterxml.jackson.databind
-    ObjectMapper]
-
-   ;; Types
+    StdioServerTransportProvider] ;; Jackson for JSON
    [io.modelcontextprotocol.spec
-    McpSchema$ServerCapabilities
+    McpSchema
+    McpSchema$CallToolRequest
+    McpSchema$CallToolResult
     McpSchema$ServerCapabilities$Builder
-    McpSchema$Tool]
-
-   ;; Java standard library
-   [java.util Map List]
-   [java.util.concurrent TimeUnit]))
+    McpSchema$Tool] ;; Java standard library
+   [java.lang AutoCloseable]
+   [java.util List
+    Map]
+   [java.util.concurrent CompletableFuture
+    TimeUnit]))
 
 ;;; Utility functions
 
+;;; Records for Java SDK client and server wrappers
+
+(defrecord JavaSdkClient [^McpClient client transport async?]
+  AutoCloseable
+  (close [_this]
+    (log/info :java-sdk/closing-client)
+    (try
+      (.close ^AutoCloseable client)
+      (.close ^AutoCloseable transport)
+      (catch Exception e
+        (log/warn :java-sdk/close-error {:error e})))))
+
+(defrecord JavaSdkServer [^McpServer server name version async?]
+  AutoCloseable
+  (close [_this]
+    (log/info :java-sdk/closing-server)
+    (try
+      (if async?
+        (.closeGracefully ^McpAsyncServer server)
+        (.closeGracefully ^McpSyncServer server))
+      (catch Exception e
+        (log/warn :java-sdk/server-close-error {:error e})))))
+
 (defn- clj->java-map
   "Convert Clojure map to Java Map"
-  [m]
+  ^Map [m]
   (if (map? m)
     (java.util.HashMap. ^Map m)
     m))
 
 (defn- await-future
   "Block and wait for CompletableFuture with timeout"
-  [future timeout-seconds]
+  [^CompletableFuture future timeout-seconds]
   (try
     (.get future timeout-seconds TimeUnit/SECONDS)
     (catch Exception e
       (log/error :java-sdk/future-error {:error e})
       (throw e))))
 
-(defn- java-content->clj
-  "Convert Java content object to Clojure map"
-  [content]
-  ;; Convert Java content objects to Clojure maps
-  ;; The exact structure depends on the Java SDK implementation
-  (try
-    {:type (.getType content)
-     :text (.getText content)}
-    (catch Exception e
-      (log/warn :java-sdk/content-conversion-error {:error e :content content})
-      {:type "text" :text (str content)})))
+#_(defn- java-content->clj
+    "Convert Java content object to Clojure map"
+    [content]
+     ;; Convert Java content objects to Clojure maps
+     ;; The exact structure depends on the Java SDK implementation
+    (try
+      {:type (.getType content)
+       :text (.getText content)}
+      (catch Exception e
+        (log/warn :java-sdk/content-conversion-error {:error e :content content})
+        {:type "text" :text (str content)})))
 
-(defn- java-McpSchema$Tool-result->clj
-  "Convert Java McpSchema$Tool call result to Clojure map"
+(defn- java-tool-result->clj
+  "Convert Java tool call result to Clojure map"
   [result]
   (try
     (if (instance? Map result)
@@ -72,18 +101,21 @@
       {:content [{:type "text" :text "Error converting result"}]
        :isError true})))
 
-(defn- java-McpSchema$Tools-result->clj
-  "Convert Java McpSchema$Tools list to Clojure map"
-  [McpSchema$Tools]
+(defn- java-tools-result->clj
+  "Convert Java tools list to Clojure map"
+  [tools]
   (try
-    {:McpSchema$Tools (mapv (fn [McpSchema$Tool]
-                              {:name        (.getName McpSchema$Tool)
-                               :description (.getDescription McpSchema$Tool)
-                               :inputSchema (into {} (.getInputSchema McpSchema$Tool))})
-                            McpSchema$Tools)}
+    {:tools (mapv (fn [^McpSchema$Tool tool]
+                    {:name          (.name tool)
+                     :title         (.title tool)
+                     :description   (.description tool)
+                     :input-schema  (into {} (.inputSchema tool))
+                     :output-schema (into {} (.outputSchema tool))
+                     :meta          (into {} (._meta tool))})
+                  tools)}
     (catch Exception e
-      (log/error :java-sdk/McpSchema$Tools-result-conversion-error {:error e})
-      {:McpSchema$Tools []})))
+      (log/error :java-sdk/tools-result-conversion-error {:error e})
+      {:tools []})))
 
 ;;; Client API
 
@@ -95,18 +127,15 @@
   - :timeout - Request timeout in seconds (default 30)
   - :async? - Whether to create async client (default true)
 
-  Returns a map with :client key."
+  Returns a JavaSdkClient record that implements AutoCloseable."
   [{:keys [transport timeout async?]
-    :or   {timeout 30 async? true}}]
+    :or {timeout 30 async? true}}]
   (let [client (if async?
                  (-> (McpClient/async transport)
-                     (.serverInfo "java-sdk-client" "1.0.0")
                      (.build))
                  (-> (McpClient/sync transport)
-                     (.serverInfo "java-sdk-client" "1.0.0")
                      (.build)))]
-    {:client client
-     :async? async?}))
+    (->JavaSdkClient client transport async?)))
 
 (defn create-stdio-client-transport
   "Create a stdio transport provider for the client.
@@ -134,56 +163,61 @@
 
 (defn create-stdio-server-transport
   "Create a stdio transport provider for the server."
-  []
+  ^StdioServerTransportProvider []
   (StdioServerTransportProvider. (ObjectMapper.)))
 
 (defn initialize-client
   "Initialize the Java SDK client connection.
 
   Returns the initialization result."
-  [{:keys [client async?] :as client-map}]
+  [^JavaSdkClient client-record]
   (log/info :java-sdk/initializing-client)
-  (if async?
-    (await-future (.connect client) 30)
-    (.connect client)))
+  (if (:async? client-record)
+    (await-future (.initialize ^McpAsyncClient (:client client-record)) 30)
+    (.initialize ^McpSyncClient (:client client-record))))
 
-(defn list-McpSchema$Tools
-  "List available McpSchema$Tools from the server.
+(defn list-tools
+  "List available tools from the server.
 
-  Returns McpSchema$Tools list converted to Clojure map."
-  [{:keys [client async?]}]
-  (log/info :java-sdk/listing-McpSchema$Tools)
-  (if async?
-    (let [result (await-future (.listMcpSchema$Tools client) 30)]
-      (java-McpSchema$Tools-result->clj result))
-    (let [result (.listMcpSchema$Tools client)]
-      (java-McpSchema$Tools-result->clj result))))
+  Returns tools list converted to Clojure map."
+  [^JavaSdkClient client-record]
+  (log/info :java-sdk/listing-tools)
+  (if (:async? client-record)
+    (let [result (await-future (.listTools ^McpAsyncClient (:client client-record)) 30)]
+      (java-tools-result->clj result))
+    (let [result (.listTools ^McpSyncClient (:client client-record))]
+      (java-tools-result->clj result))))
 
-(defn call-McpSchema$Tool
-  "Call a McpSchema$Tool through the Java SDK client.
+(defn call-tool
+  "Call a tool through the Java SDK client.
 
   Args:
-  - client-map: Map with :client key
-  - McpSchema$Tool-name: Name of the McpSchema$Tool to call
-  - arguments: Map of arguments for the McpSchema$Tool
+  - client-record: JavaSdkClient record
+  - tool-name: Name of the tool to call
+  - arguments: Map of arguments for the tool
 
-  Returns McpSchema$Tool result converted to Clojure map."
-  [{:keys [client async?]} McpSchema$Tool-name arguments]
-  (log/info :java-sdk/calling-McpSchema$Tool {:McpSchema$Tool McpSchema$Tool-name :args arguments})
-  (if async?
-    (let [result (await-future (.callMcpSchema$Tool client McpSchema$Tool-name (clj->java-map arguments)) 30)]
-      (java-McpSchema$Tool-result->clj result))
-    (let [result (.callMcpSchema$Tool client McpSchema$Tool-name (clj->java-map arguments))]
-      (java-McpSchema$Tool-result->clj result))))
+  Returns tool result converted to Clojure map."
+  [^JavaSdkClient client-record ^String tool-name arguments]
+  (log/info :java-sdk/calling-tool {:tool tool-name :args arguments})
+  (let [^McpSchema$CallToolRequest request
+        (-> (McpSchema$CallToolRequest/builder)
+            (.name tool-name)
+            (.arguments (clj->java-map arguments))
+            (.build))]
+    (if (:async? client-record)
+      (let [^McpAsyncClient client (:client client-record)
+            result                 (await-future
+                                    (.callTool client request)
+                                    30)]
+        (java-tool-result->clj result))
+      (let [^McpSyncClient client (:client client-record)
+            result                (.callTool client request)]
+        (java-tool-result->clj result)))))
 
 (defn close-client
   "Close the Java SDK client."
-  [{:keys [client]}]
-  (log/info :java-sdk/closing-client)
-  (try
-    (.close client)
-    (catch Exception e
-      (log/warn :java-sdk/close-error {:error e}))))
+  [^JavaSdkClient client-record]
+  (.close client-record))
 
 ;;; Server API (placeholder - not fully implemented yet)
 
@@ -195,29 +229,26 @@
   - :version - Server version (default '0.1.0')
   - :async? - Whether to create async server (default true)
 
-  Returns a map with server configuration."
+  Returns a JavaSdkServer record that implements AutoCloseable."
   [{:keys [name version async?]
-    :or   {name "java-sdk-server" version "0.1.0" async? true}}]
+    :or {name "java-sdk-server" version "0.1.0" async? true}}]
   (log/info :java-sdk/creating-server {:name name :version version :async? async?})
   (let [transport (create-stdio-server-transport)
-        server    (if async?
-                    (-> (McpServer/async transport)
-                        (.serverInfo name version)
-                        (.capabilities
-                         (-> (McpSchema$ServerCapabilities$Builder.)
-                             (.tools true)
-                             (.build)))
-                        (.build))
-                    (-> (McpServer/sync transport)
-                        (.serverInfo name version)
-                        (.capabilities
-                         (-> (McpSchema$ServerCapabilities$Builder.)
-                             (.tools true)
-                             (.build)))))]
-    {:server  server
-     :async?  async?
-     :name    name
-     :version version}))
+        server (if async?
+                 (-> (McpServer/async transport)
+                     (.serverInfo name version)
+                     (.capabilities
+                      (-> (McpSchema$ServerCapabilities$Builder.)
+                          (.tools true)
+                          (.build)))
+                     (.build))
+                 (-> (McpServer/sync transport)
+                     (.serverInfo name version)
+                     (.capabilities
+                      (-> (McpSchema$ServerCapabilities$Builder.)
+                          (.tools true)
+                          (.build)))))]
+    (->JavaSdkServer server name version async?)))
 
 ;;; Process management for stdio transport
 
@@ -243,58 +274,73 @@
     (when-not (.waitFor process 5 TimeUnit/SECONDS)
       (.destroyForcibly process))))
 
-(defn register-McpSchema$Tool
-  "Register a McpSchema$Tool with the Java SDK server.
+(defn register-tool
+  "Register a tool with the Java SDK server.
 
   Args:
-  - server-map: Server map returned from create-java-server
-  - McpSchema$Tool-spec: Map with :name, :description, :inputSchema, :implementation keys
+  - server-record: JavaSdkServer record
+  - tool-spec: Map with :name, :description, :inputSchema, :implementation keys
 
-  Returns the updated server map."
-  [server-map {:keys [name description inputSchema implementation] :as McpSchema$Tool-spec}]
-  (when-not (:server server-map)
-    (throw (ex-info "Invalid server map" {:server-map server-map})))
-  (log/info :java-sdk/registering-McpSchema$Tool {:name name})
-  ;; Build McpSchema$Tool object
-  (let [McpSchema$Tool (-> (McpSchema$Tool/builder)
-                 (.name name)
-                 (.description description)
-                 (.inputSchema (clj->java-map inputSchema))
-                 (.build))
-        server (:server server-map)]
-    ;; Add McpSchema$Tool to server
-    (if (:async? server-map)
-      (.addMcpSchema$Tool server McpSchema$Tool implementation)
-      (.addMcpSchema$Tool server McpSchema$Tool implementation)))
-  server-map)
+  Returns the updated server record."
+  [^JavaSdkServer server
+   {:keys [name description ^String input-schema implementation] :as tool-spec}]
+  (when-not (:server server)
+    (throw (ex-info "Invalid server record" {:server-record server})))
+  (log/info :java-sdk/registering-tool {:name name})
+  ;; Build Tool object
+  (let [tool              (-> (McpSchema$Tool/builder)
+                              (.name name)
+                              (.description description)
+                              (.inputSchema input-schema)
+                              (.build))
+        ^McpServer server (:server server)]
+    (if (:sync? server)
+      (let [f                     (fn ^McpSchema$CallToolResult
+                                    [exchange
+                                     ^McpSchema$CallToolRequest call-tool-request]
+                                    (implementation))
+            tool-spec             (-> (McpServerFeatures$SyncToolSpecification$Builder.)
+                                      (.tool tool)
+                                      (.callHandler f)
+                                      (.build))
+            ^McpSyncServer server (:server server)]
+        ;; Add tool to server
+        (.addTool server tool-spec))
+      (let [f                      (fn ^McpSchema$CallToolResult
+                                     [exchange
+                                      ^McpSchema$CallToolRequest call-tool-request]
+                                     (implementation))
+            tool-spec              (-> (McpServerFeatures$AsyncToolSpecification$Builder.)
+                                       (.tool tool)
+                                       (.callHandler f)
+                                       (.build))
+            ^McpAsyncServer server (:server server)]
+        ;; Add tool to server
+        (.addTool server tool-spec))))
+  server)
 
 (defn start-server
   "Start the Java SDK server.
 
   Args:
-  - server-map: Server map returned from create-java-server
+  - server-record: JavaSdkServer record
 
-  Returns the server map."
-  [server-map]
-  (when-not (:server server-map)
-    (throw (ex-info "Invalid server map" {:server-map server-map})))
-  (log/info :java-sdk/starting-server {:name (:name server-map)})
-  (let [server (:server server-map)]
-    (.start server))
-  server-map)
+  Returns the server record."
+  [^JavaSdkServer server-record]
+  (when-not (:server server-record)
+    (throw (ex-info "Invalid server record" {:server-record server-record})))
+  (log/info :java-sdk/starting-server {:name (:name server-record)})
+  ;; (let [server (:server server-record)]
+  ;;   (.start server))
+  server-record)
 
 (defn stop-server
   "Stop the Java SDK server.
 
   Args:
-  - server-map: Server map returned from create-java-server"
-  [server-map]
-  (when-not (:server server-map)
-    (throw (ex-info "Invalid server map" {:server-map server-map})))
-  (log/info :java-sdk/stopping-server {:name (:name server-map)})
-  (let [server (:server server-map)]
-    (.close server))
-  server-map)
+  - server-record: JavaSdkServer record"
+  [^JavaSdkServer server-record]
+  (.close server-record))
 
 (defn create-transport
   "Create transport for Java SDK client/server based on type.
@@ -309,7 +355,13 @@
   (case transport-type
     :stdio-client (let [command (:command options)]
                     (when-not command
-                      (throw (ex-info "Command required for stdio client transport" {:options options})))
+                      (throw
+                       (ex-info
+                        "Command required for stdio client transport"
+                        {:options options})))
                     (create-stdio-client-transport command))
     :stdio-server (create-stdio-server-transport)
-    (throw (ex-info "Unknown transport type" {:transport-type transport-type}))))
+    (throw
+     (ex-info
+      "Unknown transport type"
+      {:transport-type transport-type}))))
