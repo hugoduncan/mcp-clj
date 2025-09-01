@@ -46,8 +46,10 @@
   (close [_this]
     (log/info :java-sdk/closing-client)
     (try
-      (.close ^AutoCloseable client)
-      (.close ^AutoCloseable transport)
+      (if async?
+        (.close ^McpAsyncClient client)
+        (.close ^McpSyncClient client))
+      (.close ^StdioClientTransport transport)
       (catch Exception e
         (log/warn :java-sdk/close-error {:error e})))))
 
@@ -63,17 +65,51 @@
         (log/warn :java-sdk/server-close-error {:error e})))))
 
 (defn- clj->java-map
-  "Convert Clojure map to Java Map"
+  "Convert Clojure map to Java Map, recursively converting keywords to strings"
   ^Map [m]
-  (if (map? m)
-    (java.util.HashMap. ^Map m)
+  (cond
+    (map? m)
+    (java.util.HashMap.
+     ^Map (into {} (map (fn [[k v]]
+                          [(if (keyword? k) (name k) k)
+                           (clj->java-map v)])
+                        m)))
+
+    (sequential? m)
+    (java.util.ArrayList. ^java.util.Collection (map clj->java-map m))
+
+    (keyword? m)
+    (name m)
+
+    :else
     m))
 
+(defn- clj-result->java-result
+  "Convert Clojure tool result to Java CallToolResult"
+  [clj-result]
+  (let [builder (McpSchema$CallToolResult/builder)]
+    (when (:isError clj-result)
+      (.isError builder (:isError clj-result)))
+
+    ;; Add content items
+    (when-let [content (:content clj-result)]
+      (doseq [item content]
+        (case (:type item)
+          "text" (.addTextContent builder (:text item))
+          ;; Default to text for other types
+          (.addTextContent builder (str item)))))
+
+    (.build builder)))
+
 (defn- await-future
-  "Block and wait for CompletableFuture with timeout"
-  [^CompletableFuture future timeout-seconds]
+  "Block and wait for CompletableFuture or Mono with timeout"
+  [future-or-mono timeout-seconds]
   (try
-    (.get future timeout-seconds TimeUnit/SECONDS)
+    (let [^CompletableFuture future (if (instance? CompletableFuture future-or-mono)
+                                      future-or-mono
+                                      ;; Convert Mono to CompletableFuture
+                                      (.toFuture ^reactor.core.publisher.Mono future-or-mono))]
+      (.get future timeout-seconds TimeUnit/SECONDS))
     (catch Exception e
       (log/error :java-sdk/future-error {:error e})
       (throw e))))
@@ -94,8 +130,21 @@
   "Convert Java tool call result to Clojure map"
   [result]
   (try
-    (if (instance? Map result)
-      (into {} result)
+    (if (instance? McpSchema$CallToolResult result)
+      {:content (mapv (fn [content-item]
+                        (cond
+                          ;; Handle TextContent
+                          (instance? io.modelcontextprotocol.spec.McpSchema$TextContent content-item)
+                          {:type "text"
+                           :text (.text content-item)}
+
+                          ;; Handle other content types - convert to text for now
+                          :else
+                          {:type "text"
+                           :text (str content-item)}))
+                      (.content result))
+       :isError (.isError result)}
+      ;; Fallback for non-CallToolResult objects
       {:content [{:type "text" :text (str result)}]})
     (catch Exception e
       (log/error :java-sdk/result-conversion-error {:error e})
@@ -103,17 +152,30 @@
        :isError true})))
 
 (defn- java-tools-result->clj
-  "Convert Java tools list to Clojure map"
-  [tools]
+  "Convert Java tools list result to Clojure map"
+  [result]
   (try
     {:tools (mapv (fn [^McpSchema$Tool tool]
                     {:name (.name tool)
                      :title (.title tool)
                      :description (.description tool)
-                     :input-schema (into {} (.inputSchema tool))
-                     :output-schema (into {} (.outputSchema tool))
-                     :meta (into {} (._meta tool))})
-                  tools)}
+                     :input-schema (when-let [schema (.inputSchema tool)]
+                                     (try
+                                       ;; Convert JsonSchema to string then parse back to avoid type issues
+                                       (-> schema .toString)
+                                       (catch Exception e
+                                         (str schema))))
+                     :output-schema (when-let [schema (.outputSchema tool)]
+                                      (try
+                                        (-> schema .toString)
+                                        (catch Exception e
+                                          (str schema))))
+                     :meta (try
+                             (when-let [meta-obj (._meta tool)]
+                               (str meta-obj))
+                             (catch Exception e
+                               nil))})
+                  (.tools result))}
     (catch Exception e
       (log/error :java-sdk/tools-result-conversion-error {:error e})
       {:tools []})))
@@ -305,7 +367,10 @@
     (if (:async? server-record)
       (let [f (fn ^McpSchema$CallToolResult
                 [exchange ^McpSchema$CallToolRequest call-tool-request]
-                (implementation (.arguments call-tool-request)))
+                (let [java-args (.arguments call-tool-request)
+                      clj-args (into {} (map (fn [[k v]] [(keyword k) v]) java-args))
+                      clj-result (implementation clj-args)]
+                  (clj-result->java-result clj-result)))
             tool-spec (-> (McpServerFeatures$AsyncToolSpecification$Builder.)
                           (.tool tool)
                           (.callHandler f)
@@ -315,7 +380,10 @@
         (.addTool async-server tool-spec))
       (let [f (fn ^McpSchema$CallToolResult
                 [exchange ^McpSchema$CallToolRequest call-tool-request]
-                (implementation (.arguments call-tool-request)))
+                (let [java-args (.arguments call-tool-request)
+                      clj-args (into {} (map (fn [[k v]] [(keyword k) v]) java-args))
+                      clj-result (implementation clj-args)]
+                  (clj-result->java-result clj-result)))
             tool-spec (-> (McpServerFeatures$SyncToolSpecification$Builder.)
                           (.tool tool)
                           (.callHandler f)

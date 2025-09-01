@@ -17,7 +17,6 @@
 
 ;;; Test Infrastructure
 
-(def ^:dynamic *server-process* nil)
 (def ^:dynamic *sync-client* nil)
 (def ^:dynamic *async-client* nil)
 
@@ -55,38 +54,27 @@
   [async?]
   (let [transport (java-sdk/create-stdio-client-transport
                    {:command "clj"
-                    :args ["-M:dev:test" "-m"
-                           "mcp-clj.java-sdk.sdk-server-main"]})
-        client (java-sdk/create-java-client
-                {:transport transport
-                 :async? async?})]
+                    :args    ["-M:dev:test" "-m"
+                              "mcp-clj.java-sdk.sdk-server-main"]})
+        client    (java-sdk/create-java-client
+                   {:transport transport
+                    :async?    async?})]
     client))
-
-(defn with-server-process
-  "Test fixture: start/stop server process"
-  [f]
-  (let [process (start-test-server-process)]
-    (try
-      (binding [*server-process* process]
-        (f))
-      (finally
-        (stop-test-server-process process)))))
 
 (defn with-clients
   "Test fixture: create sync and async clients"
   [f]
-  (when *server-process*
-    (let [sync-client (create-test-client false)
-          async-client (create-test-client true)]
-      (try
-        (binding [*sync-client* sync-client
-                  *async-client* async-client]
-          (f))
-        (finally
-          (when sync-client (java-sdk/close-client sync-client))
-          (when async-client (java-sdk/close-client async-client)))))))
+  (let [sync-client  (create-test-client false)
+        async-client (create-test-client true)]
+    (try
+      (binding [*sync-client*  sync-client
+                *async-client* async-client]
+        (f))
+      (finally
+        (when sync-client (java-sdk/close-client sync-client))
+        (when async-client (java-sdk/close-client async-client))))))
 
-(use-fixtures :each with-server-process with-clients)
+(use-fixtures :each with-clients)
 
 ;;; Transport Layer Tests
 

@@ -48,16 +48,15 @@
 
   Starts a Java SDK MCP server with stdio transport and registers test tools."
   [& args]
-  (prn :running)
   (log/info :sdk-server-main/starting {:args args})
 
   (try
     ;; Create SDK server with stdio transport
     (with-open [server (java-sdk/create-java-server
-                        {:name "java-sdk-test-server"
+                        {:name    "java-sdk-test-server"
                          :version "1.0.0"
                          ;; Use sync for simpler subprocess handling
-                         :async? false})]
+                         :async?  false})]
       (let [tools (create-test-tools)]
 
         (log/info :sdk-server-main/server-created {:name (:name server)})
@@ -90,9 +89,7 @@
 
     (catch Exception e
       (log/error :sdk-server-main/error {:error e})
-      (prn {:error e})
-      (System/exit 1)))
-  (prn :done))
+      (System/exit 1))))
 
 ;; For REPL testing
 (comment
