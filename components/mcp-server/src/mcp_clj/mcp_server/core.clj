@@ -81,11 +81,15 @@
                    [(str "Client version " protocolVersion " not supported. "
                          "Using " negotiated-version ". "
                          "Supported versions: " (pr-str supported-versions))])]
+    (log/info :server/mcp-version
+      {:negotiated-version negotiated-version
+       :warnings warnings})
     {:negotiation negotiation
      :client-info clientInfo
      :response {:serverInfo (cond-> {:name    "mcp-clj"
                                      :version "0.1.0"}
-                              (>= negotiated-version "2025-06-18")
+                              (not
+                               (neg? (compare negotiated-version "2025-06-18")))
                               (assoc :title "MCP Clojure Server"))
                 :protocolVersion negotiated-version
                 :capabilities {;; :logging   {} needs to implement logging/setLevel

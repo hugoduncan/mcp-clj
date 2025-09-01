@@ -10,12 +10,13 @@
   [_]
   (try
     (log/warn :stdio-server {:msg "Starting"})
-    (let [server (mcp-server/create-server {:transport :stdio})]
+    (with-open [server (mcp-server/create-server {:transport :stdio})]
       (log/warn :stdio-server {:msg "Started"})
-      (.addShutdownHook (Runtime/getRuntime)
-                        (Thread. #(do
-                                    (log/info :shutting-down-stdio-server)
-                                    ((:stop server)))))
+      (.addShutdownHook
+       (Runtime/getRuntime)
+       (Thread. #(do
+                   (log/info :shutting-down-stdio-server)
+                   ((:stop server)))))
       ;; Keep the main thread alive
       @(promise))
     (catch Exception e

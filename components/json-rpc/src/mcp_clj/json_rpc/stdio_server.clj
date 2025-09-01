@@ -85,7 +85,9 @@
       (if-let [handler (get handlers (:method rpc-call))]
         (dispatch-rpc-call executor handler rpc-call)
         (do
-          (log/warn :rpc/no-such-method {:method (:method rpc-call)})
+          (log/warn :rpc/no-such-method
+            {:method             (:method rpc-call)
+             :available-handlers (keys handlers)})
           (write-json!
            *out*
            (json-protocol/json-rpc-error
@@ -123,16 +125,16 @@
 (defn create-server
   "Create JSON-RPC server over stdio."
   [{:keys [num-threads handlers]
-    :or {num-threads (* 2 (.availableProcessors (Runtime/getRuntime)))
-         handlers {}}}]
+    :or   {num-threads (* 2 (.availableProcessors (Runtime/getRuntime)))
+           handlers    {}}}]
   (log/debug :server/starting {:msg "Starting"})
   (let [executor (executor/create-executor num-threads)
         handlers (atom handlers)
-        running (atom true)
-        out *out*
-        in (input-reader)
-        #_(PushbackReader.
-           (InputStreamReader. System/in) 1024)
+        running  (atom true)
+        out      *out*
+        in       (input-reader)
+        #_       (PushbackReader.
+                  (InputStreamReader. System/in) 1024)
 
         server-future
         (future
@@ -140,9 +142,12 @@
             (try
               (log/debug :server/started {:msg "Running"})
               (loop []
+                (loop [] (when (empty? @handlers)
+                           (Thread/sleep 10)
+                           (recur)))
                 (when @running
                   (let [[rpc-call ex :as resp] (read-json in)
-                        _ (log/debug :rpc/call {:call rpc-call})
+                        _                      (log/debug :rpc/call {:call rpc-call})
                         v
                         (cond
                           (nil? resp)
