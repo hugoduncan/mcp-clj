@@ -1,4 +1,4 @@
-(ns mcp-clj.json-rpc.java-sdk-integration-test
+(ns mcp-clj.mcp-client.java-sdk-integration-test
   "Integration tests using Clojure stdio client against Java SDK server.
    
    This tests cross-implementation compatibility by using our Clojure JSON-RPC
