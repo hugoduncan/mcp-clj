@@ -9,26 +9,24 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [mcp-clj.java-sdk.interop :as java-sdk]
-   [mcp-clj.log :as log])
-  (:import
-   [java.util.concurrent TimeUnit]))
+   [mcp-clj.log :as log]))
 
 (defn- create-server-client
   "Create SDK client connected to our Clojure MCP server subprocess"
-  []
+  [async?]
   (let [transport (java-sdk/create-stdio-client-transport
                    {:command "clj"
                     :args    ["-M:stdio-server:dev:test"]})
         client    (java-sdk/create-java-client
                    {:transport transport
-                    :async?    false})] ; Use sync for simpler testing
+                    :async?    async?})] ; Use sync for simpler testing
     client))
 
 ;;; Server Behavior Tests
 
 (deftest test-server-initialization
   (testing "Clojure MCP server initialization with Java SDK client"
-    (with-open [client (create-server-client)]
+    (with-open [client (create-server-client false)]
       ;; Initialize connection
       (let [result (java-sdk/initialize-client client)]
         (is (some? result))
@@ -36,7 +34,7 @@
 
 (deftest test-server-tool-discovery
   (testing "server tool discovery via Java SDK client"
-    (with-open [client (create-server-client)]
+    (with-open [client (create-server-client false)]
       ;; Initialize connection
       (java-sdk/initialize-client client)
 
@@ -62,7 +60,7 @@
 
 (deftest test-server-tool-execution
   (testing "server tool execution via Java SDK client"
-    (with-open [client (create-server-client)]
+    (with-open [client (create-server-client false)]
       ;; Initialize connection
       (java-sdk/initialize-client client)
 
@@ -92,7 +90,7 @@
 
 (deftest test-server-error-handling
   (testing "server error handling via Java SDK client"
-    (with-open [client (create-server-client)]
+    (with-open [client (create-server-client false)]
       ;; Initialize connection
       (java-sdk/initialize-client client)
 
@@ -122,7 +120,7 @@
 
 (deftest test-server-concurrent-operations
   (testing "server concurrent operations via Java SDK client"
-    (with-open [client (create-server-client)]
+    (with-open [client (create-server-client true)]
       ;; Initialize connection
       (java-sdk/initialize-client client)
 
@@ -147,12 +145,12 @@
 
       (testing "mixed operation types concurrently"
         (let [list-future (future (java-sdk/list-tools client))
-              ls-future (future (java-sdk/call-tool client "ls" {:path "."}))
+              ls-future   (future (java-sdk/call-tool client "ls" {:path "."}))
               eval-future (future (java-sdk/call-tool client "clj-eval" {:code "42"}))]
 
           ;; Wait for all to complete
           (let [list-result @list-future
-                ls-result @ls-future
+                ls-result   @ls-future
                 eval-result @eval-future]
 
             ;; List tools result
@@ -170,7 +168,7 @@
 
 (deftest test-server-session-robustness
   (testing "server session robustness via Java SDK client"
-    (with-open [client (create-server-client)]
+    (with-open [client (create-server-client false)]
       ;; Initialize connection
       (java-sdk/initialize-client client)
 
@@ -182,7 +180,7 @@
 
         ;; Server should still work for valid operations
         (let [result (java-sdk/call-tool client "clj-eval" {:code "(str \"after-error\")"})]
-          (is (= "\"after-error\"" (-> result :content first :text))))
+          (is (= "after-error" (-> result :content first :text))))
 
         ;; Tool listing should still work
         (let [tools (java-sdk/list-tools client)]
@@ -203,7 +201,7 @@
 (deftest test-server-resource-cleanup
   (testing "server resource management and cleanup"
     ;; This test verifies our server shuts down cleanly when client disconnects
-    (let [client (create-server-client)]
+    (let [client (create-server-client false)]
       ;; Initialize and use server
       (java-sdk/initialize-client client)
       (let [result (java-sdk/call-tool client "clj-eval" {:code "42"})]

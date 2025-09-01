@@ -10,7 +10,7 @@
        :result (with-out-str
                  (binding [*err* *out*]
                    (try
-                     (println (eval form))
+                     (print (eval form))
                      (catch Throwable e
                        (println "EVAL FAILED:")
                        (println (ex-message e) (pr-str (ex-data e)))
