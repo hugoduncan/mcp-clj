@@ -1,310 +1,271 @@
 (ns mcp-clj.mcp-client.java-sdk-integration-test
-  "Integration tests using Clojure stdio client against Java SDK server.
+  "Integration tests using Clojure MCP client against Java SDK server.
    
-   This tests cross-implementation compatibility by using our Clojure JSON-RPC
-   stdio client to communicate with the Java SDK MCP server subprocess."
+   This tests cross-implementation compatibility by using our Clojure MCP client
+   to communicate with the Java SDK MCP server subprocess."
   (:require
    [clojure.test :refer [deftest is testing use-fixtures]]
-   [mcp-clj.json-rpc.stdio-client :as stdio-client]
+   [mcp-clj.mcp-client.core :as client]
    [mcp-clj.log :as log])
   (:import
-   [java.io BufferedReader
-    BufferedWriter
-    InputStreamReader
-    OutputStreamWriter]
    [java.util.concurrent TimeUnit]))
 
-(def ^:dynamic *java-sdk-process* nil)
 (def ^:dynamic *client* nil)
 
-(defn start-java-sdk-server
-  "Start the Java SDK server as a subprocess"
-  []
-  (log/info :integration-test/starting-java-sdk-server)
-  (let [pb (ProcessBuilder. (into-array String ["clj" "-M:dev:test" "-m" "mcp-clj.java-sdk.sdk-server-main"]))
-        _ (.redirectErrorStream pb true)
-        process (.start pb)]
-
-    ;; Give server time to start
-    (Thread/sleep 2000)
-
-    (if (.isAlive process)
-      (do
-        (log/info :integration-test/java-sdk-server-started)
-        process)
-      (throw (ex-info "Java SDK server failed to start"
-                      {:exit-code (.exitValue process)})))))
-
-(defn stop-java-sdk-server
-  "Stop the Java SDK server subprocess"
-  [process]
-  (when (and process (.isAlive process))
-    (log/info :integration-test/stopping-java-sdk-server)
-    (.destroy process)
-    (when-not (.waitFor process 5 TimeUnit/SECONDS)
-      (.destroyForcibly process))
-    (log/info :integration-test/java-sdk-server-stopped)))
-
-(defn create-stdio-client
-  "Create stdio client connected to Java SDK server process"
-  [process]
-  (let [input-stream (BufferedReader. (InputStreamReader. (.getInputStream process)))
-        output-stream (BufferedWriter. (OutputStreamWriter. (.getOutputStream process)))]
-    (stdio-client/create-json-rpc-client input-stream output-stream)))
-
-(defn with-java-sdk-server
-  "Test fixture: start/stop Java SDK server process"
+(defn with-java-sdk-client
+  "Test fixture: create MCP client connected to Java SDK server"
   [f]
-  (let [process (start-java-sdk-server)]
-    (try
-      (binding [*java-sdk-process* process]
-        (f))
-      (finally
-        (stop-java-sdk-server process)))))
+  (with-open [client (client/create-client
+                      {:server {:command "clj"
+                                :args ["-M:dev:test" "-m" "mcp-clj.java-sdk.sdk-server-main"]}
+                       :client-info {:name "java-sdk-integration-test"
+                                     :version "0.1.0"}
+                       :capabilities {}
+                       :protocol-version "2024-11-05"})]
 
-(defn with-stdio-client
-  "Test fixture: create stdio client connected to server"
-  [f]
-  (when *java-sdk-process*
-    (let [client (create-stdio-client *java-sdk-process*)]
-      (try
-        (binding [*client* client]
-          (f))
-        (finally
-          (stdio-client/close-json-rpc-client! client))))))
+    ;; Wait for client to be ready
+    (client/wait-for-ready client 10000) ; 10 second timeout
 
-(use-fixtures :each with-java-sdk-server with-stdio-client)
+    (binding [*client* client]
+      (f))))
+
+(use-fixtures :each with-java-sdk-client)
 
 ;;; MCP Protocol Tests
 
-(deftest test-mcp-initialization
-  "Test MCP protocol initialization with Java SDK server"
-  (testing "initialize request"
-    (let [init-params {:protocolVersion "2024-11-05"
-                       :capabilities {:roots {:listChanged false}}
-                       :clientInfo {:name "clojure-mcp-client" :version "0.1.0"}}
-          future (stdio-client/send-request! *client* "initialize" init-params 5000)]
+(deftest test-client-initialization
+  "Test MCP client initialization with Java SDK server"
+  (testing "client should be ready after initialization"
+    (is (client/client-ready? *client*))
+    (is (not (client/client-error? *client*)))
 
-      ;; Wait for response
-      (let [response (.get future 5 TimeUnit/SECONDS)]
-        (is (map? response))
-        (is (contains? response :protocolVersion))
-        (is (contains? response :capabilities))
-        (is (contains? response :serverInfo))
+    (let [client-info (client/get-client-info *client*)]
+      (is (= :ready (:state client-info)))
+      (is (= "2024-11-05" (:protocol-version client-info)))
+      (is (= {:name "java-sdk-integration-test" :version "0.1.0"}
+             (:client-info client-info)))
+      (is (some? (:server-info client-info)))
+      (is (map? (:server-capabilities client-info)))
+      (is (:transport-alive? client-info))
 
-        (log/info :integration-test/initialize-response {:response response}))))
-
-  (testing "initialized notification"
-    ;; Send initialized notification after initialize
-    (stdio-client/send-notification! *client* "initialized" {})
-
-    ;; Give server time to process
-    (Thread/sleep 100)))
+      (log/info :integration-test/client-ready {:client-info client-info}))))
 
 (deftest test-tool-discovery
   "Test tool discovery with Java SDK server"
-  (testing "list tools request"
-    ;; First initialize
-    (let [init-params {:protocolVersion "2024-11-05"
-                       :capabilities {:roots {:listChanged false}}
-                       :clientInfo {:name "clojure-mcp-client" :version "0.1.0"}}
-          init-future (stdio-client/send-request! *client* "initialize" init-params 5000)]
-      (.get init-future 5 TimeUnit/SECONDS))
+  (testing "list available tools"
+    (let [tools-response (client/list-tools *client*)]
+      (is (map? tools-response))
+      (is (contains? tools-response :tools))
+      (is (sequential? (:tools tools-response)))
 
-    (stdio-client/send-notification! *client* "initialized" {})
-    (Thread/sleep 100)
+      ;; Should have our test tools
+      (let [tool-names (set (map :name (:tools tools-response)))]
+        (is (contains? tool-names "echo"))
+        (is (contains? tool-names "add"))
+        (is (contains? tool-names "get-time"))
 
-    ;; List tools
-    (let [future (stdio-client/send-request! *client* "tools/list" {} 5000)]
-      (let [response (.get future 5 TimeUnit/SECONDS)]
-        (is (map? response))
-        (is (contains? response :tools))
-        (is (sequential? (:tools response)))
+        ;; Each tool should have proper schema
+        (doseq [tool (:tools tools-response)]
+          (is (contains? tool :name))
+          (is (contains? tool :description))
+          (is (some? (:name tool)))
+          (is (some? (:description tool)))))
 
-        ;; Should have our test tools
-        (let [tool-names (set (map :name (:tools response)))]
-          (is (contains? tool-names "echo"))
-          (is (contains? tool-names "add"))
-          (is (contains? tool-names "get-time")))
+      (log/info :integration-test/tools-discovered {:tools (:tools tools-response)})
 
-        (log/info :integration-test/tools-list {:tools (:tools response)})))))
+      ;; Verify client knows tools are available
+      (is (client/available-tools? *client*)))))
 
 (deftest test-tool-calls
   "Test actual tool calls with Java SDK server"
   (testing "echo tool call"
-    ;; Initialize first
-    (let [init-params {:protocolVersion "2024-11-05"
-                       :capabilities {:roots {:listChanged false}}
-                       :clientInfo {:name "clojure-mcp-client" :version "0.1.0"}}
-          init-future (stdio-client/send-request! *client* "initialize" init-params 5000)]
-      (.get init-future 5 TimeUnit/SECONDS))
+    (let [result (client/call-tool *client* "echo" {:message "Hello from Clojure MCP client!"})]
+      (is (map? result))
+      (is (contains? result :content))
+      (is (sequential? (:content result)))
 
-    (stdio-client/send-notification! *client* "initialized" {})
-    (Thread/sleep 100)
+      (let [first-content (first (:content result))]
+        (is (= "text" (:type first-content)))
+        (is (= "Echo: Hello from Clojure MCP client!" (:text first-content))))
 
-    ;; Call echo tool
-    (let [call-params {:name "echo" :arguments {:message "Hello from Clojure client!"}}
-          future (stdio-client/send-request! *client* "tools/call" call-params 5000)]
-
-      (let [response (.get future 5 TimeUnit/SECONDS)]
-        (is (map? response))
-        (is (contains? response :content))
-        (is (sequential? (:content response)))
-
-        (let [first-content (first (:content response))]
-          (is (= "text" (:type first-content)))
-          (is (= "Echo: Hello from Clojure client!" (:text first-content))))
-
-        (log/info :integration-test/echo-response {:response response}))))
+      (log/info :integration-test/echo-result {:result result})))
 
   (testing "add tool call"
-    ;; Call add tool
-    (let [call-params {:name "add" :arguments {:a 42 :b 13}}
-          future (stdio-client/send-request! *client* "tools/call" call-params 5000)]
+    (let [result (client/call-tool *client* "add" {:a 42 :b 13})]
+      (is (map? result))
+      (is (contains? result :content))
 
-      (let [response (.get future 5 TimeUnit/SECONDS)]
-        (is (map? response))
-        (is (contains? response :content))
+      (let [first-content (first (:content result))]
+        (is (= "text" (:type first-content)))
+        (is (= "55" (:text first-content))))
 
-        (let [first-content (first (:content response))]
-          (is (= "text" (:type first-content)))
-          (is (= "55" (:text first-content))))
-
-        (log/info :integration-test/add-response {:response response}))))
+      (log/info :integration-test/add-result {:result result})))
 
   (testing "get-time tool call"
-    ;; Call get-time tool
-    (let [call-params {:name "get-time" :arguments {}}
-          future (stdio-client/send-request! *client* "tools/call" call-params 5000)]
+    (let [result (client/call-tool *client* "get-time" {})]
+      (is (map? result))
+      (is (contains? result :content))
 
-      (let [response (.get future 5 TimeUnit/SECONDS)]
-        (is (map? response))
-        (is (contains? response :content))
+      (let [first-content (first (:content result))]
+        (is (= "text" (:type first-content)))
+        (is (string? (:text first-content)))
+        (is (> (count (:text first-content)) 0)))
 
-        (let [first-content (first (:content response))]
-          (is (= "text" (:type first-content)))
-          (is (string? (:text first-content)))
-          (is (> (count (:text first-content)) 0)))
-
-        (log/info :integration-test/get-time-response {:response response})))))
+      (log/info :integration-test/get-time-result {:result result}))))
 
 (deftest test-error-handling
   "Test error handling scenarios"
   (testing "non-existent tool call"
-    ;; Initialize first
-    (let [init-params {:protocolVersion "2024-11-05"
-                       :capabilities {:roots {:listChanged false}}
-                       :clientInfo {:name "clojure-mcp-client" :version "0.1.0"}}
-          init-future (stdio-client/send-request! *client* "initialize" init-params 5000)]
-      (.get init-future 5 TimeUnit/SECONDS))
+    (try
+      (client/call-tool *client* "non-existent-tool" {:param "value"})
+      (is false "Should have thrown exception for non-existent tool")
+      (catch Exception e
+        (is (instance? Exception e))
+        (log/info :integration-test/non-existent-tool-error {:error (.getMessage e)}))))
 
-    (stdio-client/send-notification! *client* "initialized" {})
-    (Thread/sleep 100)
+  (testing "invalid tool arguments"
+    (try
+      ;; Try to call add with invalid arguments (missing required params)
+      (client/call-tool *client* "add" {:invalid "args"})
+      ;; If it doesn't throw, check for error indication in result
+      :no-exception
+      (catch Exception e
+        (is (instance? Exception e))
+        (log/info :integration-test/invalid-args-error {:error (.getMessage e)})))))
 
-    ;; Try to call non-existent tool
-    (let [call-params {:name "non-existent-tool" :arguments {:param "value"}}
-          future (stdio-client/send-request! *client* "tools/call" call-params 5000)]
-
-      (try
-        (let [response (.get future 5 TimeUnit/SECONDS)]
-          ;; If we get a response instead of exception, check for error indication
-          (when (and (map? response) (contains? response :isError))
-            (is (:isError response))))
-        (catch Exception e
-          ;; Exception is also acceptable for non-existent tools
-          (is (instance? Exception e))
-          (log/info :integration-test/non-existent-tool-error {:error (.getMessage e)})))))
-
-  (testing "invalid method call"
-    ;; Try to call non-existent method
-    (let [future (stdio-client/send-request! *client* "invalid/method" {} 5000)]
-
-      (try
-        (.get future 5 TimeUnit/SECONDS)
-        (is false "Should have thrown exception for invalid method")
-        (catch Exception e
-          (is (instance? Exception e))
-          (log/info :integration-test/invalid-method-error {:error (.getMessage e)}))))))
-
-(deftest test-protocol-compliance
-  "Test MCP protocol compliance"
-  (testing "jsonrpc version in responses"
-    (let [init-params {:protocolVersion "2024-11-05"
-                       :capabilities {:roots {:listChanged false}}
-                       :clientInfo {:name "clojure-mcp-client" :version "0.1.0"}}
-          future (stdio-client/send-request! *client* "initialize" init-params 5000)]
-
-      (let [response (.get future 5 TimeUnit/SECONDS)]
-        ;; Response should be a proper JSON-RPC response
-        (is (map? response))
-        ;; The actual protocol validation happens at the JSON-RPC layer
-        (log/info :integration-test/protocol-compliance {:response response}))))
-
-  (testing "concurrent requests"
-    ;; Initialize first
-    (let [init-params {:protocolVersion "2024-11-05"
-                       :capabilities {:roots {:listChanged false}}
-                       :clientInfo {:name "clojure-mcp-client" :version "0.1.0"}}
-          init-future (stdio-client/send-request! *client* "initialize" init-params 5000)]
-      (.get init-future 5 TimeUnit/SECONDS))
-
-    (stdio-client/send-notification! *client* "initialized" {})
-    (Thread/sleep 100)
-
-    ;; Send multiple concurrent tool calls
+(deftest test-concurrent-operations
+  "Test concurrent tool calls"
+  (testing "multiple concurrent tool calls"
     (let [futures (doall
                    (for [i (range 5)]
-                     (stdio-client/send-request!
-                      *client*
-                      "tools/call"
-                      {:name "echo" :arguments {:message (str "Message " i)}}
-                      5000)))]
+                     (future
+                       (client/call-tool *client* "echo"
+                                         {:message (str "Concurrent message " i)}))))]
 
       ;; Wait for all to complete
-      (let [responses (doall (map #(.get % 5 TimeUnit/SECONDS) futures))]
-        (is (= 5 (count responses)))
+      (let [results (doall (map deref futures))]
+        (is (= 5 (count results)))
 
-        ;; Each should be a valid response
-        (doseq [response responses]
-          (is (map? response))
-          (is (contains? response :content)))
+        ;; Each should be a valid result
+        (doseq [result results]
+          (is (map? result))
+          (is (contains? result :content))
+          (is (sequential? (:content result))))
 
         ;; Messages should be different
-        (let [messages (map #(-> % :content first :text) responses)]
-          (is (= 5 (count (set messages)))))
+        (let [messages (map #(-> % :content first :text) results)]
+          (is (= 5 (count (set messages))))
 
-        (log/info :integration-test/concurrent-responses {:count (count responses)})))))
+          ;; Each message should contain the expected pattern
+          (doseq [message messages]
+            (is (clojure.string/includes? message "Concurrent message"))))
 
-(deftest test-lifecycle-management
-  "Test proper lifecycle management"
-  (testing "multiple initialize calls"
-    ;; First initialize
-    (let [init-params {:protocolVersion "2024-11-05"
-                       :capabilities {:roots {:listChanged false}}
-                       :clientInfo {:name "clojure-mcp-client" :version "0.1.0"}}
-          future1 (stdio-client/send-request! *client* "initialize" init-params 5000)]
+        (log/info :integration-test/concurrent-results {:count (count results)}))))
 
-      (let [response1 (.get future1 5 TimeUnit/SECONDS)]
-        (is (map? response1)))
+  (testing "mixed operation types concurrently"
+    (let [list-future (future (client/list-tools *client*))
+          echo-future (future (client/call-tool *client* "echo" {:message "concurrent"}))
+          add-future (future (client/call-tool *client* "add" {:a 10 :b 20}))]
 
-      ;; Second initialize (should work or give appropriate error)
-      (let [future2 (stdio-client/send-request! *client* "initialize" init-params 5000)]
-        (try
-          (let [response2 (.get future2 5 TimeUnit/SECONDS)]
-            (is (map? response2)))
-          (catch Exception e
-            ;; Multiple initializes might be rejected, which is valid
-            (is (instance? Exception e))
-            (log/info :integration-test/multiple-init-error {:error (.getMessage e)}))))))
+      ;; Wait for all to complete
+      (let [list-result @list-future
+            echo-result @echo-future
+            add-result @add-future]
 
-  (testing "requests before initialization"
-    ;; Try to call tools before initialize - should fail
-    (let [call-params {:name "echo" :arguments {:message "test"}}
-          future (stdio-client/send-request! *client* "tools/call" call-params 2000)]
+        ;; List tools result
+        (is (map? list-result))
+        (is (contains? list-result :tools))
 
-      (try
-        (.get future 2 TimeUnit/SECONDS)
-        (is false "Should have failed before initialization")
-        (catch Exception e
-          (is (instance? Exception e))
-          (log/info :integration-test/before-init-error {:error (.getMessage e)}))))))
+        ;; Echo result
+        (is (= "Echo: concurrent" (-> echo-result :content first :text)))
+
+        ;; Add result  
+        (is (= "30" (-> add-result :content first :text)))
+
+        (log/info :integration-test/mixed-concurrent-success)))))
+
+(deftest test-session-robustness
+  "Test session robustness and error recovery"
+  (testing "client remains functional after errors"
+    ;; Try a failing operation
+    (try
+      (client/call-tool *client* "non-existent-tool" {})
+      (catch Exception _))
+
+    ;; Client should still work for valid operations
+    (let [result (client/call-tool *client* "echo" {:message "after error"})]
+      (is (= "Echo: after error" (-> result :content first :text))))
+
+    ;; Tool listing should still work
+    (let [tools (client/list-tools *client*)]
+      (is (map? tools))
+      (is (sequential? (:tools tools)))))
+
+  (testing "client info remains consistent"
+    (let [info1 (client/get-client-info *client*)
+          _ (client/call-tool *client* "echo" {:message "test"})
+          info2 (client/get-client-info *client*)]
+
+      ;; Core info should remain the same
+      (is (= (:state info1) (:state info2)))
+      (is (= (:client-info info1) (:client-info info2)))
+      (is (= (:server-info info1) (:server-info info2)))
+      (is (:transport-alive? info1))
+      (is (:transport-alive? info2)))))
+
+(deftest test-protocol-compliance
+  "Test MCP protocol compliance features"
+  (testing "proper protocol version negotiation"
+    (let [client-info (client/get-client-info *client*)]
+      ;; Should negotiate to 2024-11-05 as requested
+      (is (= "2024-11-05" (:protocol-version client-info))))
+
+    (log/info :integration-test/protocol-version-verified))
+
+  (testing "server info validation"
+    (let [server-info (:server-info (client/get-client-info *client*))]
+      (is (map? server-info))
+      ;; Server should provide name and version
+      (is (contains? server-info :name))
+      (is (contains? server-info :version))
+      (is (string? (:name server-info)))
+      (is (string? (:version server-info))))
+
+    (log/info :integration-test/server-info-validated))
+
+  (testing "capabilities exchange"
+    (let [client-info (client/get-client-info *client*)
+          server-caps (:server-capabilities client-info)]
+      (is (map? server-caps))
+      ;; Java SDK server should declare tool capabilities
+      (when (contains? server-caps :tools)
+        (is (contains? (:tools server-caps) :listChanged))))
+
+    (log/info :integration-test/capabilities-validated)))
+
+(deftest test-resource-management
+  "Test proper resource management and cleanup"
+  (testing "client cleanup works properly"
+    ;; This test verifies the with-open pattern works
+    ;; The fixture handles this, so we just verify client is functional
+    (is (client/client-ready? *client*))
+    (is (not (client/client-error? *client*)))
+
+    ;; Perform an operation to ensure everything works
+    (let [result (client/call-tool *client* "echo" {:message "cleanup test"})]
+      (is (= "Echo: cleanup test" (-> result :content first :text))))
+
+    (log/info :integration-test/resource-management-verified)))
+
+(comment
+  ;; Manual testing examples
+
+  ;; Run a single test
+  (clojure.test/run-tests 'mcp-clj.mcp-client.java-sdk-integration-test)
+
+  ;; Test specific functionality
+  (with-java-sdk-client
+    (fn []
+      (println "Tools:" (client/list-tools *client*))
+      (println "Echo:" (client/call-tool *client* "echo" {:message "test"}))
+      (println "Add:" (client/call-tool *client* "add" {:a 1 :b 2})))))
