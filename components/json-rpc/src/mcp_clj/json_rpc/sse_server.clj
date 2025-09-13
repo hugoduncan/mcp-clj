@@ -113,17 +113,23 @@
   {:pre [(ifn? on-sse-connect) (ifn? on-sse-close)]}
   (let [executor (executor/create-executor num-threads)
         session-id->session (atom {})
-        handlers (atom {})
+        handlers (atom nil)
         handler (fn [{:keys [request-method uri] :as request}]
                   (log/info :rpc/http-request
                             {:method request-method :uri uri})
                   (case [request-method uri]
                     [:post "/messages"]
-                    (handle-request
-                     executor
-                     @session-id->session
-                     @handlers
-                     request)
+                    (if (nil? @handlers)
+                      (http/json-response
+                       (json-protocol/json-rpc-error
+                        :internal-error
+                        "Server not ready - handlers not initialized")
+                       http/Unavailable)
+                      (handle-request
+                       executor
+                       @session-id->session
+                       @handlers
+                       request))
 
                     [:get "/sse"]
                     (let [id (uuid->hex (random-uuid))

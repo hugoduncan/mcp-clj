@@ -126,7 +126,7 @@
   "Create JSON-RPC server over stdio."
   [{:keys [num-threads handlers]
     :or   {num-threads (* 2 (.availableProcessors (Runtime/getRuntime)))
-           handlers    {}}}]
+           handlers    nil}}]
   (log/debug :server/starting {:msg "Starting"})
   (let [executor (executor/create-executor num-threads)
         handlers (atom handlers)
@@ -142,7 +142,7 @@
             (try
               (log/debug :server/started {:msg "Running"})
               (loop []
-                (loop [] (when (empty? @handlers)
+                (loop [] (when (and (nil? @handlers) @running)
                            (Thread/sleep 10)
                            (recur)))
                 (when @running
