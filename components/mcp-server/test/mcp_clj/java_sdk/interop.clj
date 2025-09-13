@@ -353,18 +353,19 @@
 ;;; Server API (placeholder - not fully implemented yet)
 
 (defn create-java-server
-  "Create a Java SDK MCP server using stdio transport.
+  "Create a Java SDK MCP server with configurable transport.
 
   Options:
   - :name - Server name (default 'java-sdk-server')
   - :version - Server version (default '0.1.0')
   - :async? - Whether to create async server (default true)
+  - :transport - Server transport provider (default stdio)
 
   Returns a JavaSdkServer record that implements AutoCloseable."
-  [{:keys [name version async?]
+  [{:keys [name version async? transport]
     :or {name "java-sdk-server" version "0.1.0" async? true}}]
   (log/info :java-sdk/creating-server {:name name :version version :async? async?})
-  (let [transport (create-stdio-server-transport)
+  (let [transport (or transport (create-stdio-server-transport))
         server (if async?
                  (-> (McpServer/async transport)
                      (.serverInfo name version)

@@ -368,6 +368,73 @@
       ;; Stop should not throw and returns nil
       (is (nil? (java-sdk/stop-server server-map))))))
 
+;;; HTTP Transport Integration Tests
+
+(deftest ^:integration test-http-transport-object-creation
+  "Test HTTP transport object creation and basic properties"
+  (testing "HTTP client transport object creation"
+    ;; Test that HTTP client transports can be created with correct configuration
+    (let [http-transport (java-sdk/create-http-client-transport
+                          {:url "http://localhost:8080/mcp"})
+          sse-transport (java-sdk/create-http-client-transport
+                         {:url "http://localhost:8080" :use-sse true})]
+
+      (is (some? http-transport))
+      (is (some? sse-transport))
+
+      ;; Verify they are different types
+      (is (not= (class http-transport) (class sse-transport)))
+
+      ;; Should be WebClientStreamableHttpTransport and WebFluxSseClientTransport
+      (is (= "WebClientStreamableHttpTransport" (.getSimpleName (class http-transport))))
+      (is (= "WebFluxSseClientTransport" (.getSimpleName (class sse-transport))))))
+
+  (testing "HTTP server transport object creation"
+    ;; Test that HTTP server transports can be created
+    (let [http-server-transport (java-sdk/create-http-server-transport
+                                 {:port 8080 :endpoint "/api"})
+          sse-server-transport (java-sdk/create-http-server-transport
+                                {:port 8081 :use-sse true :endpoint "/events"})]
+
+      (is (some? http-server-transport))
+      (is (some? sse-server-transport))
+
+      ;; Should be different types
+      (is (not= (class http-server-transport) (class sse-server-transport)))
+
+      ;; Should be WebFluxStreamableServerTransportProvider and WebFluxSseServerTransportProvider
+      (is (= "WebFluxStreamableServerTransportProvider" (.getSimpleName (class http-server-transport))))
+      (is (= "WebFluxSseServerTransportProvider" (.getSimpleName (class sse-server-transport))))))
+
+  (testing "HTTP transport integration with Java SDK clients and servers"
+    ;; Test that transports can be passed to client/server constructors without errors
+    (let [client-transport (java-sdk/create-http-client-transport
+                           {:url "http://example.com/mcp"})
+          server-transport (java-sdk/create-http-server-transport
+                           {:port 9999 :endpoint "/test"})
+
+          ;; Create client with HTTP transport
+          client (java-sdk/create-java-client
+                 {:transport client-transport :async? false})
+
+          ;; Create server with HTTP transport
+          server (java-sdk/create-java-server
+                 {:name "http-test-server"
+                  :version "1.0.0"
+                  :transport server-transport})]
+
+      ;; Verify objects were created successfully
+      (is (some? client))
+      (is (some? server))
+
+      ;; Verify they contain the expected transport objects
+      (is (identical? client-transport (:transport client)))
+      (is (some? (:server server)))
+
+      ;; Clean up
+      (java-sdk/close-client client)
+      (java-sdk/stop-server server))))
+
 ;;; Performance and Stress Tests
 
 (deftest ^:integration test-multiple-rapid-calls
