@@ -618,117 +618,117 @@
                                         (is (= :passed result)))]))))
           (future-cancel f))))))
 
-#_x(deftest version-negotiation-test
-     (testing "MCP protocol version negotiation"
-       (let [port     (port)
-             url      (format "http://localhost:%d" port)
-             queue    (LinkedBlockingQueue.)
-             state    {:url    url
-                       :queue  queue
-                       :failed false}
-             response (hato/get (str url "/sse")
-                                {:headers {"Accept" "text/event-stream"}
-                                 :as      :stream})]
-         (with-open [reader (io/reader (:body response))]
-           (let [done (volatile! nil)
-                 f    (future
-                        (try
-                          (wait-for-sse-events reader queue done)
-                          (catch Throwable e
-                            (prn :error e)
-                            (flush))))]
+#_(deftest version-negotiation-test
+    (testing "MCP protocol version negotiation"
+      (let [port     (port)
+            url      (format "http://localhost:%d" port)
+            queue    (LinkedBlockingQueue.)
+            state    {:url    url
+                      :queue  queue
+                      :failed false}
+            response (hato/get (str url "/sse")
+                               {:headers {"Accept" "text/event-stream"}
+                                :as      :stream})]
+        (with-open [reader (io/reader (:body response))]
+          (let [done (volatile! nil)
+                f    (future
+                       (try
+                         (wait-for-sse-events reader queue done)
+                         (catch Throwable e
+                           (prn :error e)
+                           (flush))))]
 
-             (testing "supported version 2024-11-05 negotiation succeeds"
-               (let [plan
-                     [{:action   :receive
-                       :data     {:event "endpoint"}
-                       :apply-fn (update-state-apply-key :uri :data)}
-                      {:action :send
-                       :msg    (json-request
-                                "initialize"
-                                {:protocolVersion "2024-11-05"
-                                 :capabilities    {:tools {:listChanged true}}
-                                 :clientInfo      {:name "test-client" :version "1.0.0"}}
-                                1)}
-                      {:action :receive
-                       :data   {:event "message"
-                                :data
-                                (json-result
-                                 {:serverInfo      {:name    "mcp-clj"
-                                                    :version "0.1.0"}
-                                  :protocolVersion "2024-11-05"
-                                  :capabilities    {:tools     {:listChanged true}
-                                                    :resources {:listChanged false
-                                                                :subscribe   false}
-                                                    :prompts   {:listChanged true}}
-                                  :instructions    "mcp-clj is used to interact with a clojure REPL."}
-                                 nil
-                                 1)}}]
-                     state           (assoc state :plan plan)
-                     [state' result] (run-plan state)]
-                 (is (= :passed result))
-                 (is (not (:failed state')))))
+            (testing "supported version 2024-11-05 negotiation succeeds"
+              (let [plan
+                    [{:action   :receive
+                      :data     {:event "endpoint"}
+                      :apply-fn (update-state-apply-key :uri :data)}
+                     {:action :send
+                      :msg    (json-request
+                               "initialize"
+                               {:protocolVersion "2024-11-05"
+                                :capabilities    {:tools {:listChanged true}}
+                                :clientInfo      {:name "test-client" :version "1.0.0"}}
+                               1)}
+                     {:action :receive
+                      :data   {:event "message"
+                               :data
+                               (json-result
+                                {:serverInfo      {:name    "mcp-clj"
+                                                   :version "0.1.0"}
+                                 :protocolVersion "2024-11-05"
+                                 :capabilities    {:tools     {:listChanged true}
+                                                   :resources {:listChanged false
+                                                               :subscribe   false}
+                                                   :prompts   {:listChanged true}}
+                                 :instructions    "mcp-clj is used to interact with a clojure REPL."}
+                                nil
+                                1)}}]
+                    state           (assoc state :plan plan)
+                    [state' result] (run-plan state)]
+                (is (= :passed result))
+                (is (not (:failed state')))))
 
-             (testing "latest version 2025-06-18 negotiation succeeds"
-               (let [plan
-                     [{:action :send
-                       :msg    (json-request
-                                "initialize"
-                                {:protocolVersion "2025-06-18"
-                                 :capabilities    {:tools {:listChanged true}}
-                                 :clientInfo      {:name "test-client" :version "1.0.0"}}
-                                2)}
-                      {:action :receive
-                       :data   {:event "message"
-                                :data
-                                (json-result
-                                 {:serverInfo      {:name    "mcp-clj"
-                                                    :title   "MCP Clojure Server"
-                                                    :version "0.1.0"}
-                                  :protocolVersion "2025-06-18"
-                                  :capabilities    {:tools     {:listChanged true}
-                                                    :resources {:listChanged false
-                                                                :subscribe   false}
-                                                    :prompts   {:listChanged true}}
-                                  :instructions    "mcp-clj is used to interact with a clojure REPL."}
-                                 nil
-                                 2)}}]
-                     state           (assoc state :plan plan)
-                     [state' result] (run-plan state)]
-                 (is (= :passed result))
-                 (is (not (:failed state')))))
+            (testing "latest version 2025-06-18 negotiation succeeds"
+              (let [plan
+                    [{:action :send
+                      :msg    (json-request
+                               "initialize"
+                               {:protocolVersion "2025-06-18"
+                                :capabilities    {:tools {:listChanged true}}
+                                :clientInfo      {:name "test-client" :version "1.0.0"}}
+                               2)}
+                     {:action :receive
+                      :data   {:event "message"
+                               :data
+                               (json-result
+                                {:serverInfo      {:name    "mcp-clj"
+                                                   :title   "MCP Clojure Server"
+                                                   :version "0.1.0"}
+                                 :protocolVersion "2025-06-18"
+                                 :capabilities    {:tools     {:listChanged true}
+                                                   :resources {:listChanged false
+                                                               :subscribe   false}
+                                                   :prompts   {:listChanged true}}
+                                 :instructions    "mcp-clj is used to interact with a clojure REPL."}
+                                nil
+                                2)}}]
+                    state           (assoc state :plan plan)
+                    [state' result] (run-plan state)]
+                (is (= :passed result))
+                (is (not (:failed state')))))
 
-             (testing "unsupported version falls back with warning"
-               (let [plan
-                     [{:action :send
-                       :msg    (json-request
-                                "initialize"
-                                {:protocolVersion "0.2"
-                                 :capabilities    {:tools {:listChanged true}}
-                                 :clientInfo      {:name "test-client" :version "1.0.0"}}
-                                3)}
-                      {:action :receive
-                       :data   {:event "message"
-                                :data
-                                (json-result
-                                 {:serverInfo      {:name    "mcp-clj"
-                                                    :title   "MCP Clojure Server"
-                                                    :version "0.1.0"}
-                                  :protocolVersion "2025-06-18"
-                                  :capabilities    {:tools     {:listChanged true}
-                                                    :resources {:listChanged false
-                                                                :subscribe   false}
-                                                    :prompts   {:listChanged true}}
-                                  :instructions    "mcp-clj is used to interact with a clojure REPL."
-                                  :warnings        ["Client version 0.2 not supported. Using 2025-06-18. Supported versions: [\"2025-06-18\" \"2024-11-05\"]"]}
-                                 nil
-                                 3)}}]
-                     state           (assoc state :plan plan)
-                     [state' result] (run-plan state)]
-                 (is (= :passed result))
-                 (is (not (:failed state')))))
+            (testing "unsupported version falls back with warning"
+              (let [plan
+                    [{:action :send
+                      :msg    (json-request
+                               "initialize"
+                               {:protocolVersion "0.2"
+                                :capabilities    {:tools {:listChanged true}}
+                                :clientInfo      {:name "test-client" :version "1.0.0"}}
+                               3)}
+                     {:action :receive
+                      :data   {:event "message"
+                               :data
+                               (json-result
+                                {:serverInfo      {:name    "mcp-clj"
+                                                   :title   "MCP Clojure Server"
+                                                   :version "0.1.0"}
+                                 :protocolVersion "2025-06-18"
+                                 :capabilities    {:tools     {:listChanged true}
+                                                   :resources {:listChanged false
+                                                               :subscribe   false}
+                                                   :prompts   {:listChanged true}}
+                                 :instructions    "mcp-clj is used to interact with a clojure REPL."
+                                 :warnings        ["Client version 0.2 not supported. Using 2025-06-18. Supported versions: [\"2025-06-18\" \"2024-11-05\"]"]}
+                                nil
+                                3)}}]
+                    state           (assoc state :plan plan)
+                    [state' result] (run-plan state)]
+                (is (= :passed result))
+                (is (not (:failed state')))))
 
-             (future-cancel f))))))
+            (future-cancel f))))))
 
 #_(deftest error-handling-test
     (testing "error handling - OUTDATED: This test expects old rigid version checking behavior"
