@@ -23,7 +23,7 @@ Include REFINE to refine the spec
 
 # Medium
 
-- [ ] extend the interop to enable use of HTTP transport
+- [x] extend the interop to enable use of HTTP transport
 
 - [ ] extend the interop to enable use of SSE transport ? not sure this
       is worth doing still

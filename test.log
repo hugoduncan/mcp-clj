@@ -1,0 +1,42 @@
+--- unit (clojure.test) ---------------------------
+mcp-clj.tools.core-test
+  tool-definition-test
+    tool definition extraction
+  valid-tool-test
+    tool validation
+      valid tool
+      invalid tool - missing name
+      invalid tool - missing implementation
+  default-tools-test
+    default tools registry
+
+mcp-clj.json-rpc.sse-server-test
+  protocol-implementation-test
+    JsonRpcServer protocol implementation
+      set-handlers! through protocol
+      notify-all! through protocol
+      stop! through protocol
+  server-handlers-test
+    Handler management
+      Add handler
+      Replace handlers
+  server-request-handling-test
+    Basic request handling
+      Echo request
+      Invalid request format
+      Method not found
+  notification-test
+    Server notifications
+      Broadcast notification
+      Single client notification
+  concurrent-requests-test
+    Concurrent request handling
+      Multiple simultaneous requests
+  connection-establishment-test
+    SSE connection establishment
+
+mcp-clj.http-server.adapter-test
+  error-handling-test
+    handler throwing runtime exception
+  query-string-test
+[32m11 tests, 44 assertions, 0 failures.[m

@@ -93,12 +93,53 @@
     (let [transport (java-sdk/create-stdio-server-transport)]
       (is (some? transport))))
 
+  (testing "HTTP client transport creation"
+    (let [transport (java-sdk/create-http-client-transport
+                     {:url "http://localhost:8080"})]
+      (is (some? transport)))
+
+    (let [transport (java-sdk/create-http-client-transport
+                     {:url "http://localhost:8080"
+                      :open-connection-on-startup true
+                      :resumable-streams true})]
+      (is (some? transport)))
+
+    (let [transport (java-sdk/create-http-client-transport
+                     {:url "http://localhost:8080"
+                      :use-sse true})]
+      (is (some? transport))))
+
+  (testing "HTTP server transport creation"
+    (let [transport (java-sdk/create-http-server-transport
+                     {:port 8080})]
+      (is (some? transport)))
+
+    (let [transport (java-sdk/create-http-server-transport
+                     {:port 8081
+                      :use-sse true})]
+      (is (some? transport))))
+
+  (testing "transport creation via create-transport function"
+    (let [transport (java-sdk/create-transport :http-client
+                                                {:url "http://localhost:8080"})]
+      (is (some? transport)))
+
+    (let [transport (java-sdk/create-transport :http-server
+                                                {:port 8080})]
+      (is (some? transport))))
+
   (testing "transport creation error handling"
     (is (thrown? Exception
                  (java-sdk/create-stdio-client-transport nil)))
 
     (is (thrown? Exception
-                 (java-sdk/create-stdio-client-transport {})))))
+                 (java-sdk/create-stdio-client-transport {})))
+
+    (is (thrown? Exception
+                 (java-sdk/create-http-client-transport {})))
+
+    (is (thrown? Exception
+                 (java-sdk/create-http-client-transport {:use-sse true})))))
 
 ;;; Client Operations Tests
 

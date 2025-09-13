@@ -38,6 +38,8 @@
           org.clojure/clojure {:mvn/version "1.12.0"}
           ;; MCP Java SDK for cross-implementation testing
           io.modelcontextprotocol.sdk/mcp {:mvn/version "0.11.2"}
+          ;; MCP Java SDK Spring WebFlux support for HTTP transport
+          io.modelcontextprotocol.sdk/mcp-spring-webflux {:mvn/version "0.11.2"}
           ;; SLF4J implementation for Java SDK logging
           org.slf4j/slf4j-simple {:mvn/version "2.0.13"}}}
   :kaocha {:extra-deps

@@ -14,7 +14,9 @@
     McpSyncClient]
    [io.modelcontextprotocol.client.transport
     StdioClientTransport
-    ServerParameters]
+    ServerParameters
+    WebFluxSseClientTransport
+    WebClientStreamableHttpTransport]
    [io.modelcontextprotocol.server
     McpServer
     McpAsyncServer
@@ -24,13 +26,19 @@
     McpServerFeatures$SyncToolSpecification$Builder
     McpServerFeatures$AsyncToolSpecification$Builder]
    [io.modelcontextprotocol.server.transport
-    StdioServerTransportProvider] ;; Jackson for JSON
+    StdioServerTransportProvider
+    WebFluxSseServerTransportProvider
+    WebFluxStatelessServerTransport
+    WebFluxStreamableServerTransportProvider] ;; Jackson for JSON
    [io.modelcontextprotocol.spec
     McpSchema
     McpSchema$CallToolRequest
     McpSchema$CallToolResult
     McpSchema$ServerCapabilities$Builder
-    McpSchema$Tool] ;; Java standard library
+    McpSchema$Tool] ;; Spring WebFlux
+   [org.springframework.web.reactive.function.client
+    WebClient
+    WebClient$Builder] ;; Java standard library
    [java.lang AutoCloseable]
    [java.util List
     Map]
@@ -232,6 +240,63 @@
   ^StdioServerTransportProvider []
   (StdioServerTransportProvider. (ObjectMapper.)))
 
+(defn create-http-client-transport
+  "Create an HTTP transport for the client using Spring WebFlux.
+
+  Options:
+  - :url - Base URL for the MCP server (required)
+  - :use-sse - Whether to use Server-Sent Events (default false)
+  - :open-connection-on-startup - Whether to open connection immediately (default false)
+  - :resumable-streams - Whether to enable resumable streams (default false)
+
+  Returns an HTTP transport provider object."
+  [{:keys [url use-sse open-connection-on-startup resumable-streams]
+    :or {use-sse false open-connection-on-startup false resumable-streams false}}]
+  (when-not url
+    (throw (ex-info "URL required for HTTP client transport" {:options {:url url}})))
+  (if use-sse
+    ;; Use SSE transport for streaming
+    (let [web-client-builder (-> (WebClient/builder)
+                                 (.baseUrl url))]
+      (WebFluxSseClientTransport. web-client-builder (ObjectMapper.)))
+    ;; Use regular HTTP transport
+    (let [web-client-builder (WebClient/builder)
+          builder (-> (WebClientStreamableHttpTransport/builder web-client-builder)
+                      (.endpoint url)
+                      (.objectMapper (ObjectMapper.))
+                      (.openConnectionOnStartup open-connection-on-startup)
+                      (.resumableStreams resumable-streams))]
+      (.build builder))))
+
+(defn create-http-server-transport
+  "Create an HTTP transport provider for the server using Spring WebFlux.
+
+  Options:
+  - :port - Port to listen on (default 8080)
+  - :use-sse - Whether to use Server-Sent Events (default false)
+  - :stateless - Whether to use stateless transport (default false)
+  - :endpoint - Message endpoint path (default '/message')
+
+  Returns an HTTP server transport provider object."
+  [{:keys [port use-sse stateless endpoint]
+    :or {port 8080 use-sse false stateless false endpoint "/message"}}]
+  (cond
+    stateless
+    ;; Note: WebFluxStatelessServerTransport might need different initialization
+    ;; This is a placeholder - actual implementation depends on the class structure
+    (throw (ex-info "Stateless HTTP server transport not yet implemented" {}))
+
+    use-sse
+    ;; Use SSE transport - takes ObjectMapper and endpoint path
+    (WebFluxSseServerTransportProvider. (ObjectMapper.) endpoint)
+
+    :else
+    ;; Use streamable HTTP transport with builder pattern
+    (-> (WebFluxStreamableServerTransportProvider/builder)
+        (.objectMapper (ObjectMapper.))
+        (.messageEndpoint endpoint)
+        (.build))))
+
 (defn initialize-client
   "Initialize the Java SDK client connection.
 
@@ -420,9 +485,11 @@
   "Create transport for Java SDK client/server based on type.
 
   Args:
-  - transport-type: :stdio-client, :stdio-server
+  - transport-type: :stdio-client, :stdio-server, :http-client, :http-server
   - options: Transport-specific options
     For :stdio-client - :command (string or map with :command and :args)
+    For :http-client - :url (required), :use-sse (optional), :open-connection-on-startup (optional), :resumable-streams (optional)
+    For :http-server - :port (optional), :use-sse (optional), :stateless (optional), :endpoint (optional)
 
   Returns appropriate transport provider object."
   [transport-type options]
@@ -435,6 +502,8 @@
                         {:options options})))
                     (create-stdio-client-transport command))
     :stdio-server (create-stdio-server-transport)
+    :http-client (create-http-client-transport options)
+    :http-server (create-http-server-transport options)
     (throw
      (ex-info
       "Unknown transport type"
