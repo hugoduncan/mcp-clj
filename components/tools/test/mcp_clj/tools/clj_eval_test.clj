@@ -10,7 +10,7 @@
       (testing "successful evaluation"
         (let [result (implementation {:code "(+ 1 2)"})]
           (is (= {:content [{:type "text"
-                             :text "3\n"}]}
+                             :text "3"}]}
                  result))))
 
       (testing "divide by zero error"
