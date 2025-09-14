@@ -36,6 +36,16 @@ clj -M:kaocha:dev:test
 clj -M:kaocha:dev:test --plugin kaocha.plugin/cloverage
 ```
 
+```clojure
+;; Run tests from REPL after code changes
+(require 'my.test.namespace :reload)
+(clojure.test/run-tests 'my.test.namespace)
+
+;; Run specific test
+(require 'mcp-clj.mcp-server.version-test :reload)
+(clojure.test/run-tests 'mcp-clj.mcp-server.version-test)
+```
+
 ### Development REPL
 ```bash
 # Start development REPL with all components loaded

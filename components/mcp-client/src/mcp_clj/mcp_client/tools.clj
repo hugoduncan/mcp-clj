@@ -3,7 +3,7 @@
   (:require
    [clojure.data.json :as json]
    [mcp-clj.log :as log]
-   [mcp-clj.json-rpc.stdio-client :as stdio-client]))
+   [mcp-clj.mcp-client.transport :as transport]))
 
 (defn- get-tools-cache
   "Get or create tools cache in client session"
@@ -36,8 +36,9 @@
   (try
     (let [transport (:transport client)
           json-rpc-client (:json-rpc-client transport)
-          response (stdio-client/send-request!
-                    json-rpc-client
+          ;; Use the core namespace's send-request! function
+          response (transport/send-request!
+                    transport
                     "tools/list"
                     {}
                     30000)]
@@ -91,8 +92,9 @@
     (let [transport (:transport client)
           json-rpc-client (:json-rpc-client transport)
           params {:name tool-name :arguments (or arguments {})}
-          response (stdio-client/send-request!
-                    json-rpc-client
+          ;; Use the core namespace's send-request! function
+          response (transport/send-request!
+                    transport
                     "tools/call"
                     params
                     30000)

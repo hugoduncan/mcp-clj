@@ -51,6 +51,10 @@ Include REFINE to refine the spec
          protocol spec (do not replace the SSE server - that stays as it
          is)
 
+- [x]  add support for the new protocol spec for HTTP to the
+       mcp-clj.mcp-client.core/create-client.  We just added support the
+       HTTP transport in the server.
+
 - [ ] support different mcp versions properly. REFINE
       - need conditionals for changes in spec between versions
 

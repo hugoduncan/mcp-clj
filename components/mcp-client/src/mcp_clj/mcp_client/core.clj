@@ -1,11 +1,14 @@
 (ns mcp-clj.mcp-client.core
   "MCP client implementation with initialization support"
   (:require
+   [mcp-clj.json-rpc.http-client :as http-client]
    [mcp-clj.json-rpc.stdio-client :as stdio-client]
    [mcp-clj.log :as log]
+   [mcp-clj.mcp-client.http :as http]
    [mcp-clj.mcp-client.session :as session]
    [mcp-clj.mcp-client.stdio :as stdio]
-   [mcp-clj.mcp-client.tools :as tools])
+   [mcp-clj.mcp-client.tools :as tools]
+   [mcp-clj.mcp-client.transport :as transport])
   (:import
    [java.lang AutoCloseable]
    [java.util.concurrent CompletableFuture ExecutionException TimeUnit TimeoutException]))
@@ -25,15 +28,23 @@
 
 (defn- create-transport
   "Create transport based on configuration"
-  [{:keys [server] :as _config}]
-  (if (and (map? server) (:command server))
+  [{:keys [server url] :as config}]
+  (cond
+    ;; HTTP transport configuration (URL provided)
+    url
+    (http/create-transport config)
+
     ;; Claude Code MCP server configuration (map with :command)
+    (and (map? server) (:command server))
     (stdio/create-transport server)
+
+    :else
     (throw
      (ex-info
       "Unsupported server configuration"
       {:server server
-       :supported "Map with :command and :args"}))))
+       :url url
+       :supported "Either :url for HTTP or :server map with :command and :args for stdio"}))))
 
 ;;; Initialization Protocol
 
@@ -77,7 +88,7 @@
   "Send initialized notification after successful initialization"
   [transport]
   (try
-    (stdio-client/send-notification! (:json-rpc-client transport) "notifications/initialized" {})
+    (transport/send-notification! transport "notifications/initialized" {})
     (log/info :client/initialized-sent)
     (catch Exception e
       (log/error :client/client {:error e})
@@ -102,14 +113,12 @@
         (swap! session-atom #(session/transition-state! % :initializing))
 
         ;; Send initialize request
-        (log/debug :client/initialize
-                   {:msg "Send initialize"
-                    :process-alive? (.isAlive ^Process (-> transport :process-info :process))})
+        (log/debug :client/initialize {:msg "Send initialize"})
         (let [init-params {:protocolVersion (:protocol-version session)
                            :capabilities (:capabilities session)
                            :clientInfo (:client-info session)}
-              response-future (stdio-client/send-request!
-                               (:json-rpc-client transport)
+              response-future (transport/send-request!
+                               transport
                                "initialize"
                                init-params
                                30000)]
@@ -154,13 +163,23 @@
   "Close client connection and cleanup resources"
   [client]
   (log/info :client/client-closing)
-  (let [session-atom (:session client)]
+  (let [session-atom (:session client)
+        transport (:transport client)]
     ;; Transition session to disconnected
     (when-not (= :disconnected (:state @session-atom))
       (swap! session-atom #(session/transition-state! % :disconnected)))
 
-    ;; Close transport
-    (stdio/close! (:transport client))
+    ;; Close transport based on type
+    (cond
+      (instance? mcp_clj.mcp_client.stdio.StdioTransport transport)
+      (stdio/close! transport)
+
+      (instance? mcp_clj.mcp_client.http.HttpTransport transport)
+      (http/close! transport)
+
+      :else
+      (log/warn :client/unknown-transport {:transport (type transport)}))
+
     (log/info :client/client-closed)))
 
 (defn client-ready?

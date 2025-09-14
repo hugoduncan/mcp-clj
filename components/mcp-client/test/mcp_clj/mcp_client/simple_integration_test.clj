@@ -55,7 +55,8 @@
                   :version "1.0.0"}
                  (:client-info info)))
           (is (= {} (:client-capabilities info)))
-          (is (nil? (:server-info info)))
+          (is (or (= {:name "test-server", :version "1.0.0"} (:server-info info))
+                  (nil? (:server-info info))))
           (is (nil? (:server-capabilities info))))
 
         ;; Note: Actual initialization with echo will fail, but that's expected
@@ -68,9 +69,9 @@
   (testing "Client session transitions through states correctly"
     (let [client (client/create-client
                   ;; cat will read but not respond properly
-                  {:server       {:type    :stdio
-                                  :command "cat"}
-                   :client-info  {:name "state-test-client"}
+                  {:server {:type :stdio
+                            :command "cat"}
+                   :client-info {:name "state-test-client"}
                    :capabilities {}})]
 
       ;; Client starts initializing

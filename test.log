@@ -1,4 +1,511 @@
 --- unit (clojure.test) ---------------------------
+mcp-clj.java-sdk.interop-test
+  test-transport-creation
+    stdio client transport with string command
+    stdio client transport with command and args map
+    stdio server transport
+    HTTP client transport creation
+    HTTP server transport creation
+    transport creation via create-transport function
+    transport creation error handling
+  test-server-wrapper-operations
+    server creation with default config
+    server creation with custom config
+  test-tool-discovery
+    sync client tool listing
+    async client tool listing
+  test-resource-cleanup
+    client cleanup
+    server cleanup
+  test-client-initialization
+    sync client initialization
+    async client initialization
+  test-multiple-rapid-calls
+    rapid sequential calls
+  test-tool-execution-patterns
+    sequential tool calls
+    different tool types in sequence
+    async tool execution
+  test-error-handling
+    non-existent tool
+    invalid arguments for tool
+    tool call with nil arguments
+    tool call with nil tool name
+  test-client-creation-and-types
+    sync client creation
+    async client creation
+  test-data-marshalling
+    simple string arguments
+    numeric arguments
+    special characters and unicode
+    empty and nil values
+  test-http-transport-object-creation
+    HTTP client transport object creation
+    HTTP server transport object creation
+    HTTP transport integration with Java SDK clients and servers
+
+mcp-clj.mcp-server.http-transport-test
+  mcp-ping-test
+    MCP ping
+  http-batch-request-test
+    HTTP batch request
+  http-with-origin-validation-test
+    HTTP transport with origin validation
+      allows requests from allowed origins
+      blocks requests from disallowed origins
+      allows requests without origin header
+  mcp-capabilities-endpoint-test
+    GET /mcp endpoint
+  http-transport-creation-test
+    HTTP transport server creation
+  mcp-initialize-test
+    MCP initialization
+  mcp-list-tools-test
+    MCP tools/list
+
+mcp-clj.json-rpc.http-server-test
+  post-message-handling-test
+    POST /mcp
+      handles valid JSON-RPC request
+      handles batch requests
+      returns method not found error
+      handles invalid JSON
+      returns 503 when handlers not initialized
+  notification-test
+    server notifications
+      get-sessions returns empty initially
+  handler-management-test
+    set-handlers!
+      sets valid handlers
+      allows nil handlers
+      throws on invalid handlers
+  http-server-creation-test
+    create-server
+  mcp-endpoint-discovery-test
+    GET /mcp without SSE accept header
+  session-management-test
+    session management
+      accepts requests with session ID in header
+      accepts requests with session ID in query params
+  protocol-implementation-test
+    JsonRpcServer protocol implementation
+      set-handlers! through protocol
+      stop! through protocol is callable
+  origin-validation-test
+    origin validation
+      allows requests from allowed origins
+      blocks requests from disallowed origins
+      allows requests without origin header
+  endpoint-routing-test
+    endpoint routing
+      returns 404 for unknown endpoints
+      returns 404 for wrong HTTP method on /mcp
+
+mcp-clj.mcp-client.integration-test
+  client-server-initialization-test
+    MCP client automatically initializes with real MCP serverDEBUG [server/starting] {:msg "Starting"}
+DEBUG [server/started] {:msg "Running"}
+DEBUG [rpc/call] {:call {:jsonrpc "2.0", :id 1, :method "initialize", :params {:protocolVersion "2025-06-18", :capabilities {}, :clientInfo {:name "integration-test-client", :title "Integration Test Client", :version "1.0.0"}}}}
+DEBUG [rpc/call] {:call {:jsonrpc "2.0", :method "notifications/initialized", :params {}}}
+WARN [server/error] {:msg "missing mcp session", :request "notifications/initialized", :params {}}
+DEBUG [rpc/call] {:call nil}
+
+  client-server-error-handling-test
+    MCP client handles server connection errors gracefully
+
+mcp-clj.mcp-server.sdk-client-http-integration-test
+  test-http-server-origin-validation
+    HTTP server with origin validation
+  test-http-server-tool-execution
+    server tool execution via Java SDK HTTP client
+      ls tool call over HTTP
+      clj-eval tool call over HTTP
+  test-http-server-with-sse-disabled
+    HTTP server with SSE disabled via Java SDK client
+  test-http-server-tool-discovery
+    server tool discovery via Java SDK HTTP client
+      list server tools
+  test-http-server-initialization
+    Clojure MCP server initialization with Java SDK HTTP client
+  test-http-server-session-robustness
+    server session robustness via Java SDK HTTP client
+      server remains functional after errors over HTTP
+      server handles multiple sequential operations over HTTP
+  test-http-server-error-handling
+    server error handling via Java SDK HTTP client
+      non-existent tool call over HTTP
+      invalid tool arguments for clj-eval over HTTP
+  test-http-server-concurrent-operations
+    server concurrent operations via Java SDK HTTP client
+      multiple concurrent tool calls over HTTP
+      mixed operation types concurrently over HTTP
+
+mcp-clj.json-rpc.sse-server-test
+  server-handlers-test
+    Handler management
+      Add handler
+      Replace handlers
+  connection-establishment-test
+    SSE connection establishment
+  concurrent-requests-test
+    Concurrent request handling
+      Multiple simultaneous requests
+  server-request-handling-test
+    Basic request handling
+      Echo request
+      Invalid request format
+      Method not found
+  notification-test
+    Server notifications
+      Broadcast notification
+      Single client notification
+  protocol-implementation-test
+    JsonRpcServer protocol implementation
+      set-handlers! through protocol
+      notify-all! through protocol
+      stop! through protocol
+
+mcp-clj.json-rpc.protocols-test
+  polymorphic-server-operations-test
+    SSE Server polymorphic operations
+      SSE Server - satisfies JsonRpcServer protocol
+      SSE Server - set-handlers! works polymorphically
+      SSE Server - notify-all! works polymorphically
+      SSE Server - stop! works polymorphically
+    Stdio Server polymorphic operations
+      Stdio Server - satisfies JsonRpcServer protocol
+      Stdio Server - set-handlers! works polymorphically
+      Stdio Server - notify-all! works polymorphically
+      Stdio Server - stop! works polymorphically
+  protocol-interface-consistency-test
+    Both servers expose the same protocol interface
+      Both servers satisfy JsonRpcServer protocol
+      Protocol functions work on both server types
+  protocol-error-handling-test
+    Protocol implementations handle errors consistently
+      Invalid handlers throw consistent errors
+  cross-server-handler-compatibility-test
+    Handlers work consistently across server types
+      Same handlers can be set on different server types
+      Handler function signatures are compatible
+  polymorphic-server-management-test
+    Multiple servers can be managed polymorphically
+      Bulk operations on heterogeneous server collection
+
+mcp-clj.mcp-client.smoke-test
+  smoke-state-predicates-test
+    Client state predicates work correctly
+  smoke-transport-configuration-test
+    Different transport configurations work
+  smoke-client-creation-test
+    Can create client without starting processes
+  smoke-session-info-test
+    Can get comprehensive session info
+
+mcp-clj.mcp-client.simple-integration-test
+  client-configuration-test
+    Client accepts various transport configurations
+  client-session-state-transitions-test
+    Client session transitions through states correctly
+  in-process-server-client-test
+    MCP client can initialize with in-process MCP server[31m FAIL[m[31m FAIL[m[31m FAIL[m
+
+mcp-clj.mcp-client.java-sdk-integration-test
+  test-multiple-clients[pool-1-thread-1] INFO io.modelcontextprotocol.server.McpAsyncServer - Client initialize request - Protocol: 2024-11-05, Capabilities: ClientCapabilities[experimental=null, roots=null, sampling=null, elicitation=null], Info: Implementation[name=java-sdk-integration-test, title=null, version=0.1.0]
+[pool-1-thread-1] INFO io.modelcontextprotocol.server.McpAsyncServer - Client initialize request - Protocol: 2024-11-05, Capabilities: ClientCapabilities[experimental=null, roots=null, sampling=null, elicitation=null], Info: Implementation[name=java-sdk-integration-test, title=null, version=0.1.0]
+
+    multiple client instances work independently
+      two clients can work simultaneously
+  test-concurrent-operations[pool-1-thread-1] INFO io.modelcontextprotocol.server.McpAsyncServer - Client initialize request - Protocol: 2024-11-05, Capabilities: ClientCapabilities[experimental=null, roots=null, sampling=null, elicitation=null], Info: Implementation[name=java-sdk-integration-test, title=null, version=0.1.0]
+[boundedElastic-2] ERROR reactor.core.publisher.Operators - Operator called default onErrorDropped
+reactor.core.Exceptions$ErrorCallbackNotImplemented: java.lang.RuntimeException: Failed to enqueue message
+Caused by: java.lang.RuntimeException: Failed to enqueue message
+	at io.modelcontextprotocol.server.transport.StdioServerTransportProvider$StdioMcpSessionTransport.lambda$sendMessage$0(StdioServerTransportProvider.java:162)
+	at reactor.core.publisher.MonoDefer.subscribe(MonoDefer.java:45)
+	at reactor.core.publisher.MonoIgnoreThen$ThenIgnoreMain.subscribeNext(MonoIgnoreThen.java:241)
+	at reactor.core.publisher.MonoIgnoreThen$ThenIgnoreMain.onComplete(MonoIgnoreThen.java:204)
+	at reactor.core.publisher.MonoZip$ZipInner.onComplete(MonoZip.java:536)
+	at reactor.core.publisher.Operators$MonoInnerProducerBase.complete(Operators.java:2869)
+	at reactor.core.publisher.SinkOneMulticast.subscribe(SinkOneMulticast.java:98)
+	at reactor.core.publisher.MonoZip$ZipCoordinator.request(MonoZip.java:220)
+	at reactor.core.publisher.MonoIgnoreThen$ThenIgnoreMain.onSubscribe(MonoIgnoreThen.java:135)
+	at reactor.core.publisher.MonoZip.subscribe(MonoZip.java:129)
+	at reactor.core.publisher.Mono.subscribe(Mono.java:4576)
+	at reactor.core.publisher.MonoIgnoreThen$ThenIgnoreMain.subscribeNext(MonoIgnoreThen.java:265)
+	at reactor.core.publisher.MonoIgnoreThen.subscribe(MonoIgnoreThen.java:51)
+	at reactor.core.publisher.MonoFlatMap$FlatMapMain.onNext(MonoFlatMap.java:165)
+	at reactor.core.publisher.FluxOnErrorResume$ResumeSubscriber.onNext(FluxOnErrorResume.java:79)
+	at reactor.core.publisher.FluxOnErrorResume$ResumeSubscriber.onNext(FluxOnErrorResume.java:79)
+	at reactor.core.publisher.FluxMapFuseable$MapFuseableSubscriber.onNext(FluxMapFuseable.java:129)
+	at reactor.core.publisher.MonoFlatMap$FlatMapMain.secondComplete(MonoFlatMap.java:245)
+	at reactor.core.publisher.MonoFlatMap$FlatMapInner.onNext(MonoFlatMap.java:305)
+	at reactor.core.publisher.FluxSubscribeOnCallable$CallableSubscribeOnSubscription.run(FluxSubscribeOnCallable.java:252)
+	at reactor.core.scheduler.SchedulerTask.call(SchedulerTask.java:68)
+	at reactor.core.scheduler.SchedulerTask.call(SchedulerTask.java:28)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:304)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+[31m ERROR[m
+  test-protocol-compliance[pool-1-thread-1] INFO io.modelcontextprotocol.server.McpAsyncServer - Client initialize request - Protocol: 2024-11-05, Capabilities: ClientCapabilities[experimental=null, roots=null, sampling=null, elicitation=null], Info: Implementation[name=java-sdk-integration-test, title=null, version=0.1.0]
+
+    MCP protocol compliance features
+      proper protocol version negotiation
+      server info validation
+      capabilities exchange
+  test-session-robustness[pool-1-thread-1] INFO io.modelcontextprotocol.server.McpAsyncServer - Client initialize request - Protocol: 2024-11-05, Capabilities: ClientCapabilities[experimental=null, roots=null, sampling=null, elicitation=null], Info: Implementation[name=java-sdk-integration-test, title=null, version=0.1.0]
+
+    session robustness and error recovery
+      client remains functional after errors
+      client info remains consistent
+  test-resource-management[pool-1-thread-1] INFO io.modelcontextprotocol.server.McpAsyncServer - Client initialize request - Protocol: 2024-11-05, Capabilities: ClientCapabilities[experimental=null, roots=null, sampling=null, elicitation=null], Info: Implementation[name=java-sdk-integration-test, title=null, version=0.1.0]
+
+    proper resource management and cleanup
+      client cleanup works properly
+  test-client-initialization[pool-1-thread-1] INFO io.modelcontextprotocol.server.McpAsyncServer - Client initialize request - Protocol: 2024-11-05, Capabilities: ClientCapabilities[experimental=null, roots=null, sampling=null, elicitation=null], Info: Implementation[name=java-sdk-integration-test, title=null, version=0.1.0]
+
+    MCP client initialization with Java SDK server
+      client should be ready after initialization
+  test-tool-discovery[pool-1-thread-1] INFO io.modelcontextprotocol.server.McpAsyncServer - Client initialize request - Protocol: 2024-11-05, Capabilities: ClientCapabilities[experimental=null, roots=null, sampling=null, elicitation=null], Info: Implementation[name=java-sdk-integration-test, title=null, version=0.1.0]
+
+    tool discovery with Java SDK server
+      list available tools
+  test-tool-calls[pool-1-thread-1] INFO io.modelcontextprotocol.server.McpAsyncServer - Client initialize request - Protocol: 2024-11-05, Capabilities: ClientCapabilities[experimental=null, roots=null, sampling=null, elicitation=null], Info: Implementation[name=java-sdk-integration-test, title=null, version=0.1.0]
+
+    actual tool calls with Java SDK server
+      echo tool call
+      add tool call
+      get-time tool call
+  test-error-handling[pool-1-thread-1] INFO io.modelcontextprotocol.server.McpAsyncServer - Client initialize request - Protocol: 2024-11-05, Capabilities: ClientCapabilities[experimental=null, roots=null, sampling=null, elicitation=null], Info: Implementation[name=java-sdk-integration-test, title=null, version=0.1.0]
+
+    error handling scenarios
+      non-existent tool call
+      invalid tool arguments
+
+mcp-clj.mcp-server-test
+  tools-test
+    A server with tools
+      initialisation
+        tool interactions
+          tools/list
+          makes a successful tools/call
+          tools/call with an error
+          tools/call with unknown tool
+  lifecycle-test
+    server lifecycle with SSE
+      initialisation
+  tool-change-notifications-test
+    tool change notifications
+      initialisation and tool changes
+  prompt-test
+    server lifecycle with SSE
+      initialisation
+        prompt interactions
+          prompts/list
+  resource-test
+        resource interactions
+          resources/list
+  custom-tools-test
+    server with custom tools
+      using custom tool
+        tool interactions
+  tool-management-test
+    tool management
+
+mcp-clj.mcp-server.sdk-client-integration-test
+  test-server-resource-cleanup
+    server resource management and cleanup
+  test-server-concurrent-operations
+    server concurrent operations via Java SDK client
+      multiple concurrent tool calls[31m ERROR[m
+  test-server-error-handling
+    server error handling via Java SDK client
+      non-existent tool call
+      invalid tool arguments for clj-eval
+  test-server-tool-execution
+    server tool execution via Java SDK client
+      ls tool call
+      clj-eval tool call
+  test-server-initialization
+    Clojure MCP server initialization with Java SDK client
+  test-server-tool-discovery
+    server tool discovery via Java SDK client
+      list server tools
+  test-server-session-robustness
+    server session robustness via Java SDK client
+      server remains functional after errors
+      server handles multiple sequential operations
+
+mcp-clj.json-rpc.stdio-server-test
+  test-set-handlers
+    sets valid handlers
+    rejects invalid handlers
+  test-error-handling
+    handles malformed JSON gracefully
+    handles notification requests (no id)
+  test-read-json
+    reads valid JSON
+    handles EOF
+    handles malformed JSON
+  test-handle-json-rpc
+    processes valid request and returns result
+    returns nil for handler returning nil
+    uses simplified handler interface
+  test-write-json
+    writes JSON to output stream
+    handles write errors gracefully
+  test-dispatch-rpc-call
+    dispatches call successfully
+    handles handler exceptions
+  test-handle-request
+    handles valid request
+    handles method not found
+    handles validation errors
+    handles server overload
+  test-protocol-implementation
+    JsonRpcServer protocol implementation
+      set-handlers! through protocol
+      notify-all! through protocol - no-op for stdio
+      stop! through protocol
+      protocol functions work with server instance
+  test-integration
+    full request-response cycle
+  test-server-lifecycle
+    creates server with default config
+    creates server with custom config
+
+mcp-clj.mcp-client.ls-tool-integration-test
+  ls-tool-integration-testDEBUG [server/starting] {:msg "Starting"}
+DEBUG [server/started] {:msg "Running"}
+DEBUG [rpc/call] {:call {:jsonrpc "2.0", :id 1, :method "initialize", :params {:protocolVersion "2025-06-18", :capabilities {}, :clientInfo {:name "ls-integration-test-client", :version "1.0.0"}}}}
+DEBUG [rpc/call] {:call {:jsonrpc "2.0", :method "notifications/initialized", :params {}}}
+
+    ls tool works through mcp-client connecting to mcp-serverWARN [server/error] {:msg "missing mcp session", :request "notifications/initialized", :params {}}
+DEBUG [rpc/call] {:call {:jsonrpc "2.0", :id 2, :method "tools/call", :params {:name "ls", :arguments {:path "."}}}}
+ERROR [tool/ls] {:args {:path "."}}
+
+      can list current directoryDEBUG [rpc/call] {:call {:jsonrpc "2.0", :id 3, :method "tools/call", :params {:name "ls", :arguments {:path "components"}}}}
+ERROR [tool/ls] {:args {:path "components"}}
+
+      can list specific subdirectoryDEBUG [rpc/call] {:call {:jsonrpc "2.0", :id 4, :method "tools/call", :params {:name "ls", :arguments {:path ".", :max-files 5}}}}
+ERROR [tool/ls] {:args {:path ".", :max-files 5}}
+
+      respects max-files parameterDEBUG [rpc/call] {:call {:jsonrpc "2.0", :id 5, :method "tools/call", :params {:name "ls", :arguments {:path ".", :max-depth 1}}}}
+ERROR [tool/ls] {:args {:path ".", :max-depth 1}}
+
+      respects max-depth parameterDEBUG [rpc/call] {:call {:jsonrpc "2.0", :id 6, :method "tools/call", :params {:name "ls", :arguments {:path "/non-existent-path-12345"}}}}
+ERROR [tool/ls] {:args {:path "/non-existent-path-12345"}}
+
+      handles non-existent path gracefully by throwing exceptionDEBUG [rpc/call] {:call {:jsonrpc "2.0", :id 7, :method "tools/call", :params {:name "ls", :arguments {:path "non-existent-path-12345"}}}}
+ERROR [tool/ls] {:args {:path "non-existent-path-12345"}}
+DEBUG [rpc/call] {:call nil}
+
+
+mcp-clj.http-server.adapter-test
+  basic-request-test
+    basic GET request
+    streaming SSE response
+    error response
+    header passing and case insensitivity
+  post-request-test
+    POST with body
+  error-handling-test
+    handler throwing runtime exception
+  query-string-test
+    query string parsing
+      empty query string
+      single parameter
+      multiple parameters
+      URL encoded parameters
+      missing value parameter
+      duplicate parameters - last value wins
+
+mcp-clj.mcp-client.session-test
+  session-state-transitions-test
+    Valid state transitions
+    Invalid state transitions throw exceptions
+  get-session-info-test
+    Get comprehensive session information
+  create-session-test
+    Create session with defaults
+    Create session with custom values
+  session-predicates-test
+    Session state predicates
+
+mcp-clj.mcp-client.tools-test
+  tools-cache-test
+    tools cache creation and access
+  call-tool-impl-test
+    successful tool call
+    tool call with error response
+    tool call with transport error
+  call-tool-error-test
+    tool execution throws on error
+  call-tool-success-test
+    successful tool execution returns content directly
+    tool execution with JSON content parsing
+  list-tools-impl-test
+    successful tools list request
+    error handling in tools list
+  available-tools?-impl-test
+    returns true when cached tools exist
+    returns false when no cached tools
+    queries server when no cached tools
+    returns false on server error
+
+mcp-clj.json-rpc.stdio-client-test
+  notification-handling-test
+    JSON-RPC notification handling
+      notification logging
+  send-notification-test
+    JSONRPClient send-notification! functionality
+      notification sending
+        multiple notifications
+  integration-test
+    JSONRPClient integration scenarios
+      complete request-response cycle simulation
+      multiple concurrent operations
+  request-id-generation-test
+    request ID generation
+      sequential ID generation
+      counter state is maintained
+      concurrent ID generation produces unique IDs
+  response-handling-test
+    JSON-RPC response handling
+      successful response handling
+      error response handling
+      orphan response handling
+  message-reader-loop-test
+    message reader loop functionality
+      processes responses and notifications
+      stops when running atom is false
+  send-request-test
+    JSONRPClient send-request! functionality
+      successful request sending
+      request timeout handling
+  json-rpc-client-creation-test
+    JSONRPClient record creation and structure
+      creation with streams
+      creation with custom thread count
+  client-cleanup-test
+    JSON-RPC client cleanup and resource management
+      close-json-rpc-client! cancels pending requests
+      executor shutdown
+  json-io-wrapper-test
+    JSON I/O wrapper functions
+      write-json-with-locking!
+      read-json-with-logging success
+      read-json-with-logging EOF
+      read-json-with-logging error
+
+mcp-clj.tools.clj-eval-test
+  clj-eval-test
+    clj eval implementation
+      successful evaluation
+      divide by zero error
+      invalid syntax
+
 mcp-clj.tools.core-test
   tool-definition-test
     tool definition extraction
@@ -10,33 +517,989 @@ mcp-clj.tools.core-test
   default-tools-test
     default tools registry
 
-mcp-clj.json-rpc.sse-server-test
-  protocol-implementation-test
-    JsonRpcServer protocol implementation
-      set-handlers! through protocol
-      notify-all! through protocol
-      stop! through protocol
-  server-handlers-test
-    Handler management
-      Add handler
-      Replace handlers
-  server-request-handling-test
-    Basic request handling
-      Echo request
-      Invalid request format
-      Method not found
-  notification-test
-    Server notifications
-      Broadcast notification
-      Single client notification
-  concurrent-requests-test
-    Concurrent request handling
-      Multiple simultaneous requests
-  connection-establishment-test
-    SSE connection establishment
+mcp-clj.mcp-server.version-test
+  negotiate-version-test
+    version negotiation according to MCP specification
+      client requests supported version
+      client requests older supported version
+      client requests unsupported old version - fallback to latest
+      client requests unsupported future version - fallback to latest
+      client requests malformed version - fallback to latest
+  version-specific-behavior-test
+    version-specific behavior dispatch
+      supported version with capabilities
+      older supported version with capabilities
+      unsupported feature throws exception
+  supported?-test
+    version support checking
+  get-latest-version-test
+    latest version retrieval
 
-mcp-clj.http-server.adapter-test
-  error-handling-test
-    handler throwing runtime exception
-  query-string-test
-[32m11 tests, 44 assertions, 0 failures.[m
+mcp-clj.json-rpc.json-protocol-test
+  request-validation
+    Valid request
+    Invalid version
+  json-conversion
+    EDN to JSON conversion
+    JSON to EDN conversion
+
+mcp-clj.mcp-server.transport-test
+  server-functionality-test
+    Both transports support basic MCP operations
+      Transport: :stdio
+        Server creation
+        Tool registry access
+        Server management functions
+      Transport: :sse
+        Server creation
+        Tool registry access
+        Server management functions
+  transport-error-handling-test
+    Invalid transport type
+    Invalid tool definitions
+  stdio-server-creation-test
+    stdio server creation
+      protocol operations work
+  protocol-polymorphism-test
+    Both server types implement JsonRpcServer protocol
+      Both servers support set-handlers!
+      Both servers support notify-all!
+      Both servers support stop!
+  stdio-server-default-test
+    stdio is default when no port specified
+  sse-server-port-implies-test
+    port parameter implies SSE transport
+  sse-server-creation-test
+    SSE server creation
+      protocol operations work
+  transport-selection-test
+    Transport determination logic
+      explicit stdio transport
+      explicit sse transport
+      port implies sse transport
+      default is stdio
+
+mcp-clj.tools.ls-test
+  ls-tool-gitignore-test
+    gitignore filtering
+  ls-tool-schema-validation-test
+    tool schema structure
+  ls-tool-error-handling-test
+    non-existent path
+    path traversal prevention
+    current directory access allowed
+    user.dir access allowed
+  ls-tool-depth-limit-test
+    depth limit enforcement
+  ls-tool-basic-test
+    basic directory listing
+  ls-tool-single-file-test
+    single file handling
+  ls-tool-file-limit-test
+    file count limit enforcement
+
+mcp-clj.mcp-client.core-test
+  create-client-test
+    should create client with Claude Code MCP server configuration and automatic initialization
+    should create client with minimal server configuration
+    should throw exception for invalid server configuration
+  client-state-test
+    should provide correct client state predicates
+  wait-for-ready-test
+    should timeout when waiting for ready with short timeout
+    should timeout when waiting for ready with default timeout
+  get-client-info-test
+    should return correct client information
+
+Randomized with --seed 561874620
+
+[31mFAIL[m in mcp-clj.mcp-client.simple-integration-test/in-process-server-client-test (simple_integration_test.clj:51)
+MCP client can initialize with in-process MCP server
+Expected:
+  [1;33m:initializing[0m
+Actual:
+  [31m-:initializing[0m [32m+:ready[0m
+╭───── Test output ───────────────────────────────────────────────────────
+│ DEBUG [server/starting] {:msg "Starting"}
+│ DEBUG [server/started] {:msg "Running"}
+│ DEBUG [client/process] {:command ["echo" "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"serverInfo\":{\"name\":\"test-server\",\"version\":\"1.0.0\"}}}"], :env nil, :dir nil}
+│ DEBUG [client/initialize] {:msg "Send initialize", :process-alive? true}
+│ DEBUG [client/initialize] {:msg "Received response"}
+│ DEBUG [client/initialize] {:session-ready? true}
+│ ERROR [rpc/write-error] {:error #error {
+│  :cause "Stream closed"
+│  :via
+│  [{:type java.io.IOException
+│    :message "Stream closed"
+│    :at [java.lang.ProcessBuilder$NullOutputStream write "ProcessBuilder.java" 447]}]
+│  :trace
+│  [[java.lang.ProcessBuilder$NullOutputStream write "ProcessBuilder.java" 447]
+│   [java.io.OutputStream write "OutputStream.java" 167]
+│   [java.io.BufferedOutputStream flushBuffer "BufferedOutputStream.java" 125]
+│   [java.io.BufferedOutputStream implFlush "BufferedOutputStream.java" 252]
+│   [java.io.BufferedOutputStream flush "BufferedOutputStream.java" 246]
+│   [sun.nio.cs.StreamEncoder implFlush "StreamEncoder.java" 412]
+│   [sun.nio.cs.StreamEncoder lockedFlush "StreamEncoder.java" 214]
+│   [sun.nio.cs.StreamEncoder flush "StreamEncoder.java" 201]
+│   [java.io.OutputStreamWriter flush "OutputStreamWriter.java" 262]
+│   [java.io.BufferedWriter implFlush "BufferedWriter.java" 372]
+│   [java.io.BufferedWriter flush "BufferedWriter.java" 359]
+│   [mcp_clj.json_rpc.stdio$write_json_BANG_ invokeStatic "stdio.clj" 31]
+│   [mcp_clj.json_rpc.stdio$write_json_BANG_ invoke "stdio.clj" 25]
+│   [mcp_clj.json_rpc.stdio_client$write_json_with_locking_BANG_ invokeStatic "stdio_client.clj" 94]
+│   [mcp_clj.json_rpc.stdio_client$write_json_with_locking_BANG_ invoke "stdio_client.clj" 89]
+│   [mcp_clj.json_rpc.stdio_client$send_notification_BANG_ invokeStatic "stdio_client.clj" 143]
+│   [mcp_clj.json_rpc.stdio_client$send_notification_BANG_ invoke "stdio_client.clj" 137]
+│   [mcp_clj.mcp_client.core$send_initialized_notification invokeStatic "core.clj" 80]
+│   [mcp_clj.mcp_client.core$send_initialized_notification invoke "core.clj" 76]
+│   [mcp_clj.mcp_client.core$start_initialization_BANG_$fn__9406$fn__9407 invoke "core.clj" 131]
+│   [mcp_clj.mcp_client.core$start_initialization_BANG_$fn__9406 invoke "core.clj" 123]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 154]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.lang.Reflector lambda$boxArg$1 "Reflector.java" 600]
+│   [jdk.proxy3.$Proxy16 apply nil -1]
+│   [java.util.concurrent.CompletableFuture$UniCompose tryFire "CompletableFuture.java" 1150]
+│   [java.util.concurrent.CompletableFuture postComplete "CompletableFuture.java" 510]
+│   [java.util.concurrent.CompletableFuture complete "CompletableFuture.java" 2179]
+│   [mcp_clj.json_rpc.stdio_client$handle_response invokeStatic "stdio_client.clj" 61]
+│   [mcp_clj.json_rpc.stdio_client$handle_response invoke "stdio_client.clj" 55]
+│   [mcp_clj.json_rpc.stdio_client$message_reader_loop invokeStatic "stdio_client.clj" 81]
+│   [mcp_clj.json_rpc.stdio_client$message_reader_loop invoke "stdio_client.clj" 69]
+│   [mcp_clj.json_rpc.stdio_client$create_json_rpc_client$fn__8523 invoke "stdio_client.clj" 47]
+│   [mcp_clj.json_rpc.executor$wrap_log_throwables$fn__7286 invoke "executor.clj" 22]
+│   [clojure.lang.AFn call "AFn.java" 18]
+│   [java.util.concurrent.FutureTask run "FutureTask.java" 317]
+│   [java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask run "ScheduledThreadPoolExecutor.java" 304]
+│   [java.util.concurrent.ThreadPoolExecutor runWorker "ThreadPoolExecutor.java" 1144]
+│   [java.util.concurrent.ThreadPoolExecutor$Worker run "ThreadPoolExecutor.java" 642]
+│   [java.lang.Thread run "Thread.java" 1583]]}}
+│ ERROR [client/client] {:error #error {
+│  :cause "Stream closed"
+│  :via
+│  [{:type java.io.IOException
+│    :message "Stream closed"
+│    :at [java.lang.ProcessBuilder$NullOutputStream write "ProcessBuilder.java" 447]}]
+│  :trace
+│  [[java.lang.ProcessBuilder$NullOutputStream write "ProcessBuilder.java" 447]
+│   [java.io.OutputStream write "OutputStream.java" 167]
+│   [java.io.BufferedOutputStream flushBuffer "BufferedOutputStream.java" 125]
+│   [java.io.BufferedOutputStream implFlush "BufferedOutputStream.java" 252]
+│   [java.io.BufferedOutputStream flush "BufferedOutputStream.java" 246]
+│   [sun.nio.cs.StreamEncoder implFlush "StreamEncoder.java" 412]
+│   [sun.nio.cs.StreamEncoder lockedFlush "StreamEncoder.java" 214]
+│   [sun.nio.cs.StreamEncoder flush "StreamEncoder.java" 201]
+│   [java.io.OutputStreamWriter flush "OutputStreamWriter.java" 262]
+│   [java.io.BufferedWriter implFlush "BufferedWriter.java" 372]
+│   [java.io.BufferedWriter flush "BufferedWriter.java" 359]
+│   [mcp_clj.json_rpc.stdio$write_json_BANG_ invokeStatic "stdio.clj" 31]
+│   [mcp_clj.json_rpc.stdio$write_json_BANG_ invoke "stdio.clj" 25]
+│   [mcp_clj.json_rpc.stdio_client$write_json_with_locking_BANG_ invokeStatic "stdio_client.clj" 94]
+│   [mcp_clj.json_rpc.stdio_client$write_json_with_locking_BANG_ invoke "stdio_client.clj" 89]
+│   [mcp_clj.json_rpc.stdio_client$send_notification_BANG_ invokeStatic "stdio_client.clj" 143]
+│   [mcp_clj.json_rpc.stdio_client$send_notification_BANG_ invoke "stdio_client.clj" 137]
+│   [mcp_clj.mcp_client.core$send_initialized_notification invokeStatic "core.clj" 80]
+│   [mcp_clj.mcp_client.core$send_initialized_notification invoke "core.clj" 76]
+│   [mcp_clj.mcp_client.core$start_initialization_BANG_$fn__9406$fn__9407 invoke "core.clj" 131]
+│   [mcp_clj.mcp_client.core$start_initialization_BANG_$fn__9406 invoke "core.clj" 123]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 154]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.lang.Reflector lambda$boxArg$1 "Reflector.java" 600]
+│   [jdk.proxy3.$Proxy16 apply nil -1]
+│   [java.util.concurrent.CompletableFuture$UniCompose tryFire "CompletableFuture.java" 1150]
+│   [java.util.concurrent.CompletableFuture postComplete "CompletableFuture.java" 510]
+│   [java.util.concurrent.CompletableFuture complete "CompletableFuture.java" 2179]
+│   [mcp_clj.json_rpc.stdio_client$handle_response invokeStatic "stdio_client.clj" 61]
+│   [mcp_clj.json_rpc.stdio_client$handle_response invoke "stdio_client.clj" 55]
+│   [mcp_clj.json_rpc.stdio_client$message_reader_loop invokeStatic "stdio_client.clj" 81]
+│   [mcp_clj.json_rpc.stdio_client$message_reader_loop invoke "stdio_client.clj" 69]
+│   [mcp_clj.json_rpc.stdio_client$create_json_rpc_client$fn__8523 invoke "stdio_client.clj" 47]
+│   [mcp_clj.json_rpc.executor$wrap_log_throwables$fn__7286 invoke "executor.clj" 22]
+│   [clojure.lang.AFn call "AFn.java" 18]
+│   [java.util.concurrent.FutureTask run "FutureTask.java" 317]
+│   [java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask run "ScheduledThreadPoolExecutor.java" 304]
+│   [java.util.concurrent.ThreadPoolExecutor runWorker "ThreadPoolExecutor.java" 1144]
+│   [java.util.concurrent.ThreadPoolExecutor$Worker run "ThreadPoolExecutor.java" 642]
+│   [java.lang.Thread run "Thread.java" 1583]]}}
+│ DEBUG [rpc/close-json-rpc-client]
+│ DEBUG [rpc/close-json-rpc-client] {:state :shutdown-exec}
+│ DEBUG [rpc/close-json-rpc-client] {:state :done}
+│ WARN [client/killing-process]
+╰─────────────────────────────────────────────────────────────────────────
+
+[31mFAIL[m in mcp-clj.mcp-client.simple-integration-test/in-process-server-client-test (simple_integration_test.clj:58)
+MCP client can initialize with in-process MCP server
+expected: (nil? (:server-info info))
+  actual: (not (nil? {:name "test-server", :version "1.0.0"}))
+╭───── Test output ───────────────────────────────────────────────────────
+│ DEBUG [server/starting] {:msg "Starting"}
+│ DEBUG [server/started] {:msg "Running"}
+│ DEBUG [client/process] {:command ["echo" "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"serverInfo\":{\"name\":\"test-server\",\"version\":\"1.0.0\"}}}"], :env nil, :dir nil}
+│ DEBUG [client/initialize] {:msg "Send initialize", :process-alive? true}
+│ DEBUG [client/initialize] {:msg "Received response"}
+│ DEBUG [client/initialize] {:session-ready? true}
+│ ERROR [rpc/write-error] {:error #error {
+│  :cause "Stream closed"
+│  :via
+│  [{:type java.io.IOException
+│    :message "Stream closed"
+│    :at [java.lang.ProcessBuilder$NullOutputStream write "ProcessBuilder.java" 447]}]
+│  :trace
+│  [[java.lang.ProcessBuilder$NullOutputStream write "ProcessBuilder.java" 447]
+│   [java.io.OutputStream write "OutputStream.java" 167]
+│   [java.io.BufferedOutputStream flushBuffer "BufferedOutputStream.java" 125]
+│   [java.io.BufferedOutputStream implFlush "BufferedOutputStream.java" 252]
+│   [java.io.BufferedOutputStream flush "BufferedOutputStream.java" 246]
+│   [sun.nio.cs.StreamEncoder implFlush "StreamEncoder.java" 412]
+│   [sun.nio.cs.StreamEncoder lockedFlush "StreamEncoder.java" 214]
+│   [sun.nio.cs.StreamEncoder flush "StreamEncoder.java" 201]
+│   [java.io.OutputStreamWriter flush "OutputStreamWriter.java" 262]
+│   [java.io.BufferedWriter implFlush "BufferedWriter.java" 372]
+│   [java.io.BufferedWriter flush "BufferedWriter.java" 359]
+│   [mcp_clj.json_rpc.stdio$write_json_BANG_ invokeStatic "stdio.clj" 31]
+│   [mcp_clj.json_rpc.stdio$write_json_BANG_ invoke "stdio.clj" 25]
+│   [mcp_clj.json_rpc.stdio_client$write_json_with_locking_BANG_ invokeStatic "stdio_client.clj" 94]
+│   [mcp_clj.json_rpc.stdio_client$write_json_with_locking_BANG_ invoke "stdio_client.clj" 89]
+│   [mcp_clj.json_rpc.stdio_client$send_notification_BANG_ invokeStatic "stdio_client.clj" 143]
+│   [mcp_clj.json_rpc.stdio_client$send_notification_BANG_ invoke "stdio_client.clj" 137]
+│   [mcp_clj.mcp_client.core$send_initialized_notification invokeStatic "core.clj" 80]
+│   [mcp_clj.mcp_client.core$send_initialized_notification invoke "core.clj" 76]
+│   [mcp_clj.mcp_client.core$start_initialization_BANG_$fn__9406$fn__9407 invoke "core.clj" 131]
+│   [mcp_clj.mcp_client.core$start_initialization_BANG_$fn__9406 invoke "core.clj" 123]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 154]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.lang.Reflector lambda$boxArg$1 "Reflector.java" 600]
+│   [jdk.proxy3.$Proxy16 apply nil -1]
+│   [java.util.concurrent.CompletableFuture$UniCompose tryFire "CompletableFuture.java" 1150]
+│   [java.util.concurrent.CompletableFuture postComplete "CompletableFuture.java" 510]
+│   [java.util.concurrent.CompletableFuture complete "CompletableFuture.java" 2179]
+│   [mcp_clj.json_rpc.stdio_client$handle_response invokeStatic "stdio_client.clj" 61]
+│   [mcp_clj.json_rpc.stdio_client$handle_response invoke "stdio_client.clj" 55]
+│   [mcp_clj.json_rpc.stdio_client$message_reader_loop invokeStatic "stdio_client.clj" 81]
+│   [mcp_clj.json_rpc.stdio_client$message_reader_loop invoke "stdio_client.clj" 69]
+│   [mcp_clj.json_rpc.stdio_client$create_json_rpc_client$fn__8523 invoke "stdio_client.clj" 47]
+│   [mcp_clj.json_rpc.executor$wrap_log_throwables$fn__7286 invoke "executor.clj" 22]
+│   [clojure.lang.AFn call "AFn.java" 18]
+│   [java.util.concurrent.FutureTask run "FutureTask.java" 317]
+│   [java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask run "ScheduledThreadPoolExecutor.java" 304]
+│   [java.util.concurrent.ThreadPoolExecutor runWorker "ThreadPoolExecutor.java" 1144]
+│   [java.util.concurrent.ThreadPoolExecutor$Worker run "ThreadPoolExecutor.java" 642]
+│   [java.lang.Thread run "Thread.java" 1583]]}}
+│ ERROR [client/client] {:error #error {
+│  :cause "Stream closed"
+│  :via
+│  [{:type java.io.IOException
+│    :message "Stream closed"
+│    :at [java.lang.ProcessBuilder$NullOutputStream write "ProcessBuilder.java" 447]}]
+│  :trace
+│  [[java.lang.ProcessBuilder$NullOutputStream write "ProcessBuilder.java" 447]
+│   [java.io.OutputStream write "OutputStream.java" 167]
+│   [java.io.BufferedOutputStream flushBuffer "BufferedOutputStream.java" 125]
+│   [java.io.BufferedOutputStream implFlush "BufferedOutputStream.java" 252]
+│   [java.io.BufferedOutputStream flush "BufferedOutputStream.java" 246]
+│   [sun.nio.cs.StreamEncoder implFlush "StreamEncoder.java" 412]
+│   [sun.nio.cs.StreamEncoder lockedFlush "StreamEncoder.java" 214]
+│   [sun.nio.cs.StreamEncoder flush "StreamEncoder.java" 201]
+│   [java.io.OutputStreamWriter flush "OutputStreamWriter.java" 262]
+│   [java.io.BufferedWriter implFlush "BufferedWriter.java" 372]
+│   [java.io.BufferedWriter flush "BufferedWriter.java" 359]
+│   [mcp_clj.json_rpc.stdio$write_json_BANG_ invokeStatic "stdio.clj" 31]
+│   [mcp_clj.json_rpc.stdio$write_json_BANG_ invoke "stdio.clj" 25]
+│   [mcp_clj.json_rpc.stdio_client$write_json_with_locking_BANG_ invokeStatic "stdio_client.clj" 94]
+│   [mcp_clj.json_rpc.stdio_client$write_json_with_locking_BANG_ invoke "stdio_client.clj" 89]
+│   [mcp_clj.json_rpc.stdio_client$send_notification_BANG_ invokeStatic "stdio_client.clj" 143]
+│   [mcp_clj.json_rpc.stdio_client$send_notification_BANG_ invoke "stdio_client.clj" 137]
+│   [mcp_clj.mcp_client.core$send_initialized_notification invokeStatic "core.clj" 80]
+│   [mcp_clj.mcp_client.core$send_initialized_notification invoke "core.clj" 76]
+│   [mcp_clj.mcp_client.core$start_initialization_BANG_$fn__9406$fn__9407 invoke "core.clj" 131]
+│   [mcp_clj.mcp_client.core$start_initialization_BANG_$fn__9406 invoke "core.clj" 123]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 154]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.lang.Reflector lambda$boxArg$1 "Reflector.java" 600]
+│   [jdk.proxy3.$Proxy16 apply nil -1]
+│   [java.util.concurrent.CompletableFuture$UniCompose tryFire "CompletableFuture.java" 1150]
+│   [java.util.concurrent.CompletableFuture postComplete "CompletableFuture.java" 510]
+│   [java.util.concurrent.CompletableFuture complete "CompletableFuture.java" 2179]
+│   [mcp_clj.json_rpc.stdio_client$handle_response invokeStatic "stdio_client.clj" 61]
+│   [mcp_clj.json_rpc.stdio_client$handle_response invoke "stdio_client.clj" 55]
+│   [mcp_clj.json_rpc.stdio_client$message_reader_loop invokeStatic "stdio_client.clj" 81]
+│   [mcp_clj.json_rpc.stdio_client$message_reader_loop invoke "stdio_client.clj" 69]
+│   [mcp_clj.json_rpc.stdio_client$create_json_rpc_client$fn__8523 invoke "stdio_client.clj" 47]
+│   [mcp_clj.json_rpc.executor$wrap_log_throwables$fn__7286 invoke "executor.clj" 22]
+│   [clojure.lang.AFn call "AFn.java" 18]
+│   [java.util.concurrent.FutureTask run "FutureTask.java" 317]
+│   [java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask run "ScheduledThreadPoolExecutor.java" 304]
+│   [java.util.concurrent.ThreadPoolExecutor runWorker "ThreadPoolExecutor.java" 1144]
+│   [java.util.concurrent.ThreadPoolExecutor$Worker run "ThreadPoolExecutor.java" 642]
+│   [java.lang.Thread run "Thread.java" 1583]]}}
+│ DEBUG [rpc/close-json-rpc-client]
+│ DEBUG [rpc/close-json-rpc-client] {:state :shutdown-exec}
+│ DEBUG [rpc/close-json-rpc-client] {:state :done}
+│ WARN [client/killing-process]
+╰─────────────────────────────────────────────────────────────────────────
+
+[31mFAIL[m in mcp-clj.mcp-client.simple-integration-test/in-process-server-client-test (simple_integration_test.clj:59)
+MCP client can initialize with in-process MCP server
+expected: (nil? (:server-capabilities info))
+  actual: (not (nil? {}))
+╭───── Test output ───────────────────────────────────────────────────────
+│ DEBUG [server/starting] {:msg "Starting"}
+│ DEBUG [server/started] {:msg "Running"}
+│ DEBUG [client/process] {:command ["echo" "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"serverInfo\":{\"name\":\"test-server\",\"version\":\"1.0.0\"}}}"], :env nil, :dir nil}
+│ DEBUG [client/initialize] {:msg "Send initialize", :process-alive? true}
+│ DEBUG [client/initialize] {:msg "Received response"}
+│ DEBUG [client/initialize] {:session-ready? true}
+│ ERROR [rpc/write-error] {:error #error {
+│  :cause "Stream closed"
+│  :via
+│  [{:type java.io.IOException
+│    :message "Stream closed"
+│    :at [java.lang.ProcessBuilder$NullOutputStream write "ProcessBuilder.java" 447]}]
+│  :trace
+│  [[java.lang.ProcessBuilder$NullOutputStream write "ProcessBuilder.java" 447]
+│   [java.io.OutputStream write "OutputStream.java" 167]
+│   [java.io.BufferedOutputStream flushBuffer "BufferedOutputStream.java" 125]
+│   [java.io.BufferedOutputStream implFlush "BufferedOutputStream.java" 252]
+│   [java.io.BufferedOutputStream flush "BufferedOutputStream.java" 246]
+│   [sun.nio.cs.StreamEncoder implFlush "StreamEncoder.java" 412]
+│   [sun.nio.cs.StreamEncoder lockedFlush "StreamEncoder.java" 214]
+│   [sun.nio.cs.StreamEncoder flush "StreamEncoder.java" 201]
+│   [java.io.OutputStreamWriter flush "OutputStreamWriter.java" 262]
+│   [java.io.BufferedWriter implFlush "BufferedWriter.java" 372]
+│   [java.io.BufferedWriter flush "BufferedWriter.java" 359]
+│   [mcp_clj.json_rpc.stdio$write_json_BANG_ invokeStatic "stdio.clj" 31]
+│   [mcp_clj.json_rpc.stdio$write_json_BANG_ invoke "stdio.clj" 25]
+│   [mcp_clj.json_rpc.stdio_client$write_json_with_locking_BANG_ invokeStatic "stdio_client.clj" 94]
+│   [mcp_clj.json_rpc.stdio_client$write_json_with_locking_BANG_ invoke "stdio_client.clj" 89]
+│   [mcp_clj.json_rpc.stdio_client$send_notification_BANG_ invokeStatic "stdio_client.clj" 143]
+│   [mcp_clj.json_rpc.stdio_client$send_notification_BANG_ invoke "stdio_client.clj" 137]
+│   [mcp_clj.mcp_client.core$send_initialized_notification invokeStatic "core.clj" 80]
+│   [mcp_clj.mcp_client.core$send_initialized_notification invoke "core.clj" 76]
+│   [mcp_clj.mcp_client.core$start_initialization_BANG_$fn__9406$fn__9407 invoke "core.clj" 131]
+│   [mcp_clj.mcp_client.core$start_initialization_BANG_$fn__9406 invoke "core.clj" 123]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 154]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.lang.Reflector lambda$boxArg$1 "Reflector.java" 600]
+│   [jdk.proxy3.$Proxy16 apply nil -1]
+│   [java.util.concurrent.CompletableFuture$UniCompose tryFire "CompletableFuture.java" 1150]
+│   [java.util.concurrent.CompletableFuture postComplete "CompletableFuture.java" 510]
+│   [java.util.concurrent.CompletableFuture complete "CompletableFuture.java" 2179]
+│   [mcp_clj.json_rpc.stdio_client$handle_response invokeStatic "stdio_client.clj" 61]
+│   [mcp_clj.json_rpc.stdio_client$handle_response invoke "stdio_client.clj" 55]
+│   [mcp_clj.json_rpc.stdio_client$message_reader_loop invokeStatic "stdio_client.clj" 81]
+│   [mcp_clj.json_rpc.stdio_client$message_reader_loop invoke "stdio_client.clj" 69]
+│   [mcp_clj.json_rpc.stdio_client$create_json_rpc_client$fn__8523 invoke "stdio_client.clj" 47]
+│   [mcp_clj.json_rpc.executor$wrap_log_throwables$fn__7286 invoke "executor.clj" 22]
+│   [clojure.lang.AFn call "AFn.java" 18]
+│   [java.util.concurrent.FutureTask run "FutureTask.java" 317]
+│   [java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask run "ScheduledThreadPoolExecutor.java" 304]
+│   [java.util.concurrent.ThreadPoolExecutor runWorker "ThreadPoolExecutor.java" 1144]
+│   [java.util.concurrent.ThreadPoolExecutor$Worker run "ThreadPoolExecutor.java" 642]
+│   [java.lang.Thread run "Thread.java" 1583]]}}
+│ ERROR [client/client] {:error #error {
+│  :cause "Stream closed"
+│  :via
+│  [{:type java.io.IOException
+│    :message "Stream closed"
+│    :at [java.lang.ProcessBuilder$NullOutputStream write "ProcessBuilder.java" 447]}]
+│  :trace
+│  [[java.lang.ProcessBuilder$NullOutputStream write "ProcessBuilder.java" 447]
+│   [java.io.OutputStream write "OutputStream.java" 167]
+│   [java.io.BufferedOutputStream flushBuffer "BufferedOutputStream.java" 125]
+│   [java.io.BufferedOutputStream implFlush "BufferedOutputStream.java" 252]
+│   [java.io.BufferedOutputStream flush "BufferedOutputStream.java" 246]
+│   [sun.nio.cs.StreamEncoder implFlush "StreamEncoder.java" 412]
+│   [sun.nio.cs.StreamEncoder lockedFlush "StreamEncoder.java" 214]
+│   [sun.nio.cs.StreamEncoder flush "StreamEncoder.java" 201]
+│   [java.io.OutputStreamWriter flush "OutputStreamWriter.java" 262]
+│   [java.io.BufferedWriter implFlush "BufferedWriter.java" 372]
+│   [java.io.BufferedWriter flush "BufferedWriter.java" 359]
+│   [mcp_clj.json_rpc.stdio$write_json_BANG_ invokeStatic "stdio.clj" 31]
+│   [mcp_clj.json_rpc.stdio$write_json_BANG_ invoke "stdio.clj" 25]
+│   [mcp_clj.json_rpc.stdio_client$write_json_with_locking_BANG_ invokeStatic "stdio_client.clj" 94]
+│   [mcp_clj.json_rpc.stdio_client$write_json_with_locking_BANG_ invoke "stdio_client.clj" 89]
+│   [mcp_clj.json_rpc.stdio_client$send_notification_BANG_ invokeStatic "stdio_client.clj" 143]
+│   [mcp_clj.json_rpc.stdio_client$send_notification_BANG_ invoke "stdio_client.clj" 137]
+│   [mcp_clj.mcp_client.core$send_initialized_notification invokeStatic "core.clj" 80]
+│   [mcp_clj.mcp_client.core$send_initialized_notification invoke "core.clj" 76]
+│   [mcp_clj.mcp_client.core$start_initialization_BANG_$fn__9406$fn__9407 invoke "core.clj" 131]
+│   [mcp_clj.mcp_client.core$start_initialization_BANG_$fn__9406 invoke "core.clj" 123]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 154]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.lang.Reflector lambda$boxArg$1 "Reflector.java" 600]
+│   [jdk.proxy3.$Proxy16 apply nil -1]
+│   [java.util.concurrent.CompletableFuture$UniCompose tryFire "CompletableFuture.java" 1150]
+│   [java.util.concurrent.CompletableFuture postComplete "CompletableFuture.java" 510]
+│   [java.util.concurrent.CompletableFuture complete "CompletableFuture.java" 2179]
+│   [mcp_clj.json_rpc.stdio_client$handle_response invokeStatic "stdio_client.clj" 61]
+│   [mcp_clj.json_rpc.stdio_client$handle_response invoke "stdio_client.clj" 55]
+│   [mcp_clj.json_rpc.stdio_client$message_reader_loop invokeStatic "stdio_client.clj" 81]
+│   [mcp_clj.json_rpc.stdio_client$message_reader_loop invoke "stdio_client.clj" 69]
+│   [mcp_clj.json_rpc.stdio_client$create_json_rpc_client$fn__8523 invoke "stdio_client.clj" 47]
+│   [mcp_clj.json_rpc.executor$wrap_log_throwables$fn__7286 invoke "executor.clj" 22]
+│   [clojure.lang.AFn call "AFn.java" 18]
+│   [java.util.concurrent.FutureTask run "FutureTask.java" 317]
+│   [java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask run "ScheduledThreadPoolExecutor.java" 304]
+│   [java.util.concurrent.ThreadPoolExecutor runWorker "ThreadPoolExecutor.java" 1144]
+│   [java.util.concurrent.ThreadPoolExecutor$Worker run "ThreadPoolExecutor.java" 642]
+│   [java.lang.Thread run "Thread.java" 1583]]}}
+│ DEBUG [rpc/close-json-rpc-client]
+│ DEBUG [rpc/close-json-rpc-client] {:state :shutdown-exec}
+│ DEBUG [rpc/close-json-rpc-client] {:state :done}
+│ WARN [client/killing-process]
+╰─────────────────────────────────────────────────────────────────────────
+
+[31mERROR[m in mcp-clj.mcp-client.java-sdk-integration-test/test-concurrent-operations (java_sdk_integration_test.clj:150)
+Uncaught exception, not in assertion.
+Exception: java.util.concurrent.ExecutionException: clojure.lang.ExceptionInfo: Tool call timed out: echo {:tool-name "echo", :timeout 30000}
+ at java.util.concurrent.FutureTask.report (FutureTask.java:122)
+    java.util.concurrent.FutureTask.get (FutureTask.java:191)
+    ...
+    mcp_clj.mcp_client.java_sdk_integration_test$fn__9806$fn__9807.invoke (java_sdk_integration_test.clj:150)
+    mcp_clj.mcp_client.java_sdk_integration_test$fn__9806.invokeStatic (java_sdk_integration_test.clj:142)
+    mcp_clj.mcp_client.java_sdk_integration_test/fn (java_sdk_integration_test.clj:136)
+    kaocha.type.var$test_var.invokeStatic (var.clj:24)
+    kaocha.type.var$test_var.invoke (var.clj:20)
+    kaocha.type.var$eval13439$fn__13441$wrapped_test__13444.invoke (var.clj:36)
+    kaocha.plugin.capture_output$capture_output_pre_test_hook$fn__2257$fn__2258.invoke (capture_output.cljc:97)
+    kaocha.type.var$eval13439$fn__13441.invoke (var.clj:38)
+    ...
+    kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249$fn__2250.invoke (capture_output.cljc:88)
+    ...
+    kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249.doInvoke (capture_output.cljc:88)
+    ...
+    kaocha.testable$run.invokeStatic (testable.clj:129)
+    kaocha.testable$run.invoke (testable.clj:120)
+    kaocha.testable$run_testable.invokeStatic (testable.clj:211)
+    kaocha.testable$run_testable.invoke (testable.clj:158)
+    kaocha.testable$run_testables.invokeStatic (testable.clj:224)
+    kaocha.testable$run_testables.invoke (testable.clj:214)
+    ...
+    kaocha.type.ns$run_tests$fn__4498.invoke (ns.clj:20)
+    ...
+    kaocha.type.ns$run_tests.invokeStatic (ns.clj:20)
+    kaocha.type.ns$run_tests.invoke (ns.clj:16)
+    kaocha.type.ns$eval4516$fn__4517.invoke (ns.clj:59)
+    ...
+    kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249$fn__2250.invoke (capture_output.cljc:88)
+    ...
+    kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249.doInvoke (capture_output.cljc:88)
+    ...
+    kaocha.testable$run.invokeStatic (testable.clj:129)
+    kaocha.testable$run.invoke (testable.clj:120)
+    kaocha.testable$run_testable.invokeStatic (testable.clj:211)
+    kaocha.testable$run_testable.invoke (testable.clj:158)
+    kaocha.testable$run_testables.invokeStatic (testable.clj:224)
+    kaocha.testable$run_testables.invoke (testable.clj:214)
+    kaocha.test_suite$run.invokeStatic (test_suite.clj:7)
+    kaocha.test_suite$run.invoke (test_suite.clj:5)
+    kaocha.type.clojure.test$eval5927$fn__5928.invoke (test.clj:18)
+    ...
+    kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249$fn__2250.invoke (capture_output.cljc:88)
+    ...
+    kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249.doInvoke (capture_output.cljc:88)
+    ...
+    kaocha.testable$run.invokeStatic (testable.clj:129)
+    kaocha.testable$run.invoke (testable.clj:120)
+    kaocha.testable$run_testable.invokeStatic (testable.clj:211)
+    kaocha.testable$run_testable.invoke (testable.clj:158)
+    kaocha.testable$run_testables.invokeStatic (testable.clj:224)
+    kaocha.testable$run_testables.invoke (testable.clj:214)
+    kaocha.api$run$fn__4016$fn__4020$fn__4021.invoke (api.clj:159)
+    ...
+    kaocha.api$run$fn__4016$fn__4020.invoke (api.clj:133)
+    ...
+    kaocha.api$run$fn__4016.invoke (api.clj:132)
+    ...
+    kaocha.api$run.invokeStatic (api.clj:110)
+    kaocha.api$run.invoke (api.clj:97)
+    kaocha.runner$run$fn__4079.invoke (runner.clj:131)
+    ...
+    kaocha.runner$run.invokeStatic (runner.clj:129)
+    kaocha.runner$run.invoke (runner.clj:72)
+    kaocha.runner$_main_STAR_.invokeStatic (runner.clj:165)
+    kaocha.runner$_main_STAR_.doInvoke (runner.clj:143)
+    ...
+    kaocha.runner$_main.invokeStatic (runner.clj:176)
+    kaocha.runner$_main.doInvoke (runner.clj:174)
+    ...
+Caused by: clojure.lang.ExceptionInfo: Tool call timed out: echo
+{:tool-name "echo", :timeout 30000}
+ at mcp_clj.mcp_client.tools$call_tool_impl.invokeStatic (tools.clj:102)
+    mcp_clj.mcp_client.tools$call_tool_impl.invoke (tools.clj:81)
+    mcp_clj.mcp_client.core$call_tool.invokeStatic (core.clj:220)
+    mcp_clj.mcp_client.core$call_tool.invoke (core.clj:214)
+    mcp_clj.mcp_client.java_sdk_integration_test$fn__9806$fn__9807$iter__9808__9812$fn__9813$fn__9814$fn__9815.invoke (java_sdk_integration_test.clj:146)
+    ...
+    java.util.concurrent.FutureTask.run (FutureTask.java:317)
+    java.util.concurrent.ThreadPoolExecutor.runWorker (ThreadPoolExecutor.java:1144)
+    java.util.concurrent.ThreadPoolExecutor$Worker.run (ThreadPoolExecutor.java:642)
+    ...
+╭───── Test output ───────────────────────────────────────────────────────
+│ DEBUG [client/process] {:command ["clj" "-M:dev:test" "-m" "mcp-clj.java-sdk.sdk-server-main"], :env nil, :dir nil}
+│ DEBUG [client/initialize] {:msg "Send initialize", :process-alive? true}
+│ DEBUG [client/initialize] {:msg "Received response"}
+│ DEBUG [client/initialize] {:session-ready? true}
+│ DEBUG [rpc/close-json-rpc-client]
+│ DEBUG [rpc/close-json-rpc-client] {:state :shutdown-exec}
+│ DEBUG [rpc/close-json-rpc-client] {:state :done}
+│ WARN [client/killing-process]
+╰─────────────────────────────────────────────────────────────────────────
+
+[31mERROR[m in mcp-clj.mcp-server.sdk-client-integration-test/test-server-concurrent-operations (sdk_client_integration_test.clj:152)
+Uncaught exception, not in assertion.
+Exception: java.util.concurrent.ExecutionException: java.util.concurrent.ExecutionException: java.lang.RuntimeException: Failed to enqueue message
+ at java.util.concurrent.FutureTask.report (FutureTask.java:122)
+    java.util.concurrent.FutureTask.get (FutureTask.java:191)
+    ...
+    mcp_clj.mcp_server.sdk_client_integration_test$fn__12466.invokeStatic (sdk_client_integration_test.clj:152)
+    mcp_clj.mcp_server.sdk_client_integration_test/fn (sdk_client_integration_test.clj:121)
+    kaocha.type.var$test_var.invokeStatic (var.clj:24)
+    kaocha.type.var$test_var.invoke (var.clj:20)
+    kaocha.type.var$eval13439$fn__13441$wrapped_test__13444.invoke (var.clj:36)
+    kaocha.plugin.capture_output$capture_output_pre_test_hook$fn__2257$fn__2258.invoke (capture_output.cljc:97)
+    kaocha.type.var$eval13439$fn__13441.invoke (var.clj:38)
+    ...
+    kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249$fn__2250.invoke (capture_output.cljc:88)
+    ...
+    kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249.doInvoke (capture_output.cljc:88)
+    ...
+    kaocha.testable$run.invokeStatic (testable.clj:129)
+    kaocha.testable$run.invoke (testable.clj:120)
+    kaocha.testable$run_testable.invokeStatic (testable.clj:211)
+    kaocha.testable$run_testable.invoke (testable.clj:158)
+    kaocha.testable$run_testables.invokeStatic (testable.clj:224)
+    kaocha.testable$run_testables.invoke (testable.clj:214)
+    ...
+    kaocha.type.ns$run_tests$fn__4498.invoke (ns.clj:20)
+    ...
+    kaocha.type.ns$run_tests.invokeStatic (ns.clj:20)
+    kaocha.type.ns$run_tests.invoke (ns.clj:16)
+    kaocha.type.ns$eval4516$fn__4517.invoke (ns.clj:59)
+    ...
+    kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249$fn__2250.invoke (capture_output.cljc:88)
+    ...
+    kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249.doInvoke (capture_output.cljc:88)
+    ...
+    kaocha.testable$run.invokeStatic (testable.clj:129)
+    kaocha.testable$run.invoke (testable.clj:120)
+    kaocha.testable$run_testable.invokeStatic (testable.clj:211)
+    kaocha.testable$run_testable.invoke (testable.clj:158)
+    kaocha.testable$run_testables.invokeStatic (testable.clj:224)
+    kaocha.testable$run_testables.invoke (testable.clj:214)
+    kaocha.test_suite$run.invokeStatic (test_suite.clj:7)
+    kaocha.test_suite$run.invoke (test_suite.clj:5)
+    kaocha.type.clojure.test$eval5927$fn__5928.invoke (test.clj:18)
+    ...
+    kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249$fn__2250.invoke (capture_output.cljc:88)
+    ...
+    kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249.doInvoke (capture_output.cljc:88)
+    ...
+    kaocha.testable$run.invokeStatic (testable.clj:129)
+    kaocha.testable$run.invoke (testable.clj:120)
+    kaocha.testable$run_testable.invokeStatic (testable.clj:211)
+    kaocha.testable$run_testable.invoke (testable.clj:158)
+    kaocha.testable$run_testables.invokeStatic (testable.clj:224)
+    kaocha.testable$run_testables.invoke (testable.clj:214)
+    kaocha.api$run$fn__4016$fn__4020$fn__4021.invoke (api.clj:159)
+    ...
+    kaocha.api$run$fn__4016$fn__4020.invoke (api.clj:133)
+    ...
+    kaocha.api$run$fn__4016.invoke (api.clj:132)
+    ...
+    kaocha.api$run.invokeStatic (api.clj:110)
+    kaocha.api$run.invoke (api.clj:97)
+    kaocha.runner$run$fn__4079.invoke (runner.clj:131)
+    ...
+    kaocha.runner$run.invokeStatic (runner.clj:129)
+    kaocha.runner$run.invoke (runner.clj:72)
+    kaocha.runner$_main_STAR_.invokeStatic (runner.clj:165)
+    kaocha.runner$_main_STAR_.doInvoke (runner.clj:143)
+    ...
+    kaocha.runner$_main.invokeStatic (runner.clj:176)
+    kaocha.runner$_main.doInvoke (runner.clj:174)
+    ...
+Caused by: java.util.concurrent.ExecutionException: java.lang.RuntimeException: Failed to enqueue message
+ at java.util.concurrent.CompletableFuture.reportGet (CompletableFuture.java:396)
+    java.util.concurrent.CompletableFuture.get (CompletableFuture.java:2096)
+    mcp_clj.java_sdk.interop$await_future.invokeStatic (interop.clj:120)
+    mcp_clj.java_sdk.interop$await_future.invoke (interop.clj:112)
+    mcp_clj.java_sdk.interop$list_tools.invokeStatic (interop.clj:337)
+    mcp_clj.java_sdk.interop$list_tools.invoke (interop.clj:330)
+    mcp_clj.mcp_server.sdk_client_integration_test$fn__12466$fn__12523.invoke (sdk_client_integration_test.clj:147)
+    ...
+    java.util.concurrent.FutureTask.run (FutureTask.java:317)
+    java.util.concurrent.ThreadPoolExecutor.runWorker (ThreadPoolExecutor.java:1144)
+    java.util.concurrent.ThreadPoolExecutor$Worker.run (ThreadPoolExecutor.java:642)
+    ...
+Caused by: java.lang.RuntimeException: Failed to enqueue message
+ at io.modelcontextprotocol.client.transport.StdioClientTransport.sendMessage (StdioClientTransport.java:248)
+    io.modelcontextprotocol.spec.McpClientSession.lambda$sendRequest$10 (McpClientSession.java:257)
+    reactor.core.publisher.MonoCreate.subscribe (MonoCreate.java:61)
+    reactor.core.publisher.MonoDeferContextual.subscribe (MonoDeferContextual.java:55)
+    reactor.core.publisher.InternalMonoOperator.subscribe (InternalMonoOperator.java:76)
+    reactor.core.publisher.MonoFlatMap$FlatMapMain.onNext (MonoFlatMap.java:165)
+    reactor.core.publisher.FluxOnErrorResume$ResumeSubscriber.onNext (FluxOnErrorResume.java:79)
+    reactor.core.publisher.SerializedSubscriber.onNext (SerializedSubscriber.java:99)
+    reactor.core.publisher.FluxTimeout$TimeoutMainSubscriber.onNext (FluxTimeout.java:181)
+    reactor.core.publisher.FluxMap$MapSubscriber.onNext (FluxMap.java:122)
+    reactor.core.publisher.Operators$MonoInnerProducerBase.complete (Operators.java:2834)
+    reactor.core.publisher.SinkOneMulticast.subscribe (SinkOneMulticast.java:101)
+    reactor.core.publisher.InternalMonoOperator.subscribe (InternalMonoOperator.java:76)
+    reactor.core.publisher.MonoDeferContextual.subscribe (MonoDeferContextual.java:55)
+    reactor.core.publisher.Mono.subscribe (Mono.java:4576)
+    reactor.core.publisher.FluxExpand$ExpandBreathSubscriber.drainQueue (FluxExpand.java:179)
+    reactor.core.publisher.MonoExpand.subscribeOrReturn (MonoExpand.java:54)
+    reactor.core.publisher.Mono.subscribe (Mono.java:4560)
+    reactor.core.publisher.Mono.subscribeWith (Mono.java:4642)
+    reactor.core.publisher.Mono.toFuture (Mono.java:5154)
+    mcp_clj.java_sdk.interop$await_future.invokeStatic (interop.clj:119)
+    mcp_clj.java_sdk.interop$await_future.invoke (interop.clj:112)
+    mcp_clj.java_sdk.interop$list_tools.invokeStatic (interop.clj:337)
+    mcp_clj.java_sdk.interop$list_tools.invoke (interop.clj:330)
+    mcp_clj.mcp_server.sdk_client_integration_test$fn__12466$fn__12523.invoke (sdk_client_integration_test.clj:147)
+    ...
+    java.util.concurrent.FutureTask.run (FutureTask.java:317)
+    java.util.concurrent.ThreadPoolExecutor.runWorker (ThreadPoolExecutor.java:1144)
+    java.util.concurrent.ThreadPoolExecutor$Worker.run (ThreadPoolExecutor.java:642)
+    ...
+╭───── Test output ───────────────────────────────────────────────────────
+│ [boundedElastic-14] INFO io.modelcontextprotocol.client.transport.StdioClientTransport - MCP server starting.
+│ [boundedElastic-14] INFO io.modelcontextprotocol.client.transport.StdioClientTransport - MCP server started
+│ [ForkJoinPool.commonPool-worker-3] WARN io.modelcontextprotocol.client.transport.StdioClientTransport - Process terminated with code 143
+│ [ForkJoinPool.commonPool-worker-4] WARN io.modelcontextprotocol.client.transport.StdioClientTransport - Process terminated with code 143
+│ [pool-175-thread-1] INFO io.modelcontextprotocol.client.transport.StdioClientTransport - STDERR Message received: DEBUG [server/starting] {:msg "Starting"}
+│ [pool-175-thread-1] INFO io.modelcontextprotocol.client.transport.StdioClientTransport - STDERR Message received: DEBUG [server/started] {:msg "Running"}
+│ [pool-175-thread-1] INFO io.modelcontextprotocol.client.transport.StdioClientTransport - STDERR Message received: DEBUG [rpc/call] {:call {:jsonrpc "2.0", :method "initialize", :id "5d30d638-0", :params {:protocolVersion "2024-11-05", :capabilities {}, :clientInfo {:name "Spring AI MCP Client", :version "0.3.1"}}}}
+│ [pool-173-thread-1] INFO io.modelcontextprotocol.client.LifecycleInitializer - Server response with Protocol: 2024-11-05, Capabilities: ServerCapabilities[completions=null, experimental=null, logging=null, prompts=PromptCapabilities[listChanged=true], resources=ResourceCapabilities[subscribe=false, listChanged=false], tools=ToolCapabilities[listChanged=true]], Info: Implementation[name=mcp-clj, title=null, version=0.1.0] and Instructions mcp-clj is used to interact with a clojure REPL.
+│ [pool-175-thread-1] INFO io.modelcontextprotocol.client.transport.StdioClientTransport - STDERR Message received: DEBUG [rpc/call] {:call {:jsonrpc "2.0", :method "notifications/initialized"}}
+│ [pool-175-thread-1] INFO io.modelcontextprotocol.client.transport.StdioClientTransport - STDERR Message received: WARN [server/error] {:msg "missing mcp session", :request "notifications/initialized", :params nil}
+│ [pool-175-thread-1] INFO io.modelcontextprotocol.client.transport.StdioClientTransport - STDERR Message received: DEBUG [rpc/call] {:call {:jsonrpc "2.0", :method "tools/call", :id "5d30d638-1", :params {:name "clj-eval", :arguments {:code "(+ 0 10)"}}}}
+│ [pool-175-thread-1] INFO io.modelcontextprotocol.client.transport.StdioClientTransport - STDERR Message received: DEBUG [rpc/call] {:call {:jsonrpc "2.0", :method "tools/call", :id "5d30d638-2", :params {:name "clj-eval", :arguments {:code "(+ 1 10)"}}}}
+│ [pool-175-thread-1] INFO io.modelcontextprotocol.client.transport.StdioClientTransport - STDERR Message received: DEBUG [rpc/call] {:call {:jsonrpc "2.0", :method "tools/call", :id "5d30d638-3", :params {:name "clj-eval", :arguments {:code "(+ 2 10)"}}}}
+│ [pool-175-thread-1] INFO io.modelcontextprotocol.client.transport.StdioClientTransport - STDERR Message received: :code ":code :code" (+" (0+  120 )1"0 )"( :success +:successtrue  :errortrue  nil1
+│ [pool-175-thread-1] INFO io.modelcontextprotocol.client.transport.StdioClientTransport - STDERR Message received:  10)" :success true  :error:error  nilnil
+│ [pool-175-thread-1] INFO io.modelcontextprotocol.client.transport.StdioClientTransport - STDERR Message received: 
+│ ERROR [java-sdk/future-error] {:error #error {
+│  :cause "Failed to enqueue message"
+│  :via
+│  [{:type java.util.concurrent.ExecutionException
+│    :message "java.lang.RuntimeException: Failed to enqueue message"
+│    :at [java.util.concurrent.CompletableFuture reportGet "CompletableFuture.java" 396]}
+│   {:type java.lang.RuntimeException
+│    :message "Failed to enqueue message"
+│    :at [io.modelcontextprotocol.client.transport.StdioClientTransport sendMessage "StdioClientTransport.java" 248]}]
+│  :trace
+│  [[io.modelcontextprotocol.client.transport.StdioClientTransport sendMessage "StdioClientTransport.java" 248]
+│   [io.modelcontextprotocol.spec.McpClientSession lambda$sendRequest$10 "McpClientSession.java" 257]
+│   [reactor.core.publisher.MonoCreate subscribe "MonoCreate.java" 61]
+│   [reactor.core.publisher.MonoDeferContextual subscribe "MonoDeferContextual.java" 55]
+│   [reactor.core.publisher.InternalMonoOperator subscribe "InternalMonoOperator.java" 76]
+│   [reactor.core.publisher.MonoFlatMap$FlatMapMain onNext "MonoFlatMap.java" 165]
+│   [reactor.core.publisher.FluxOnErrorResume$ResumeSubscriber onNext "FluxOnErrorResume.java" 79]
+│   [reactor.core.publisher.SerializedSubscriber onNext "SerializedSubscriber.java" 99]
+│   [reactor.core.publisher.FluxTimeout$TimeoutMainSubscriber onNext "FluxTimeout.java" 181]
+│   [reactor.core.publisher.FluxMap$MapSubscriber onNext "FluxMap.java" 122]
+│   [reactor.core.publisher.Operators$MonoInnerProducerBase complete "Operators.java" 2834]
+│   [reactor.core.publisher.SinkOneMulticast subscribe "SinkOneMulticast.java" 101]
+│   [reactor.core.publisher.InternalMonoOperator subscribe "InternalMonoOperator.java" 76]
+│   [reactor.core.publisher.MonoDeferContextual subscribe "MonoDeferContextual.java" 55]
+│   [reactor.core.publisher.Mono subscribe "Mono.java" 4576]
+│   [reactor.core.publisher.FluxExpand$ExpandBreathSubscriber drainQueue "FluxExpand.java" 179]
+│   [reactor.core.publisher.MonoExpand subscribeOrReturn "MonoExpand.java" 54]
+│   [reactor.core.publisher.Mono subscribe "Mono.java" 4560]
+│   [reactor.core.publisher.Mono subscribeWith "Mono.java" 4642]
+│   [reactor.core.publisher.Mono toFuture "Mono.java" 5154]
+│   [mcp_clj.java_sdk.interop$await_future invokeStatic "interop.clj" 119]
+│   [mcp_clj.java_sdk.interop$await_future invoke "interop.clj" 112]
+│   [mcp_clj.java_sdk.interop$list_tools invokeStatic "interop.clj" 337]
+│   [mcp_clj.java_sdk.interop$list_tools invoke "interop.clj" 330]
+│   [mcp_clj.mcp_server.sdk_client_integration_test$fn__12466$fn__12523 invoke "sdk_client_integration_test.clj" 147]
+│   [clojure.core$binding_conveyor_fn$fn__5842 invoke "core.clj" 2047]
+│   [clojure.lang.AFn call "AFn.java" 18]
+│   [java.util.concurrent.FutureTask run "FutureTask.java" 317]
+│   [java.util.concurrent.ThreadPoolExecutor runWorker "ThreadPoolExecutor.java" 1144]
+│   [java.util.concurrent.ThreadPoolExecutor$Worker run "ThreadPoolExecutor.java" 642]
+│   [java.lang.Thread run "Thread.java" 1583]]}}
+│ [pool-175-thread-1] INFO io.modelcontextprotocol.client.transport.StdioClientTransport - STDERR Message received: DEBUG [rpc/call] {:call {:jsonrpc "2.0", :method "tools/call", :id "5d30d638-6", :params {:name "ls", :arguments {:path "."}}}}
+│ [main] WARN io.modelcontextprotocol.spec.McpClientSession - Abruptly terminating exchange for request 5d30d638-6
+│ [main] WARN io.modelcontextprotocol.spec.McpClientSession - Abruptly terminating exchange for request 5d30d638-4
+│ ERROR [java-sdk/future-error] {:error #error {
+│  :cause "MCP session with server terminated"
+│  :via
+│  [{:type java.util.concurrent.ExecutionException
+│    :message "java.lang.RuntimeException: MCP session with server terminated"
+│    :at [java.util.concurrent.CompletableFuture reportGet "CompletableFuture.java" 396]}
+│   {:type java.lang.RuntimeException
+│    :message "MCP session with server terminated"
+│    :at [io.modelcontextprotocol.spec.McpClientSession lambda$dismissPendingResponses$1 "McpClientSession.java" 142]}]
+│  :trace
+│  [[io.modelcontextprotocol.spec.McpClientSession lambda$dismissPendingResponses$1 "McpClientSession.java" 142]
+│   [java.util.concurrent.ConcurrentHashMap forEach "ConcurrentHashMap.java" 1603]
+│   [io.modelcontextprotocol.spec.McpClientSession dismissPendingResponses "McpClientSession.java" 140]
+│   [io.modelcontextprotocol.spec.McpClientSession close "McpClientSession.java" 305]
+│   [io.modelcontextprotocol.client.LifecycleInitializer$DefaultInitialization close "LifecycleInitializer.java" 230]
+│   [io.modelcontextprotocol.client.LifecycleInitializer close "LifecycleInitializer.java" 337]
+│   [io.modelcontextprotocol.client.McpAsyncClient close "McpAsyncClient.java" 347]
+│   [mcp_clj.java_sdk.interop.JavaSdkClient close "interop.clj" 58]
+│   [jdk.internal.reflect.DirectMethodHandleAccessor invoke "DirectMethodHandleAccessor.java" 103]
+│   [java.lang.reflect.Method invoke "Method.java" 580]
+│   [clojure.lang.Reflector invokeMatchingMethod "Reflector.java" 196]
+│   [clojure.lang.Reflector invokeMatchingMethod "Reflector.java" 159]
+│   [clojure.lang.Reflector invokeNoArgInstanceMember "Reflector.java" 467]
+│   [mcp_clj.mcp_server.sdk_client_integration_test$fn__12466 invokeStatic "sdk_client_integration_test.clj" 123]
+│   [mcp_clj.mcp_server.sdk_client_integration_test$fn__12466 invoke "sdk_client_integration_test.clj" 121]
+│   [kaocha.type.var$test_var invokeStatic "var.clj" 24]
+│   [kaocha.type.var$test_var invoke "var.clj" 20]
+│   [kaocha.type.var$eval13439$fn__13441$wrapped_test__13444 invoke "var.clj" 36]
+│   [kaocha.plugin.capture_output$capture_output_pre_test_hook$fn__2257$fn__2258 invoke "capture_output.cljc" 97]
+│   [kaocha.type.var$eval13439$fn__13441 invoke "var.clj" 38]
+│   [clojure.lang.MultiFn invoke "MultiFn.java" 234]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 156]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.core$apply invokeStatic "core.clj" 667]
+│   [clojure.core$apply invoke "core.clj" 662]
+│   [kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249$fn__2250 invoke "capture_output.cljc" 88]
+│   [clojure.core$with_redefs_fn invokeStatic "core.clj" 7706]
+│   [clojure.core$with_redefs_fn invoke "core.clj" 7690]
+│   [kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249 doInvoke "capture_output.cljc" 88]
+│   [clojure.lang.RestFn invoke "RestFn.java" 424]
+│   [kaocha.testable$run invokeStatic "testable.clj" 129]
+│   [kaocha.testable$run invoke "testable.clj" 120]
+│   [kaocha.testable$run_testable invokeStatic "testable.clj" 211]
+│   [kaocha.testable$run_testable invoke "testable.clj" 158]
+│   [kaocha.testable$run_testables invokeStatic "testable.clj" 224]
+│   [kaocha.testable$run_testables invoke "testable.clj" 214]
+│   [clojure.lang.Atom swap "Atom.java" 51]
+│   [clojure.core$swap_BANG_ invokeStatic "core.clj" 2370]
+│   [clojure.core$swap_BANG_ invoke "core.clj" 2362]
+│   [kaocha.type.ns$run_tests$fn__4498 invoke "ns.clj" 20]
+│   [clojure.test$default_fixture invokeStatic "test.clj" 687]
+│   [clojure.test$default_fixture invoke "test.clj" 683]
+│   [kaocha.type.ns$run_tests invokeStatic "ns.clj" 20]
+│   [kaocha.type.ns$run_tests invoke "ns.clj" 16]
+│   [kaocha.type.ns$eval4516$fn__4517 invoke "ns.clj" 59]
+│   [clojure.lang.MultiFn invoke "MultiFn.java" 234]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 156]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.core$apply invokeStatic "core.clj" 667]
+│   [clojure.core$apply invoke "core.clj" 662]
+│   [kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249$fn__2250 invoke "capture_output.cljc" 88]
+│   [clojure.core$with_redefs_fn invokeStatic "core.clj" 7706]
+│   [clojure.core$with_redefs_fn invoke "core.clj" 7690]
+│   [kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249 doInvoke "capture_output.cljc" 88]
+│   [clojure.lang.RestFn invoke "RestFn.java" 424]
+│   [kaocha.testable$run invokeStatic "testable.clj" 129]
+│   [kaocha.testable$run invoke "testable.clj" 120]
+│   [kaocha.testable$run_testable invokeStatic "testable.clj" 211]
+│   [kaocha.testable$run_testable invoke "testable.clj" 158]
+│   [kaocha.testable$run_testables invokeStatic "testable.clj" 224]
+│   [kaocha.testable$run_testables invoke "testable.clj" 214]
+│   [kaocha.test_suite$run invokeStatic "test_suite.clj" 7]
+│   [kaocha.test_suite$run invoke "test_suite.clj" 5]
+│   [kaocha.type.clojure.test$eval5927$fn__5928 invoke "test.clj" 18]
+│   [clojure.lang.MultiFn invoke "MultiFn.java" 234]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 156]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.core$apply invokeStatic "core.clj" 667]
+│   [clojure.core$apply invoke "core.clj" 662]
+│   [kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249$fn__2250 invoke "capture_output.cljc" 88]
+│   [clojure.core$with_redefs_fn invokeStatic "core.clj" 7706]
+│   [clojure.core$with_redefs_fn invoke "core.clj" 7690]
+│   [kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249 doInvoke "capture_output.cljc" 88]
+│   [clojure.lang.RestFn invoke "RestFn.java" 424]
+│   [kaocha.testable$run invokeStatic "testable.clj" 129]
+│   [kaocha.testable$run invoke "testable.clj" 120]
+│   [kaocha.testable$run_testable invokeStatic "testable.clj" 211]
+│   [kaocha.testable$run_testable invoke "testable.clj" 158]
+│   [kaocha.testable$run_testables invokeStatic "testable.clj" 224]
+│   [kaocha.testable$run_testables invoke "testable.clj" 214]
+│   [kaocha.api$run$fn__4016$fn__4020$fn__4021 invoke "api.clj" 159]
+│   [clojure.core$with_redefs_fn invokeStatic "core.clj" 7706]
+│   [clojure.core$with_redefs_fn invoke "core.clj" 7690]
+│   [kaocha.api$run$fn__4016$fn__4020 invoke "api.clj" 133]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 152]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.core$apply invokeStatic "core.clj" 667]
+│   [clojure.core$with_bindings_STAR_ invokeStatic "core.clj" 1990]
+│   [clojure.core$with_bindings_STAR_ doInvoke "core.clj" 1990]
+│   [clojure.lang.RestFn invoke "RestFn.java" 428]
+│   [kaocha.api$run$fn__4016 invoke "api.clj" 132]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 152]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.core$apply invokeStatic "core.clj" 667]
+│   [clojure.core$with_bindings_STAR_ invokeStatic "core.clj" 1990]
+│   [clojure.core$with_bindings_STAR_ doInvoke "core.clj" 1990]
+│   [clojure.lang.RestFn invoke "RestFn.java" 428]
+│   [kaocha.api$run invokeStatic "api.clj" 110]
+│   [kaocha.api$run invoke "api.clj" 97]
+│   [kaocha.runner$run$fn__4079 invoke "runner.clj" 131]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 152]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.core$apply invokeStatic "core.clj" 667]
+│   [clojure.core$with_bindings_STAR_ invokeStatic "core.clj" 1990]
+│   [clojure.core$with_bindings_STAR_ doInvoke "core.clj" 1990]
+│   [clojure.lang.RestFn invoke "RestFn.java" 428]
+│   [kaocha.runner$run invokeStatic "runner.clj" 129]
+│   [kaocha.runner$run invoke "runner.clj" 72]
+│   [kaocha.runner$_main_STAR_ invokeStatic "runner.clj" 165]
+│   [kaocha.runner$_main_STAR_ doInvoke "runner.clj" 143]
+│   [clojure.lang.RestFn invoke "RestFn.java" 400]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 152]
+│   [clojure.lang.RestFn applyTo "RestFn.java" 135]
+│   [clojure.core$apply invokeStatic "core.clj" 667]
+│   [clojure.core$apply invoke "core.clj" 662]
+│   [kaocha.runner$_main invokeStatic "runner.clj" 176]
+│   [kaocha.runner$_main doInvoke "runner.clj" 174]
+│   [clojure.lang.RestFn invoke "RestFn.java" 400]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 152]
+│   [clojure.lang.RestFn applyTo "RestFn.java" 135]
+│   [clojure.lang.Var applyTo "Var.java" 707]
+│   [clojure.core$apply invokeStatic "core.clj" 667]
+│   [clojure.main$main_opt invokeStatic "main.clj" 515]
+│   [clojure.main$main_opt invoke "main.clj" 511]
+│   [clojure.main$main invokeStatic "main.clj" 665]
+│   [clojure.main$main doInvoke "main.clj" 617]
+│   [clojure.lang.RestFn applyTo "RestFn.java" 140]
+│   [clojure.lang.Var applyTo "Var.java" 707]
+│   [clojure.main main "main.java" 40]]}}
+│ ERROR [java-sdk/future-error] {:error #error {
+│  :cause "MCP session with server terminated"
+│  :via
+│  [{:type java.util.concurrent.ExecutionException
+│    :message "java.lang.RuntimeException: MCP session with server terminated"
+│    :at [java.util.concurrent.CompletableFuture reportGet "CompletableFuture.java" 396]}
+│   {:type java.lang.RuntimeException
+│    :message "MCP session with server terminated"
+│    :at [io.modelcontextprotocol.spec.McpClientSession lambda$dismissPendingResponses$1 "McpClientSession.java" 142]}]
+│  :trace
+│  [[io.modelcontextprotocol.spec.McpClientSession lambda$dismissPendingResponses$1 "McpClientSession.java" 142]
+│   [java.util.concurrent.ConcurrentHashMap forEach "ConcurrentHashMap.java" 1603]
+│   [io.modelcontextprotocol.spec.McpClientSession dismissPendingResponses "McpClientSession.java" 140]
+│   [io.modelcontextprotocol.spec.McpClientSession close "McpClientSession.java" 305]
+│   [io.modelcontextprotocol.client.LifecycleInitializer$DefaultInitialization close "LifecycleInitializer.java" 230]
+│   [io.modelcontextprotocol.client.LifecycleInitializer close "LifecycleInitializer.java" 337]
+│   [io.modelcontextprotocol.client.McpAsyncClient close "McpAsyncClient.java" 347]
+│   [mcp_clj.java_sdk.interop.JavaSdkClient close "interop.clj" 58]
+│   [jdk.internal.reflect.DirectMethodHandleAccessor invoke "DirectMethodHandleAccessor.java" 103]
+│   [java.lang.reflect.Method invoke "Method.java" 580]
+│   [clojure.lang.Reflector invokeMatchingMethod "Reflector.java" 196]
+│   [clojure.lang.Reflector invokeMatchingMethod "Reflector.java" 159]
+│   [clojure.lang.Reflector invokeNoArgInstanceMember "Reflector.java" 467]
+│   [mcp_clj.mcp_server.sdk_client_integration_test$fn__12466 invokeStatic "sdk_client_integration_test.clj" 123]
+│   [mcp_clj.mcp_server.sdk_client_integration_test$fn__12466 invoke "sdk_client_integration_test.clj" 121]
+│   [kaocha.type.var$test_var invokeStatic "var.clj" 24]
+│   [kaocha.type.var$test_var invoke "var.clj" 20]
+│   [kaocha.type.var$eval13439$fn__13441$wrapped_test__13444 invoke "var.clj" 36]
+│   [kaocha.plugin.capture_output$capture_output_pre_test_hook$fn__2257$fn__2258 invoke "capture_output.cljc" 97]
+│   [kaocha.type.var$eval13439$fn__13441 invoke "var.clj" 38]
+│   [clojure.lang.MultiFn invoke "MultiFn.java" 234]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 156]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.core$apply invokeStatic "core.clj" 667]
+│   [clojure.core$apply invoke "core.clj" 662]
+│   [kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249$fn__2250 invoke "capture_output.cljc" 88]
+│   [clojure.core$with_redefs_fn invokeStatic "core.clj" 7706]
+│   [clojure.core$with_redefs_fn invoke "core.clj" 7690]
+│   [kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249 doInvoke "capture_output.cljc" 88]
+│   [clojure.lang.RestFn invoke "RestFn.java" 424]
+│   [kaocha.testable$run invokeStatic "testable.clj" 129]
+│   [kaocha.testable$run invoke "testable.clj" 120]
+│   [kaocha.testable$run_testable invokeStatic "testable.clj" 211]
+│   [kaocha.testable$run_testable invoke "testable.clj" 158]
+│   [kaocha.testable$run_testables invokeStatic "testable.clj" 224]
+│   [kaocha.testable$run_testables invoke "testable.clj" 214]
+│   [clojure.lang.Atom swap "Atom.java" 51]
+│   [clojure.core$swap_BANG_ invokeStatic "core.clj" 2370]
+│   [clojure.core$swap_BANG_ invoke "core.clj" 2362]
+│   [kaocha.type.ns$run_tests$fn__4498 invoke "ns.clj" 20]
+│   [clojure.test$default_fixture invokeStatic "test.clj" 687]
+│   [clojure.test$default_fixture invoke "test.clj" 683]
+│   [kaocha.type.ns$run_tests invokeStatic "ns.clj" 20]
+│   [kaocha.type.ns$run_tests invoke "ns.clj" 16]
+│   [kaocha.type.ns$eval4516$fn__4517 invoke "ns.clj" 59]
+│   [clojure.lang.MultiFn invoke "MultiFn.java" 234]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 156]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.core$apply invokeStatic "core.clj" 667]
+│   [clojure.core$apply invoke "core.clj" 662]
+│   [kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249$fn__2250 invoke "capture_output.cljc" 88]
+│   [clojure.core$with_redefs_fn invokeStatic "core.clj" 7706]
+│   [clojure.core$with_redefs_fn invoke "core.clj" 7690]
+│   [kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249 doInvoke "capture_output.cljc" 88]
+│   [clojure.lang.RestFn invoke "RestFn.java" 424]
+│   [kaocha.testable$run invokeStatic "testable.clj" 129]
+│   [kaocha.testable$run invoke "testable.clj" 120]
+│   [kaocha.testable$run_testable invokeStatic "testable.clj" 211]
+│   [kaocha.testable$run_testable invoke "testable.clj" 158]
+│   [kaocha.testable$run_testables invokeStatic "testable.clj" 224]
+│   [kaocha.testable$run_testables invoke "testable.clj" 214]
+│   [kaocha.test_suite$run invokeStatic "test_suite.clj" 7]
+│   [kaocha.test_suite$run invoke "test_suite.clj" 5]
+│   [kaocha.type.clojure.test$eval5927$fn__5928 invoke "test.clj" 18]
+│   [clojure.lang.MultiFn invoke "MultiFn.java" 234]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 156]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.core$apply invokeStatic "core.clj" 667]
+│   [clojure.core$apply invoke "core.clj" 662]
+│   [kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249$fn__2250 invoke "capture_output.cljc" 88]
+│   [clojure.core$with_redefs_fn invokeStatic "core.clj" 7706]
+│   [clojure.core$with_redefs_fn invoke "core.clj" 7690]
+│   [kaocha.plugin.capture_output$capture_output_wrap_run_hook$fn__2249 doInvoke "capture_output.cljc" 88]
+│   [clojure.lang.RestFn invoke "RestFn.java" 424]
+│   [kaocha.testable$run invokeStatic "testable.clj" 129]
+│   [kaocha.testable$run invoke "testable.clj" 120]
+│   [kaocha.testable$run_testable invokeStatic "testable.clj" 211]
+│   [kaocha.testable$run_testable invoke "testable.clj" 158]
+│   [kaocha.testable$run_testables invokeStatic "testable.clj" 224]
+│   [kaocha.testable$run_testables invoke "testable.clj" 214]
+│   [kaocha.api$run$fn__4016$fn__4020$fn__4021 invoke "api.clj" 159]
+│   [clojure.core$with_redefs_fn invokeStatic "core.clj" 7706]
+│   [clojure.core$with_redefs_fn invoke "core.clj" 7690]
+│   [kaocha.api$run$fn__4016$fn__4020 invoke "api.clj" 133]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 152]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.core$apply invokeStatic "core.clj" 667]
+│   [clojure.core$with_bindings_STAR_ invokeStatic "core.clj" 1990]
+│   [clojure.core$with_bindings_STAR_ doInvoke "core.clj" 1990]
+│   [clojure.lang.RestFn invoke "RestFn.java" 428]
+│   [kaocha.api$run$fn__4016 invoke "api.clj" 132]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 152]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.core$apply invokeStatic "core.clj" 667]
+│   [clojure.core$with_bindings_STAR_ invokeStatic "core.clj" 1990]
+│   [clojure.core$with_bindings_STAR_ doInvoke "core.clj" 1990]
+│   [clojure.lang.RestFn invoke "RestFn.java" 428]
+│   [kaocha.api$run invokeStatic "api.clj" 110]
+│   [kaocha.api$run invoke "api.clj" 97]
+│   [kaocha.runner$run$fn__4079 invoke "runner.clj" 131]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 152]
+│   [clojure.lang.AFn applyTo "AFn.java" 144]
+│   [clojure.core$apply invokeStatic "core.clj" 667]
+│   [clojure.core$with_bindings_STAR_ invokeStatic "core.clj" 1990]
+│   [clojure.core$with_bindings_STAR_ doInvoke "core.clj" 1990]
+│   [clojure.lang.RestFn invoke "RestFn.java" 428]
+│   [kaocha.runner$run invokeStatic "runner.clj" 129]
+│   [kaocha.runner$run invoke "runner.clj" 72]
+│   [kaocha.runner$_main_STAR_ invokeStatic "runner.clj" 165]
+│   [kaocha.runner$_main_STAR_ doInvoke "runner.clj" 143]
+│   [clojure.lang.RestFn invoke "RestFn.java" 400]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 152]
+│   [clojure.lang.RestFn applyTo "RestFn.java" 135]
+│   [clojure.core$apply invokeStatic "core.clj" 667]
+│   [clojure.core$apply invoke "core.clj" 662]
+│   [kaocha.runner$_main invokeStatic "runner.clj" 176]
+│   [kaocha.runner$_main doInvoke "runner.clj" 174]
+│   [clojure.lang.RestFn invoke "RestFn.java" 400]
+│   [clojure.lang.AFn applyToHelper "AFn.java" 152]
+│   [clojure.lang.RestFn applyTo "RestFn.java" 135]
+│   [clojure.lang.Var applyTo "Var.java" 707]
+│   [clojure.core$apply invokeStatic "core.clj" 667]
+│   [clojure.main$main_opt invokeStatic "main.clj" 515]
+│   [clojure.main$main_opt invoke "main.clj" 511]
+│   [clojure.main$main invokeStatic "main.clj" 665]
+│   [clojure.main$main doInvoke "main.clj" 617]
+│   [clojure.lang.RestFn applyTo "RestFn.java" 140]
+│   [clojure.lang.Var applyTo "Var.java" 707]
+│   [clojure.main main "main.java" 40]]}}
+╰─────────────────────────────────────────────────────────────────────────
+[31m142 tests, 913 assertions, 2 errors, 3 failures.[m
