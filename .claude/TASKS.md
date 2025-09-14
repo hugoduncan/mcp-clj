@@ -45,6 +45,12 @@ Include REFINE to refine the spec
         servers using the SDK, providing just the functionality we need
         for testing.
 
+- [x] examine the (deprecated) SSE implementation, and the new protocol spec for HTTP.
+       - summarise the differences
+	   - design, plan and implement a new HTTP server following the
+         protocol spec (do not replace the SSE server - that stays as it
+         is)
+
 - [ ] support different mcp versions properly. REFINE
       - need conditionals for changes in spec between versions
 
