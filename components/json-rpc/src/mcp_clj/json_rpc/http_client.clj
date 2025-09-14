@@ -15,13 +15,13 @@
 
 (defrecord HTTPJSONRPCClient
            [base-url ; Base URL for the MCP server
-            session-id ; Session ID for this client
+            session-id ; atom holding Session ID for this client
             pending-requests ; ConcurrentHashMap of request-id -> CompletableFuture
             request-id-counter ; atom for generating unique request IDs
             executor ; executor for async operations
             running ; atom for controlling SSE reader
             sse-connection ; atom holding SSE connection details
-            notification-handler]) ; function to handle notifications
+            notification-handler]) ; function to handle notifications ; function to handle notifications
 
 ;;; Request/Response Handling
 
@@ -35,8 +35,8 @@
   [client]
   (cond-> {"Content-Type" "application/json"
            "Accept" "application/json"}
-    (:session-id client)
-    (assoc "X-Session-ID" (:session-id client))))
+    @(:session-id client)
+    (assoc "X-Session-ID" @(:session-id client))))
 
 (defn- handle-response
   "Handle JSON-RPC response by completing the corresponding future"
@@ -127,7 +127,7 @@
                     {:reader reader
                      :future future
                      :response response})
-            (log/info :sse/connected {:url url :session-id (:session-id client)}))
+            (log/info :sse/connected {:url url :session-id @(:session-id client)}))
           (log/error :sse/connection-failed {:status (:status response)
                                              :body (slurp (:body response))})))
       (catch Exception e
@@ -141,16 +141,14 @@
     :or {num-threads 2}}]
   (let [client (->HTTPJSONRPCClient
                 url
-                session-id
+                (atom session-id)
                 (ConcurrentHashMap.)
                 (atom 0)
                 (executor/create-executor num-threads)
                 (atom true)
                 (atom nil)
                 notification-handler)]
-    ;; Start SSE connection if we have a session ID
-    (when session-id
-      (start-sse-connection! client))
+    ;; Don't start SSE immediately - let it be established after first request with session
     client))
 
 (defn send-request!
@@ -181,14 +179,14 @@
                                                      :throw-exceptions false})]
                             (if (= 200 (:status response))
                               (do
-                               ;; Update session ID if provided
+;; Update session ID if provided
                                 (when-let [new-session-id (get-in response [:headers "x-session-id"])]
-                                  (when (not= new-session-id (:session-id client))
-                                    (log/info :http/session-updated {:old (:session-id client)
+                                  (when (not= new-session-id @(:session-id client))
+                                    (log/info :http/session-updated {:old @(:session-id client)
                                                                      :new new-session-id})
                                    ;; Update client's session ID
-                                    (reset! (atom (:session-id client)) new-session-id)
-                                   ;; Restart SSE with new session
+                                    (reset! (:session-id client) new-session-id)
+                                   ;; Start SSE with new session
                                     (when-not @(:sse-connection client)
                                       (start-sse-connection! client))))
 
@@ -260,15 +258,15 @@
 (defn update-session-id!
   "Update the session ID and restart SSE connection if needed"
   [client new-session-id]
-  (when (not= new-session-id (:session-id client))
+  (when (not= new-session-id @(:session-id client))
     ;; Close existing SSE if any
     (when-let [conn @(:sse-connection client)]
       (try
         (.close ^BufferedReader (:reader conn))
         (catch Exception _)))
 
-    ;; Update session ID (using direct mutation since it's internal)
-    (set! (.-session_id client) new-session-id)
+    ;; Update session ID
+    (reset! (:session-id client) new-session-id)
 
     ;; Restart SSE with new session
     (when new-session-id
