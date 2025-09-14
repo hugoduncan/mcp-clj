@@ -382,6 +382,8 @@
                 tool-registry
                 prompt-registry
                 resource-registry)
+        ;; Create handlers before creating the JSON-RPC server to avoid race conditions
+        handlers (create-handlers server)
         json-rpc-server (create-json-rpc-server
                          actual-transport
                          {:port port
@@ -394,8 +396,8 @@
                                (log/info :server/stopping {})
                                (stop! server)
                                (json-rpc-protocols/stop! json-rpc-server)
-                               (log/info :server/stopped {})))
-        handlers (create-handlers server)]
+                               (log/info :server/stopped {})))]
+    ;; Set handlers immediately after creating the JSON-RPC server to minimize race window
     (json-rpc-protocols/set-handlers! json-rpc-server handlers)
     (deliver rpc-server-prom json-rpc-server)
     (log/info :server/started {})

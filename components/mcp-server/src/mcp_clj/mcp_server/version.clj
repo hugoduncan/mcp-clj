@@ -3,7 +3,7 @@
 
 (def ^:private supported-versions
   "Supported MCP protocol versions in descending order (newest first)"
-  ["2025-06-18" "2024-11-05"])
+  ["2025-06-18" "2025-03-26" "2024-11-05"])
 
 (defn get-latest-version
   "Get the latest supported protocol version"
@@ -19,8 +19,8 @@
   "Negotiate protocol version according to MCP specification.
 
   Per MCP spec:
-  - If server supports client's version, respond with same version
-  - Otherwise, respond with server's latest supported version
+  - Use the highest version supported by both client and server
+  - If no common version, server should reject the connection
 
   Args:
     client-requested-version - The protocol version requested by client
@@ -31,10 +31,14 @@
     - :client-was-supported? - Whether the client's version was supported
     - :supported-versions - List of all supported versions"
   [client-requested-version]
-  (let [client-supported? (supported? client-requested-version)]
-    {:negotiated-version (if client-supported?
-                           client-requested-version
-                           (get-latest-version))
+  (let [client-supported? (supported? client-requested-version)
+        negotiated-version (if client-supported?
+                             client-requested-version
+                             ;; Find the highest version supported by both
+                             ;; For now, we assume client supports standard versions
+                             ;; In a real implementation, we'd need client's supported versions
+                             (get-latest-version))]
+    {:negotiated-version negotiated-version
      :client-was-supported? client-supported?
      :supported-versions supported-versions}))
 
@@ -66,6 +70,11 @@
 (defmethod handle-version-specific-behavior ["2025-06-18" :capabilities]
   [_ _ context]
   ;; 2025-06-18 capabilities format
+  (:capabilities context))
+
+(defmethod handle-version-specific-behavior ["2025-03-26" :capabilities]
+  [_ _ context]
+  ;; 2025-03-26 capabilities format (same as other versions for now)
   (:capabilities context))
 
 (defmethod handle-version-specific-behavior ["2024-11-05" :capabilities]

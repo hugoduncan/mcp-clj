@@ -188,6 +188,25 @@
       (log/error :java-sdk/tools-result-conversion-error {:error e})
       {:tools []})))
 
+(defn- java-init-result->clj
+  "Convert Java SDK initialization result to Clojure map"
+  [init-result]
+  (when init-result
+    (let [server-info (.serverInfo init-result)
+          capabilities (.capabilities init-result)]
+      {:serverInfo {:name (when server-info (.name server-info))
+                    :version (when server-info (.version server-info))
+                    :title (when server-info (.title server-info))}
+       :protocolVersion (.protocolVersion init-result)
+       :capabilities {:tools (when-let [tools-cap (and capabilities (.tools capabilities))]
+                               {:listChanged (.listChanged tools-cap)})
+                      :resources (when-let [resources-cap (and capabilities (.resources capabilities))]
+                                   {:listChanged (.listChanged resources-cap)
+                                    :subscribe (.subscribe resources-cap)})
+                      :prompts (when-let [prompts-cap (and capabilities (.prompts capabilities))]
+                                 {:listChanged (.listChanged prompts-cap)})}
+       :instructions (.instructions init-result)})))
+
 ;;; Client API
 
 (defn create-java-client
@@ -300,12 +319,13 @@
 (defn initialize-client
   "Initialize the Java SDK client connection.
 
-  Returns the initialization result."
+  Returns the initialization result as a Clojure map."
   [^JavaSdkClient client-record]
   (log/info :java-sdk/initializing-client)
-  (if (:async? client-record)
-    (await-future (.initialize ^McpAsyncClient (:client client-record)) 30)
-    (.initialize ^McpSyncClient (:client client-record))))
+  (let [java-result (if (:async? client-record)
+                      (await-future (.initialize ^McpAsyncClient (:client client-record)) 30)
+                      (.initialize ^McpSyncClient (:client client-record)))]
+    (java-init-result->clj java-result)))
 
 (defn list-tools
   "List available tools from the server.
