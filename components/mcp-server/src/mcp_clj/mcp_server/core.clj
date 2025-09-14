@@ -1,6 +1,7 @@
 (ns mcp-clj.mcp-server.core
   "MCP server implementation supporting the Anthropic Model Context Protocol"
   (:require
+   [mcp-clj.json-rpc.http-server :as http-server]
    [mcp-clj.json-rpc.protocols :as json-rpc-protocols]
    [mcp-clj.json-rpc.sse-server :as sse-server]
    [mcp-clj.json-rpc.stdio-server :as stdio-server]
@@ -82,11 +83,11 @@
                          "Using " negotiated-version ". "
                          "Supported versions: " (pr-str supported-versions))])]
     (log/info :server/mcp-version
-      {:negotiated-version negotiated-version
-       :warnings warnings})
+              {:negotiated-version negotiated-version
+               :warnings warnings})
     {:negotiation negotiation
      :client-info clientInfo
-     :response {:serverInfo (cond-> {:name    "mcp-clj"
+     :response {:serverInfo (cond-> {:name "mcp-clj"
                                      :version "0.1.0"}
                               (not
                                (neg? (compare negotiated-version "2025-06-18")))
@@ -320,18 +321,24 @@
   (cond
     (= transport :stdio) :stdio
     (= transport :sse) :sse
-    (some? port) :sse
+    (= transport :http) :http
+    (some? port) :sse ; Default to SSE for backward compatibility
     (nil? transport) :stdio
     :else (throw (ex-info "Unsupported transport type" {:transport transport}))))
 
 (defn- create-json-rpc-server
   "Create JSON-RPC server based on transport type"
-  [transport {:keys [port on-sse-connect on-sse-close] :as opts}]
+  [transport {:keys [port on-sse-connect on-sse-close allowed-origins] :as opts}]
   (case transport
     :sse (sse-server/create-server
           {:port port
            :on-sse-connect on-sse-connect
            :on-sse-close on-sse-close})
+    :http (http-server/create-server
+           {:port port
+            :allowed-origins (or allowed-origins [])
+            :on-connect on-sse-connect
+            :on-disconnect on-sse-close})
     :stdio (stdio-server/create-server
             (into {} (filter (comp some? val) (select-keys opts [:num-threads]))))
     (throw (ex-info "Unsupported transport type" {:transport transport}))))
@@ -340,13 +347,19 @@
   "Create MCP server instance.
 
   Options:
-  - :transport - Transport type (:sse or :stdio). Defaults based on presence of :port
-  - :port - Port for SSE server (implies :transport :sse)
+  - :transport - Transport type (:sse, :http, or :stdio). Defaults based on presence of :port
+  - :port - Port for SSE/HTTP server (implies :transport :sse if not specified)
   - :num-threads - Number of threads for request handling
+  - :allowed-origins - Vector of allowed origins for HTTP transport (optional)
   - :tools - Map of tool name to tool definition
   - :prompts - Map of prompt name to prompt definition
-  - :resources - Map of resource name to resource definition"
-  [{:keys [transport port num-threads tools prompts resources]
+  - :resources - Map of resource name to resource definition
+  
+  Transport types:
+  - :stdio - Standard input/output (default when no port specified)
+  - :sse - Server-Sent Events over HTTP (deprecated, for backward compatibility)
+  - :http - MCP Streamable HTTP transport (2025-03-26 spec, recommended for HTTP)"
+  [{:keys [transport port num-threads tools prompts resources allowed-origins]
     :or {tools tools/default-tools
          prompts prompts/default-prompts
          resources resources/default-resources}
@@ -373,6 +386,7 @@
                          actual-transport
                          {:port port
                           :num-threads num-threads
+                          :allowed-origins allowed-origins
                           :on-sse-connect (partial on-sse-connect server)
                           :on-sse-close (partial on-sse-close server)})
         server (assoc server
