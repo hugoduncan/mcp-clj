@@ -10,31 +10,31 @@
       (let [result (version/negotiate-version "2025-06-18")]
         (is (= "2025-06-18" (:negotiated-version result)))
         (is (true? (:client-was-supported? result)))
-        (is (= ["2025-06-18" "2024-11-05"] (:supported-versions result)))))
+        (is (= ["2025-06-18" "2025-03-26" "2024-11-05"] (:supported-versions result)))))
 
     (testing "client requests older supported version"
       (let [result (version/negotiate-version "2024-11-05")]
         (is (= "2024-11-05" (:negotiated-version result)))
         (is (true? (:client-was-supported? result)))
-        (is (= ["2025-06-18" "2024-11-05"] (:supported-versions result)))))
+        (is (= ["2025-06-18" "2025-03-26" "2024-11-05"] (:supported-versions result)))))
 
     (testing "client requests unsupported old version - fallback to latest"
       (let [result (version/negotiate-version "2024-01-01")]
         (is (= "2025-06-18" (:negotiated-version result)))
         (is (false? (:client-was-supported? result)))
-        (is (= ["2025-06-18" "2024-11-05"] (:supported-versions result)))))
+        (is (= ["2025-06-18" "2025-03-26" "2024-11-05"] (:supported-versions result)))))
 
     (testing "client requests unsupported future version - fallback to latest"
       (let [result (version/negotiate-version "2026-01-01")]
         (is (= "2025-06-18" (:negotiated-version result)))
         (is (false? (:client-was-supported? result)))
-        (is (= ["2025-06-18" "2024-11-05"] (:supported-versions result)))))
+        (is (= ["2025-06-18" "2025-03-26" "2024-11-05"] (:supported-versions result)))))
 
     (testing "client requests malformed version - fallback to latest"
       (let [result (version/negotiate-version "0.2")]
         (is (= "2025-06-18" (:negotiated-version result)))
         (is (false? (:client-was-supported? result)))
-        (is (= ["2025-06-18" "2024-11-05"] (:supported-versions result)))))))
+        (is (= ["2025-06-18" "2025-03-26" "2024-11-05"] (:supported-versions result)))))))
 
 (deftest supported?-test
   (testing "version support checking"
@@ -52,13 +52,13 @@
 
     (testing "supported version with capabilities"
       (let [context {:capabilities {:tools {:listChanged true}}}
-            result  (version/handle-version-specific-behavior
+            result (version/handle-version-specific-behavior
                     "2025-06-18" :capabilities context)]
         (is (= (:capabilities context) result))))
 
     (testing "older supported version with capabilities"
       (let [context {:capabilities {:tools {:listChanged true}}}
-            result  (version/handle-version-specific-behavior
+            result (version/handle-version-specific-behavior
                     "2024-11-05" :capabilities context)]
         (is (= (:capabilities context) result))))
 
