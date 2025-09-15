@@ -10,19 +10,22 @@
 (deftest simple-http-test
   ;; Simple test to verify HTTP transport basics
   (testing "Basic HTTP transport test"
-    (let [server (server/create-server {:transport :http
-                                        :port 0
-                                        :tools {"echo" {:name "echo"
-                                                        :description "Simple echo"
-                                                        :inputSchema {:type "object"
-                                                                      :properties {:msg {:type "string"}}
-                                                                      :required ["msg"]}
-                                                        :implementation (fn [{:keys [msg]}]
-                                                                          {:content [{:type "text" :text msg}]})}}})
-          _ (Thread/sleep 2000) ; Give server time to start
-          port (when-let [prom (:rpc-server-prom server)]
-                 (when-let [rpc-server @prom]
-                   (:port rpc-server)))]
+    (let [server (server/create-server
+                  {:transport :http
+                   :port      0
+                   :tools
+                   {"echo"
+                    {:name           "echo"
+                     :description    "Simple echo"
+                     :inputSchema    {:type       "object"
+                                      :properties {:msg {:type "string"}}
+                                      :required   ["msg"]}
+                     :implementation (fn [{:keys [msg]}]
+                                       {:content [{:type "text" :text msg}]})}}})
+          _      (Thread/sleep 2000) ; Give server time to start
+          port   (when-let [prom (:rpc-server-prom server)]
+                   (when-let [rpc-server @prom]
+                     (:port rpc-server)))]
 
       (log/info :test/server-started {:port port})
       (is (some? port) "Server should have a port")
@@ -32,7 +35,7 @@
         ;; Test that we can make a simple HTTP request to the server first
         (let [response (try
                          (shell/sh "curl" "-s" "-o" "/dev/null" "-w" "%{http_code}"
-                                   (str "http://localhost:" port "/mcp")
+                                   (str "http://localhost:" port "/")
                                    "-X" "POST" "-H" "Content-Type: application/json"
                                    "-d" "{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":1}")
                          (catch Exception e
@@ -43,11 +46,11 @@
 
           ;; Only proceed with client test if server is responding
           (when (= 0 (:exit response))
-            (let [client (client/create-client {:url (str "http://localhost:" port)
-                                                :client-info {:name "test" :version "1.0.0"}
-                                                :capabilities {:tools {}}
+            (let [client (client/create-client {:url              (str "http://localhost:" port)
+                                                :client-info      {:name "test" :version "1.0.0"}
+                                                :capabilities     {:tools {}}
                                                 :protocol-version "2024-11-05"
-                                                :num-threads 2})]
+                                                :num-threads      2})]
 
               (try
                 ;; Wait for ready

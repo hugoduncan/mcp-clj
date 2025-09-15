@@ -375,7 +375,7 @@
   (testing "HTTP client transport object creation"
     ;; Test that HTTP client transports can be created with correct configuration
     (let [http-transport (java-sdk/create-http-client-transport
-                          {:url "http://localhost:8080/mcp"})
+                          {:url "http://localhost:8080/"})
           sse-transport (java-sdk/create-http-client-transport
                          {:url "http://localhost:8080" :use-sse true})]
 
@@ -409,7 +409,7 @@
   (testing "HTTP transport integration with Java SDK clients and servers"
     ;; Test that transports can be passed to client/server constructors without errors
     (let [client-transport (java-sdk/create-http-client-transport
-                           {:url "http://example.com/mcp"})
+                           {:url "http://example.com/"})
           server-transport (java-sdk/create-http-server-transport
                            {:port 9999 :endpoint "/test"})
 

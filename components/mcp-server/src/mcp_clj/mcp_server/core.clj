@@ -320,11 +320,14 @@
   [{:keys [transport port]}]
   (cond
     (= transport :stdio) :stdio
-    (= transport :sse) :sse
-    (= transport :http) :http
-    (some? port) :sse ; Default to SSE for backward compatibility
-    (nil? transport) :stdio
-    :else (throw (ex-info "Unsupported transport type" {:transport transport}))))
+    (= transport :sse)   :sse
+    (= transport :http)  :http
+    (some? port)         :sse ; Default to SSE for backward compatibility
+    (nil? transport)     :stdio
+    :else                (throw
+                          (ex-info
+                           "Unsupported transport type"
+                           {:transport transport}))))
 
 (defn- create-json-rpc-server
   "Create JSON-RPC server based on transport type"
@@ -354,50 +357,52 @@
   - :tools - Map of tool name to tool definition
   - :prompts - Map of prompt name to prompt definition
   - :resources - Map of resource name to resource definition
-  
+
   Transport types:
   - :stdio - Standard input/output (default when no port specified)
   - :sse - Server-Sent Events over HTTP (deprecated, for backward compatibility)
   - :http - MCP Streamable HTTP transport (2025-03-26 spec, recommended for HTTP)"
   [{:keys [transport port num-threads tools prompts resources allowed-origins]
-    :or {tools tools/default-tools
-         prompts prompts/default-prompts
-         resources resources/default-resources}
-    :as opts}]
+    :or   {tools     tools/default-tools
+           prompts   prompts/default-prompts
+           resources resources/default-resources}
+    :as   opts}]
   (doseq [tool (vals tools)]
     (when-not (tools/valid-tool? tool)
       (throw (ex-info "Invalid tool in constructor" {:tool tool}))))
   (doseq [prompt (vals prompts)]
     (when-not (prompts/valid-prompt? prompt)
       (throw (ex-info "Invalid prompt in constructor" {:prompt prompt}))))
-  (let [actual-transport (determine-transport opts)
+  (let [actual-transport    (determine-transport opts)
         session-id->session (atom {})
-        tool-registry (atom tools)
-        prompt-registry (atom prompts)
-        resource-registry (atom resources)
-        rpc-server-prom (promise)
-        server (->MCPServer
-                rpc-server-prom
-                session-id->session
-                tool-registry
-                prompt-registry
-                resource-registry)
-        ;; Create handlers before creating the JSON-RPC server to avoid race conditions
-        handlers (create-handlers server)
-        json-rpc-server (create-json-rpc-server
-                         actual-transport
-                         {:port port
-                          :num-threads num-threads
-                          :allowed-origins allowed-origins
-                          :on-sse-connect (partial on-sse-connect server)
-                          :on-sse-close (partial on-sse-close server)})
-        server (assoc server
-                      :stop #(do
-                               (log/info :server/stopping {})
-                               (stop! server)
-                               (json-rpc-protocols/stop! json-rpc-server)
-                               (log/info :server/stopped {})))]
-    ;; Set handlers immediately after creating the JSON-RPC server to minimize race window
+        tool-registry       (atom tools)
+        prompt-registry     (atom prompts)
+        resource-registry   (atom resources)
+        rpc-server-prom     (promise)
+        server              (->MCPServer
+                             rpc-server-prom
+                             session-id->session
+                             tool-registry
+                             prompt-registry
+                             resource-registry)
+        ;; Create handlers before creating the JSON-RPC server to avoid race
+        ;; conditions
+        handlers            (create-handlers server)
+        json-rpc-server     (create-json-rpc-server
+                             actual-transport
+                             {:port            port
+                              :num-threads     num-threads
+                              :allowed-origins allowed-origins
+                              :on-sse-connect  (partial on-sse-connect server)
+                              :on-sse-close    (partial on-sse-close server)})
+        server              (assoc server
+                                   :stop #(do
+                                            (log/info :server/stopping {})
+                                            (stop! server)
+                                            (json-rpc-protocols/stop! json-rpc-server)
+                                            (log/info :server/stopped {})))]
+    ;; Set handlers immediately after creating the JSON-RPC server to minimize
+    ;; race window
     (json-rpc-protocols/set-handlers! json-rpc-server handlers)
     (deliver rpc-server-prom json-rpc-server)
     (log/info :server/started {})

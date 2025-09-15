@@ -38,7 +38,7 @@
   "Create SDK client connected to our Clojure MCP server via HTTP"
   [async?]
   (let [transport (java-sdk/create-http-client-transport
-                   {:url (str "http://localhost:" *server-port* "/mcp")
+                   {:url (str "http://localhost:" *server-port* "/")
                     :use-sse false
                     :open-connection-on-startup false
                     :resumable-streams false})
@@ -244,8 +244,8 @@
   ;; Test HTTP server without SSE streaming transport
   (testing "HTTP server with SSE disabled via Java SDK client"
     (let [transport (java-sdk/create-http-client-transport
-                     {:url (str "http://localhost:" *server-port* "/mcp")
-                      :use-sse false ; Explicitly disable SSE 
+                     {:url (str "http://localhost:" *server-port* "/")
+                      :use-sse false ; Explicitly disable SSE
                       :open-connection-on-startup false})
           client (java-sdk/create-java-client
                   {:transport transport
@@ -278,7 +278,7 @@
         ;; Try to connect - Java SDK client doesn't set Origin headers by default
         ;; so this should succeed (no Origin header = allowed by default)
         (let [transport (java-sdk/create-http-client-transport
-                         {:url (str "http://localhost:" port "/mcp")
+                         {:url (str "http://localhost:" port "/")
                           :use-sse false})
               client (java-sdk/create-java-client
                       {:transport transport
@@ -304,9 +304,9 @@
   (let [server (mcp-core/create-server {:transport :http :port 8080})]
     (try
       (let [transport (java-sdk/create-http-client-transport
-                       {:url "http://localhost:8080/mcp"})
-            client (java-sdk/create-java-client
-                    {:transport transport :async? false})]
+                       {:url "http://localhost:8080/"})
+            client    (java-sdk/create-java-client
+                       {:transport transport :async? false})]
         (try
           (println "Init:" (java-sdk/initialize-client client))
           (println "Tools:" (java-sdk/list-tools client))

@@ -57,7 +57,7 @@
 (deftest mcp-capabilities-endpoint-test
   ;; Test GET /mcp endpoint returns MCP transport capabilities
   (testing "GET /mcp endpoint"
-    (let [response (http-get (str "http://localhost:" (get-server-port) "/mcp"))]
+    (let [response (http-get (str "http://localhost:" (get-server-port) "/"))]
       (is (= 200 (:status response)))
       (let [body (json/read-str (:body response) :key-fn keyword)]
         (is (= "streamable-http" (:transport body)))
@@ -75,7 +75,7 @@
                                                :clientInfo {:name "test-client"
                                                             :version "1.0.0"}}
                                               1)
-          response (http-post (str "http://localhost:" (get-server-port) "/mcp")
+          response (http-post (str "http://localhost:" (get-server-port) "/")
                               (json/write-str init-request))]
       (is (= 200 (:status response)))
       (let [body (json/read-str (:body response) :key-fn keyword)]
@@ -89,7 +89,7 @@
   ;; Test MCP ping over HTTP transport
   (testing "MCP ping"
     (let [ping-request (make-json-rpc-request "ping" {} 2)
-          response (http-post (str "http://localhost:" (get-server-port) "/mcp")
+          response (http-post (str "http://localhost:" (get-server-port) "/")
                               (json/write-str ping-request))]
       (is (= 200 (:status response)))
       (let [body (json/read-str (:body response) :key-fn keyword)]
@@ -101,7 +101,7 @@
   ;; Test MCP tools/list over HTTP transport
   (testing "MCP tools/list"
     (let [list-tools-request (make-json-rpc-request "tools/list" {} 3)
-          response (http-post (str "http://localhost:" (get-server-port) "/mcp")
+          response (http-post (str "http://localhost:" (get-server-port) "/")
                               (json/write-str list-tools-request))]
       (is (= 200 (:status response)))
       (let [body (json/read-str (:body response) :key-fn keyword)]
@@ -115,7 +115,7 @@
   (testing "HTTP batch request"
     (let [batch-request [(make-json-rpc-request "ping" {} 1)
                          (make-json-rpc-request "tools/list" {} 2)]
-          response (http-post (str "http://localhost:" (get-server-port) "/mcp")
+          response (http-post (str "http://localhost:" (get-server-port) "/")
                               (json/write-str batch-request))]
       (is (= 200 (:status response)))
       (let [body (json/read-str (:body response) :key-fn keyword)]
@@ -128,27 +128,27 @@
   ;; Test HTTP transport with origin validation
   (testing "HTTP transport with origin validation"
     (let [server-with-origins (mcp-core/create-server
-                               {:transport :http
-                                :port 0
+                               {:transport       :http
+                                :port            0
                                 :allowed-origins ["https://example.com"]})]
       (try
-        (let [port (-> server-with-origins :json-rpc-server deref :port)
+        (let [port         (-> server-with-origins :json-rpc-server deref :port)
               ping-request (make-json-rpc-request "ping" {} 1)]
 
           (testing "allows requests from allowed origins"
-            (let [response (http-post (str "http://localhost:" port "/mcp")
+            (let [response (http-post (str "http://localhost:" port "/")
                                       (json/write-str ping-request)
                                       {"Origin" "https://example.com"})]
               (is (= 200 (:status response)))))
 
           (testing "blocks requests from disallowed origins"
-            (let [response (http-post (str "http://localhost:" port "/mcp")
+            (let [response (http-post (str "http://localhost:" port "/")
                                       (json/write-str ping-request)
                                       {"Origin" "https://malicious.com"})]
               (is (= 400 (:status response)))))
 
           (testing "allows requests without origin header"
-            (let [response (http-post (str "http://localhost:" port "/mcp")
+            (let [response (http-post (str "http://localhost:" port "/")
                                       (json/write-str ping-request))]
               (is (= 200 (:status response))))))
         (finally

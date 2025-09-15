@@ -113,7 +113,7 @@
   [client]
   (when @(:running client)
     (try
-      (let [url (str (:base-url client) "/mcp")
+      (let [url (str (:base-url client) "/")
             headers (make-headers client)
             response (hato/get url
                                {:headers headers
@@ -168,7 +168,7 @@
     (executor/submit! (:executor client)
                       (fn []
                         (try
-                          (let [url (str (:base-url client) "/mcp")
+                          (let [url (str (:base-url client) "/")
                                 headers (make-headers client)
                                 response (hato/post url
                                                     {:headers headers
@@ -218,7 +218,7 @@
   (executor/submit! (:executor client)
                     (fn []
                       (try
-                        (let [url (str (:base-url client) "/mcp")
+                        (let [url (str (:base-url client) "/")
                               headers (make-headers client)
                               notification {:jsonrpc "2.0"
                                             :method method

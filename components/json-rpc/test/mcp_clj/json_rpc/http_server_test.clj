@@ -80,7 +80,7 @@
 (deftest mcp-endpoint-discovery-test
   ;; Test GET /mcp endpoint returns transport capabilities
   (testing "GET /mcp without SSE accept header"
-    (let [response (http-get (str "http://localhost:" (:port *server*) "/mcp"))]
+    (let [response (http-get (str "http://localhost:" (:port *server*) "/"))]
       (is (= 200 (:status response)))
       (is (= "application/json" (get (:headers response) "content-type")))
       (let [body (json/read-str (:body response) :key-fn keyword)]
@@ -91,15 +91,15 @@
         (is (:resumable (:capabilities body)))))))
 
 (deftest post-message-handling-test
-  ;; Test POST requests to /mcp endpoint
-  (testing "POST /mcp"
+  ;; Test POST requests to / endpoint
+  (testing "POST /"
     (let [handlers {"echo" (fn [_ params] params)
                     "add" (fn [_ params] (+ (:a params) (:b params)))}]
       (http-server/set-handlers! *server* handlers)
 
       (testing "handles valid JSON-RPC request"
         (let [request (make-request "echo" {:message "hello"} 1)
-              response (http-post (str "http://localhost:" (:port *server*) "/mcp")
+              response (http-post (str "http://localhost:" (:port *server*) "/")
                                   (json/write-str request))]
           (is (= 200 (:status response)))
           (let [body (json/read-str (:body response) :key-fn keyword)]
@@ -110,7 +110,7 @@
       (testing "handles batch requests"
         (let [batch-request [(make-request "add" {:a 1 :b 2} 1)
                              (make-request "echo" {:test "batch"} 2)]
-              response (http-post (str "http://localhost:" (:port *server*) "/mcp")
+              response (http-post (str "http://localhost:" (:port *server*) "/")
                                   (json/write-str batch-request))]
           (is (= 200 (:status response)))
           (let [body (json/read-str (:body response) :key-fn keyword)]
@@ -121,7 +121,7 @@
 
       (testing "returns method not found error"
         (let [request (make-request "unknown" {} 1)
-              response (http-post (str "http://localhost:" (:port *server*) "/mcp")
+              response (http-post (str "http://localhost:" (:port *server*) "/")
                                   (json/write-str request))]
           (is (= 200 (:status response)))
           (let [body (json/read-str (:body response) :key-fn keyword)]
@@ -130,7 +130,7 @@
             (is (= -32601 (:code (:error body)))))))
 
       (testing "handles invalid JSON"
-        (let [response (http-post (str "http://localhost:" (:port *server*) "/mcp")
+        (let [response (http-post (str "http://localhost:" (:port *server*) "/")
                                   "invalid json")]
           (is (= 400 (:status response)))))
 
@@ -138,7 +138,7 @@
         (let [unready-server (http-server/create-server {:port 0})]
           (try
             (let [request (make-request "test" {} 1)
-                  response (http-post (str "http://localhost:" (:port unready-server) "/mcp")
+                  response (http-post (str "http://localhost:" (:port unready-server) "/")
                                       (json/write-str request))]
               (is (= 503 (:status response))))
             (finally
@@ -155,21 +155,21 @@
 
         (testing "allows requests from allowed origins"
           (let [request (make-request "test" {} 1)
-                response (http-post (str "http://localhost:" (:port server) "/mcp")
+                response (http-post (str "http://localhost:" (:port server) "/")
                                     (json/write-str request)
                                     {"Origin" "https://example.com"})]
             (is (= 200 (:status response)))))
 
         (testing "blocks requests from disallowed origins"
           (let [request (make-request "test" {} 1)
-                response (http-post (str "http://localhost:" (:port server) "/mcp")
+                response (http-post (str "http://localhost:" (:port server) "/")
                                     (json/write-str request)
                                     {"Origin" "https://malicious.com"})]
             (is (= 400 (:status response)))))
 
         (testing "allows requests without origin header"
           (let [request (make-request "test" {} 1)
-                response (http-post (str "http://localhost:" (:port server) "/mcp")
+                response (http-post (str "http://localhost:" (:port server) "/")
                                     (json/write-str request))]
             (is (= 200 (:status response)))))
         (finally
@@ -184,7 +184,7 @@
       (testing "accepts requests with session ID in header"
         (let [session-id "test-session-123"
               request (make-request "test" {} 1)
-              response (http-post (str "http://localhost:" (:port *server*) "/mcp")
+              response (http-post (str "http://localhost:" (:port *server*) "/")
                                   (json/write-str request)
                                   {"X-Session-ID" session-id})]
           (is (= 200 (:status response)))))
@@ -192,7 +192,7 @@
       (testing "accepts requests with session ID in query params"
         (let [session-id "test-session-456"
               request (make-request "test" {} 1)
-              response (http-post (str "http://localhost:" (:port *server*) "/mcp?session_id=" session-id)
+              response (http-post (str "http://localhost:" (:port *server*) "/?session_id=" session-id)
                                   (json/write-str request))]
           (is (= 200 (:status response))))))))
 
@@ -215,8 +215,8 @@
       (let [response (http-get (str "http://localhost:" (:port *server*) "/unknown"))]
         (is (= 404 (:status response)))))
 
-    (testing "returns 404 for wrong HTTP method on /mcp"
-      (let [response (hato/put (str "http://localhost:" (:port *server*) "/mcp")
+    (testing "returns 404 for wrong HTTP method on /"
+      (let [response (hato/put (str "http://localhost:" (:port *server*) "/")
                                {:body ""
                                 :throw-exceptions false})]
         (is (= 404 (:status response)))))))
