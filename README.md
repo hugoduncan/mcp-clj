@@ -35,6 +35,33 @@ Add mcp-clj as a dependency to your project.
 This will start the server on port 3001. You can then connect to the
 server using an MCP client.
 
+## How this differs from clojure-mcp
+
+This project differs from
+[bhauman/clojure-mcp](https://github.com/bhauman/clojure-mcp) in its
+approach to REPL integration:
+
+- **Self-contained evaluation**: mcp-clj evaluates Clojure expressions
+  directly within the server process itself, rather than connecting to
+  an external nREPL server. This makes it simpler to set up but means it
+  cannot connect to remote REPLs.
+
+- **No nREPL dependency**: This implementation does not require or use
+  nREPL connections. The server maintains its own Clojure runtime and
+  evaluates expressions in that context.
+
+- **HTTP transport support**: While it cannot connect to remote REPLs
+  via nREPL, mcp-clj can run as an HTTP server, allowing remote clients
+  to connect to it over the network.
+
+- **No working directory changes**: The server operates in a fixed
+  working directory and does not support changing it during runtime.
+
+- **Trade-offs**: The self-contained approach means simpler deployment
+  and no nREPL configuration, but you lose the ability to connect to
+  existing running Clojure applications or remote development
+  environments.
+
 ## Configuration
 
 ### Configuring Claude Desktop
