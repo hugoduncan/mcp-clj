@@ -81,23 +81,35 @@
         warnings (when-not client-was-supported?
                    [(str "Client version " protocolVersion " not supported. "
                          "Using " negotiated-version ". "
-                         "Supported versions: " (pr-str supported-versions))])]
+                         "Supported versions: " (pr-str supported-versions))])
+        ;; Create base server capabilities
+        base-capabilities {;; :logging   {} needs to implement logging/setLevel
+                           :tools {:listChanged true}
+                           :resources {:listChanged false
+                                       :subscribe false}
+                           :prompts {:listChanged true}}
+        ;; Apply version-specific capability formatting
+        version-capabilities (version/handle-version-specific-behavior
+                              negotiated-version
+                              :capabilities
+                              {:capabilities base-capabilities})
+        ;; Create base server info
+        base-server-info {:name "mcp-clj"
+                          :version "0.1.0"
+                          :title "MCP Clojure Server"}
+        ;; Apply version-specific server info formatting
+        version-server-info (version/handle-version-specific-behavior
+                             negotiated-version
+                             :server-info
+                             {:server-info base-server-info})]
     (log/info :server/mcp-version
               {:negotiated-version negotiated-version
                :warnings warnings})
     {:negotiation negotiation
      :client-info clientInfo
-     :response {:serverInfo (cond-> {:name "mcp-clj"
-                                     :version "0.1.0"}
-                              (not
-                               (neg? (compare negotiated-version "2025-06-18")))
-                              (assoc :title "MCP Clojure Server"))
+     :response {:serverInfo version-server-info
                 :protocolVersion negotiated-version
-                :capabilities {;; :logging   {} needs to implement logging/setLevel
-                               :tools {:listChanged true}
-                               :resources {:listChanged false
-                                           :subscribe false}
-                               :prompts {:listChanged true}}
+                :capabilities version-capabilities
                 :instructions "mcp-clj is used to interact with a clojure REPL."
                 :warnings warnings}}))
 
@@ -154,6 +166,15 @@
     {:content [(text-map (str "Tool not found: " name))]
      :isError true}))
 
+(defn- version-aware-handle-call-tool
+  "Version-aware wrapper for handle-call-tool"
+  [server protocol-version params]
+  (let [base-response (handle-call-tool server params)]
+    (version/handle-version-specific-behavior
+     protocol-version
+     :tool-response
+     base-response)))
+
 (defn- handle-list-resources
   "Handle resources/list request from client"
   [server params]
@@ -193,7 +214,13 @@
 (defn- request-handler
   "Wrap a handler to support async responses and session updates"
   [server handler request params]
-  (let [response (handler server params)
+  (let [session (request-session server request)
+        protocol-version (:protocol-version session)
+        ;; Use version-aware handler for tool calls if protocol version is available
+        actual-handler (if (and protocol-version (= handler handle-call-tool))
+                         #(version-aware-handle-call-tool %1 protocol-version %2)
+                         handler)
+        response (actual-handler server params)
         session-update-fn (-> response meta :session-update)]
     (cond
       ;; Handle responses with session updates (like initialize)

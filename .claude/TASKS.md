@@ -61,11 +61,20 @@ Include REFINE to refine the spec
 	  Protocols are specified at
 	  https://github.com/modelcontextprotocol/modelcontextprotocol/tree/199754c8141b0b709f4a5f9caf38a708bf8552ef/docs/specification
 
-- [ ] support different mcp versions. REFINE
+- [x] support different mcp versions. REFINE
       - need conditionals for changes in spec between versions
 	  - use @doc/mcp-protocol-version-differences.md as a reference for what to support
 	  - don't add any major new features while doing this.
 	  - list unsupported features in each version.
+
+	  Implementation completed:
+	  - Version-specific capabilities formatting (nested vs flat)
+	  - Content type filtering per version (audio support, etc.)
+	  - Header validation (MCP-Protocol-Version required in 2025-06-18)
+	  - Server info formatting (title field support)
+	  - Tool response formatting (structured content support)
+	  - Comprehensive test coverage for all version-specific behaviors
+	  - Utility functions for version comparison and feature detection
 
 
 - [ ] proper capabilities handling
