@@ -1,1 +1,1 @@
-{:deps {}}
+{:deps {mcp-clj/http {:local/root "../http"}}}
