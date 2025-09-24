@@ -63,11 +63,13 @@
                                                        (clojure.string/join ", "))}]})}})
 
 (defn- get-server-port
-  "Get the port of the running server"
+  "Get the port of the running server, waiting for it to be ready"
   []
-  (when-let [prom (:rpc-server-prom *server*)]
-    (when-let [rpc-server @prom]
-      (:port rpc-server))))
+  (when-let [prom (:json-rpc-server *server*)]
+    ;; Wait for the promise to be delivered with a timeout
+    (let [rpc-server (deref prom 5000 nil)]
+      (when rpc-server
+        (:port rpc-server)))))
 
 (defn- with-http-server
   "Start HTTP server with test tools"
@@ -77,8 +79,11 @@
                                       :tools test-tools})]
     (binding [*server* server]
       (try
-        (log/info :test/server-started {:port (get-server-port)})
-        (f)
+        (let [port (get-server-port)]
+          (when-not port
+            (throw (ex-info "Server failed to start or port not available" {})))
+          (log/info :test/server-started {:port port})
+          (f))
         (finally
           ((:stop server))
           (log/info :test/server-stopped))))))
