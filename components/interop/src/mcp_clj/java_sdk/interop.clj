@@ -21,7 +21,6 @@
     McpServer
     McpAsyncServer
     McpSyncServer
-    McpServerFeatures
     McpServerFeatures$SyncToolSpecification
     McpServerFeatures$SyncToolSpecification$Builder
     McpServerFeatures$AsyncToolSpecification$Builder]

@@ -4,4 +4,4 @@
         poly/tools {:local/root "../tools"}}
  :aliases
  {:test {:extra-paths ["test"]
-         :extra-deps {}}}}
+         :extra-deps {poly/interop {:local/root "../interop"}}}}}

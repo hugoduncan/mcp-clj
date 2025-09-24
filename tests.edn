@@ -3,6 +3,7 @@
            :ns-patterns ["-test$"]
            :source-paths ["components/http/src"
                           "components/http-server/src"
+                          "components/interop/src"
                           "components/json-rpc/src"
                           "components/log/src"
                           "components/mcp-client/src"

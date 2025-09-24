@@ -1,0 +1,21 @@
+{:paths ["src"]
+ :deps {org.clojure/clojure {:mvn/version "1.11.3"}
+
+        ;; MCP Java SDK
+        io.modelcontextprotocol.sdk/mcp {:mvn/version "0.11.2"}
+        io.modelcontextprotocol.sdk/mcp-spring-webflux {:mvn/version "0.11.2"}
+
+        ;; Spring WebFlux for HTTP transport
+        org.springframework/spring-webflux {:mvn/version "6.0.11"}
+        org.springframework/spring-context {:mvn/version "6.0.11"}
+        io.projectreactor.netty/reactor-netty {:mvn/version "1.1.9"}
+
+        ;; Jackson for JSON handling (required by Java SDK)
+        com.fasterxml.jackson.core/jackson-databind {:mvn/version "2.15.2"}
+
+        ;; Logging
+        poly/log {:local/root "../log"}}
+
+ :aliases {:test {:extra-paths ["test"]
+                  :extra-deps {io.github.cognitect-labs/test-runner
+                               {:git/tag "v0.5.1" :git/sha "dfb30dd"}}}}}
