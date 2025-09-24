@@ -61,8 +61,11 @@ Include REFINE to refine the spec
 	  Protocols are specified at
 	  https://github.com/modelcontextprotocol/modelcontextprotocol/tree/199754c8141b0b709f4a5f9caf38a708bf8552ef/docs/specification
 
-- [ ] support different mcp versions properly. REFINE
+- [ ] support different mcp versions. REFINE
       - need conditionals for changes in spec between versions
+	  - use @doc/mcp-protocol-version-differences.md as a reference for what to support
+	  - don't add any major new features while doing this.
+	  - list unsupported features in each version.
 
 
 - [ ] proper capabilities handling
