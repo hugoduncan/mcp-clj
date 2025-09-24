@@ -55,6 +55,12 @@ Include REFINE to refine the spec
        mcp-clj.mcp-client.core/create-client.  We just added support the
        HTTP transport in the server.
 
+- [x] create a summary of the protocol (not transport) differences
+      between the different mcp specifications ["2025-06-18"
+      "2025-03-26" "2024-11-05"].
+	  Protocols are specified at
+	  https://github.com/modelcontextprotocol/modelcontextprotocol/tree/199754c8141b0b709f4a5f9caf38a708bf8552ef/docs/specification
+
 - [ ] support different mcp versions properly. REFINE
       - need conditionals for changes in spec between versions
 
