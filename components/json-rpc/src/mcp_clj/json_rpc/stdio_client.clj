@@ -9,6 +9,7 @@
     BufferedWriter]
    [java.util.concurrent CompletableFuture
     ConcurrentHashMap
+    Future
     TimeUnit]))
 
 ;;; JSONRPClient Record
@@ -112,14 +113,16 @@
   "Send JSON-RPC request using JSONRPClient's output stream"
   [json-rpc-client method params timeout-ms]
   (let [request-id (generate-request-id json-rpc-client)
-        future (CompletableFuture.)
-        request {:jsonrpc "2.0"
-                 :id request-id
-                 :method method
-                 :params params}]
+        future     (CompletableFuture.)
+        request    {:jsonrpc "2.0"
+                    :id      request-id
+                    :method  method
+                    :params  params}]
 
     ;; Register pending request
-    (.put (:pending-requests json-rpc-client) request-id future)
+    (.put
+     ^ConcurrentHashMap (:pending-requests json-rpc-client)
+     request-id future)
 
     ;; Send request using JSONRPClient's output stream
     (try
@@ -130,7 +133,9 @@
 
       future
       (catch Exception e
-        (.remove (:pending-requests json-rpc-client) request-id)
+        (.remove
+         ^ConcurrentHashMap (:pending-requests json-rpc-client)
+         request-id)
         (.completeExceptionally future e)
         future))))
 
@@ -151,7 +156,7 @@
 
   ;; Cancel the reader future if it exists
   (when-let [reader-future (:reader-future json-rpc-client)]
-    (.cancel reader-future true))
+    (.cancel ^Future reader-future true))
 
   ;; Cancel all pending requests
   (doseq [[_id future] (:pending-requests json-rpc-client)]
