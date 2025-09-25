@@ -1,13 +1,11 @@
 (ns mcp-clj.mcp-server.http-transport-test
   (:require
    [clojure.data.json :as json]
-   [clojure.test :refer [deftest is testing use-fixtures]]
+   [clojure.test :refer [deftest is testing]]
    [hato.client :as hato]
    [mcp-clj.mcp-server.core :as mcp-core]))
 
-;;; Test Fixtures and Helpers
-
-(def ^:private ^:dynamic *server* nil)
+;;; Test Helpers
 
 (defn- http-get
   "Send HTTP GET request"
@@ -30,126 +28,133 @@
            :params params}
     id (assoc :id id)))
 
-(defn- with-http-server
-  "Test fixture that creates an MCP server with HTTP transport"
-  [f]
-  (let [server (mcp-core/create-server {:transport :http :port 0})]
-    (try
-      (binding [*server* server]
-        (f))
-      (finally
-        ((:stop server))))))
-
-(use-fixtures :each with-http-server)
-
 (defn- get-server-port
-  []
-  (-> *server* :json-rpc-server deref :port))
+  "Extract port from a running server"
+  [server]
+  (-> server :json-rpc-server deref :port))
+
+(defn- start-test-server
+  "Start an MCP server with HTTP transport for testing"
+  [& [opts]]
+  (mcp-core/create-server (merge {:transport :http :port 0} opts)))
+
+(defmacro with-test-server
+  "Execute body with a test server, ensuring cleanup"
+  [[server-binding & [server-opts]] & body]
+  `(let [~server-binding (start-test-server ~server-opts)]
+     (try
+       ~@body
+       (finally
+         ((:stop ~server-binding))))))
 
 ;;; Tests
 
 (deftest http-transport-creation-test
   ;; Test creating MCP server with HTTP transport
-  (testing "HTTP transport server creation"
-    (is (some? *server*))
-    (is (pos? (get-server-port)))))
+  (with-test-server [server]
+    (testing "HTTP transport server creation"
+      (is (some? server))
+      (is (pos? (get-server-port server))))))
 
 (deftest mcp-capabilities-endpoint-test
   ;; Test GET /mcp endpoint returns MCP transport capabilities
-  (testing "GET /mcp endpoint"
-    (let [response (http-get (str "http://localhost:" (get-server-port) "/"))]
-      (is (= 200 (:status response)))
-      (let [body (json/read-str (:body response) :key-fn keyword)]
-        (is (= "streamable-http" (:transport body)))
-        (is (= "2025-03-26" (:version body)))
-        (is (:sse (:capabilities body)))
-        (is (:batch (:capabilities body)))
-        (is (:resumable (:capabilities body)))))))
+  (with-test-server [server]
+    (testing "GET /mcp endpoint"
+      (let [response (http-get (str "http://localhost:" (get-server-port server) "/"))]
+        (is (= 200 (:status response)))
+        (let [body (json/read-str (:body response) :key-fn keyword)]
+          (is (= "streamable-http" (:transport body)))
+          (is (= "2025-03-26" (:version body)))
+          (is (:sse (:capabilities body)))
+          (is (:batch (:capabilities body)))
+          (is (:resumable (:capabilities body))))))))
 
 (deftest mcp-initialize-test
   ;; Test MCP initialization over HTTP transport
-  (testing "MCP initialization"
-    (let [init-request (make-json-rpc-request "initialize"
-                                              {:protocolVersion "2024-11-05"
-                                               :capabilities {}
-                                               :clientInfo {:name "test-client"
-                                                            :version "1.0.0"}}
-                                              1)
-          response (http-post (str "http://localhost:" (get-server-port) "/")
-                              (json/write-str init-request))]
-      (is (= 200 (:status response)))
-      (let [body (json/read-str (:body response) :key-fn keyword)]
-        (is (= "2.0" (:jsonrpc body)))
-        (is (= 1 (:id body)))
-        (is (some? (:result body)))
-        (is (some? (get-in body [:result :serverInfo])))
-        (is (= "mcp-clj" (get-in body [:result :serverInfo :name])))))))
+  (with-test-server [server]
+    (testing "MCP initialization"
+      (let [port (get-server-port server)
+            init-request (make-json-rpc-request "initialize"
+                                                {:protocolVersion "2024-11-05"
+                                                 :capabilities {}
+                                                 :clientInfo {:name "test-client"
+                                                              :version "1.0.0"}}
+                                                1)
+            response (http-post (str "http://localhost:" port "/")
+                                (json/write-str init-request))]
+        (is (= 200 (:status response)))
+        (let [body (json/read-str (:body response) :key-fn keyword)]
+          (is (= "2.0" (:jsonrpc body)))
+          (is (= 1 (:id body)))
+          (is (some? (:result body)))
+          (is (some? (get-in body [:result :serverInfo])))
+          (is (= "mcp-clj" (get-in body [:result :serverInfo :name]))))))))
 
 (deftest mcp-ping-test
   ;; Test MCP ping over HTTP transport
-  (testing "MCP ping"
-    (let [ping-request (make-json-rpc-request "ping" {} 2)
-          response (http-post (str "http://localhost:" (get-server-port) "/")
-                              (json/write-str ping-request))]
-      (is (= 200 (:status response)))
-      (let [body (json/read-str (:body response) :key-fn keyword)]
-        (is (= "2.0" (:jsonrpc body)))
-        (is (= 2 (:id body)))
-        (is (= {} (:result body)))))))
+  (with-test-server [server]
+    (testing "MCP ping"
+      (let [port (get-server-port server)
+            ping-request (make-json-rpc-request "ping" {} 2)
+            response (http-post (str "http://localhost:" port "/")
+                                (json/write-str ping-request))]
+        (is (= 200 (:status response)))
+        (let [body (json/read-str (:body response) :key-fn keyword)]
+          (is (= "2.0" (:jsonrpc body)))
+          (is (= 2 (:id body)))
+          (is (= {} (:result body))))))))
 
 (deftest mcp-list-tools-test
   ;; Test MCP tools/list over HTTP transport
-  (testing "MCP tools/list"
-    (let [list-tools-request (make-json-rpc-request "tools/list" {} 3)
-          response (http-post (str "http://localhost:" (get-server-port) "/")
-                              (json/write-str list-tools-request))]
-      (is (= 200 (:status response)))
-      (let [body (json/read-str (:body response) :key-fn keyword)]
-        (is (= "2.0" (:jsonrpc body)))
-        (is (= 3 (:id body)))
-        (is (some? (:result body)))
-        (is (vector? (get-in body [:result :tools])))))))
+  (with-test-server [server]
+    (testing "MCP tools/list"
+      (let [port (get-server-port server)
+            list-tools-request (make-json-rpc-request "tools/list" {} 3)
+            response (http-post (str "http://localhost:" port "/")
+                                (json/write-str list-tools-request))]
+        (is (= 200 (:status response)))
+        (let [body (json/read-str (:body response) :key-fn keyword)]
+          (is (= "2.0" (:jsonrpc body)))
+          (is (= 3 (:id body)))
+          (is (some? (:result body)))
+          (is (vector? (get-in body [:result :tools]))))))))
 
 (deftest http-batch-request-test
   ;; Test JSON-RPC batch requests over HTTP transport
-  (testing "HTTP batch request"
-    (let [batch-request [(make-json-rpc-request "ping" {} 1)
-                         (make-json-rpc-request "tools/list" {} 2)]
-          response (http-post (str "http://localhost:" (get-server-port) "/")
-                              (json/write-str batch-request))]
-      (is (= 200 (:status response)))
-      (let [body (json/read-str (:body response) :key-fn keyword)]
-        (is (vector? body))
-        (is (= 2 (count body)))
-        (is (every? #(= "2.0" (:jsonrpc %)) body))
-        (is (= #{1 2} (set (map :id body))))))))
+  (with-test-server [server]
+    (testing "HTTP batch request"
+      (let [port (get-server-port server)
+            batch-request [(make-json-rpc-request "ping" {} 1)
+                           (make-json-rpc-request "tools/list" {} 2)]
+            response (http-post (str "http://localhost:" port "/")
+                                (json/write-str batch-request))]
+        (is (= 200 (:status response)))
+        (let [body (json/read-str (:body response) :key-fn keyword)]
+          (is (vector? body))
+          (is (= 2 (count body)))
+          (is (every? #(= "2.0" (:jsonrpc %)) body))
+          (is (= #{1 2} (set (map :id body)))))))))
 
 (deftest http-with-origin-validation-test
   ;; Test HTTP transport with origin validation
-  (testing "HTTP transport with origin validation"
-    (let [server-with-origins (mcp-core/create-server
-                               {:transport       :http
-                                :port            0
-                                :allowed-origins ["https://example.com"]})]
-      (try
-        (let [port         (-> server-with-origins :json-rpc-server deref :port)
-              ping-request (make-json-rpc-request "ping" {} 1)]
+  (with-test-server [server-with-origins {:allowed-origins ["https://example.com"]}]
+    (testing "HTTP transport with origin validation"
+      (let [port (get-server-port server-with-origins)
+            ping-request (make-json-rpc-request "ping" {} 1)]
 
-          (testing "allows requests from allowed origins"
-            (let [response (http-post (str "http://localhost:" port "/")
-                                      (json/write-str ping-request)
-                                      {"Origin" "https://example.com"})]
-              (is (= 200 (:status response)))))
+        (testing "allows requests from allowed origins"
+          (let [response (http-post (str "http://localhost:" port "/")
+                                    (json/write-str ping-request)
+                                    {"Origin" "https://example.com"})]
+            (is (= 200 (:status response)))))
 
-          (testing "blocks requests from disallowed origins"
-            (let [response (http-post (str "http://localhost:" port "/")
-                                      (json/write-str ping-request)
-                                      {"Origin" "https://malicious.com"})]
-              (is (= 400 (:status response)))))
+        (testing "blocks requests from disallowed origins"
+          (let [response (http-post (str "http://localhost:" port "/")
+                                    (json/write-str ping-request)
+                                    {"Origin" "https://malicious.com"})]
+            (is (= 400 (:status response)))))
 
-          (testing "allows requests without origin header"
-            (let [response (http-post (str "http://localhost:" port "/")
-                                      (json/write-str ping-request))]
-              (is (= 200 (:status response))))))
-        (finally
-          ((:stop server-with-origins)))))))
+        (testing "allows requests without origin header"
+          (let [response (http-post (str "http://localhost:" port "/")
+                                    (json/write-str ping-request))]
+            (is (= 200 (:status response)))))))))

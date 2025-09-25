@@ -1,53 +1,48 @@
 (ns mcp-clj.mcp-client.tools-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [mcp-clj.mcp-client.tools :as tools])
+   [mcp-clj.mcp-client.tools :as tools]
+   [mcp-clj.json-rpc.stdio-client :as stdio-client])
   (:import
-   [java.util.concurrent CompletableFuture]))
+   [java.util.concurrent CompletableFuture ConcurrentHashMap]
+   [java.io StringWriter BufferedWriter]))
 
 (defn- create-mock-client
   "Create a mock client for testing"
-  [transport-responses]
+  []
   (let [session (atom {})
-        string-writer (java.io.StringWriter.)
-        buffered-writer (java.io.BufferedWriter. string-writer)
-        mock-json-rpc-client {:request-id-counter (atom 0)
-                              :pending-requests (java.util.concurrent.ConcurrentHashMap.)
-                              :output-stream buffered-writer}]
+        string-writer (StringWriter.)
+        buffered-writer (BufferedWriter. string-writer)
+        ;; Create a proper JSONRPClient record instance
+        mock-json-rpc-client (stdio-client/->JSONRPClient
+                              (ConcurrentHashMap.) ; pending-requests
+                              (atom 0) ; request-id-counter
+                              nil ; executor
+                              nil ; input-stream
+                              buffered-writer ; output-stream
+                              (atom false) ; running
+                              nil)] ; reader-future
     {:session session
      :transport {:json-rpc-client mock-json-rpc-client}}))
 
-(defn- create-mock-transport
-  "Create a mock transport that returns predefined responses"
-  [responses]
-  (let [call-count (atom 0)]
-    (fn [method params]
-      (let [count (swap! call-count inc)
-            response (get responses [method params]
-                          (get responses method))]
-        (if response
-          (doto (CompletableFuture.)
-            (.complete response))
-          (doto (CompletableFuture.)
-            (.completeExceptionally
-             (ex-info "No mock response configured"
-                      {:method method :params params}))))))))
-
 (deftest call-tool-success-test
+  ;; Tests successful tool execution returns content directly
   (testing "successful tool execution returns content directly"
-    (let [client (create-mock-client {})]
+    (let [client (create-mock-client)]
       (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
                     (fn [json-rpc-client method params timeout-ms]
                       (CompletableFuture/completedFuture
                        {:content "success result" :isError false}))]
-        (is (= "success result" (tools/call-tool-impl client "test-tool" {}))))))
+        (is (= "success result"
+               (tools/call-tool-impl client "test-tool" {}))))))
 
   (testing "tool execution with JSON content parsing"
-    (let [client (create-mock-client {})]
+    (let [client (create-mock-client)]
       (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
                     (fn [json-rpc-client method params timeout-ms]
                       (CompletableFuture/completedFuture
-                       {:content [{:type "text" :text "{\"key\": \"value\"}"}] :isError false}))]
+                       {:content [{:type "text" :text "{\"key\": \"value\"}"}]
+                        :isError false}))]
         ;; Should return the parsed content - access the data field from first item
         (let [result (tools/call-tool-impl client "test-tool" {})]
           (is (vector? result))
@@ -58,8 +53,9 @@
             (is (= {:key "value"} (:data first-item)))))))))
 
 (deftest call-tool-error-test
+  ;; Tests tool execution throws on error
   (testing "tool execution throws on error"
-    (let [client (create-mock-client {})]
+    (let [client (create-mock-client)]
       (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
                     (fn [json-rpc-client method params timeout-ms]
                       (CompletableFuture/completedFuture
@@ -69,8 +65,9 @@
                               (tools/call-tool-impl client "test-tool" {})))))))
 
 (deftest tools-cache-test
+  ;; Tests tools cache creation and access
   (testing "tools cache creation and access"
-    (let [client (create-mock-client {})]
+    (let [client (create-mock-client)]
       ;; Cache should be created on first access
       (is (nil? @(#'tools/get-tools-cache client)))
 
@@ -80,13 +77,11 @@
         (is (= test-tools (#'tools/get-cached-tools client)))))))
 
 (deftest list-tools-impl-test
+  ;; Tests successful tools list request
   (testing "successful tools list request"
     (let [mock-tools [{:name "echo" :description "Echo tool"}
                       {:name "calc" :description "Calculator tool"}]
-          mock-transport (create-mock-transport
-                          {"tools/list" {:tools mock-tools}})
-          client (assoc (create-mock-client {})
-                        :transport {:send-request! mock-transport})]
+          client (create-mock-client)]
 
       ;; Mock stdio/send-request! to return our mock transport response
       (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
@@ -99,7 +94,7 @@
           (is (= mock-tools (#'tools/get-cached-tools client)))))))
 
   (testing "error handling in tools list"
-    (let [client (create-mock-client {})]
+    (let [client (create-mock-client)]
       (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
                     (fn [json-rpc-client method params timeout-ms]
                       (throw (ex-info "Connection failed" {})))]
@@ -108,8 +103,9 @@
              (tools/list-tools-impl client)))))))
 
 (deftest call-tool-impl-test
+  ;; Tests successful tool call
   (testing "successful tool call"
-    (let [client (create-mock-client {})]
+    (let [client (create-mock-client)]
       (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
                     (fn [json-rpc-client method params timeout-ms]
                       (CompletableFuture/completedFuture
@@ -119,7 +115,7 @@
           (is (= "tool result" result))))))
 
   (testing "tool call with error response"
-    (let [client (create-mock-client {})]
+    (let [client (create-mock-client)]
       (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
                     (fn [json-rpc-client method params timeout-ms]
                       (CompletableFuture/completedFuture
@@ -130,7 +126,7 @@
              (tools/call-tool-impl client "failing-tool" {}))))))
 
   (testing "tool call with transport error"
-    (let [client (create-mock-client {})]
+    (let [client (create-mock-client)]
       (with-redefs [mcp-clj.json-rpc.stdio-client/send-request!
                     (fn [json-rpc-client method params timeout-ms]
                       (throw (ex-info "Transport error" {})))]
@@ -139,24 +135,25 @@
              (tools/call-tool-impl client "test-tool" {})))))))
 
 (deftest available-tools?-impl-test
+  ;; Tests available tools checking logic
   (testing "returns true when cached tools exist"
-    (let [client (create-mock-client {})]
+    (let [client (create-mock-client)]
       (#'tools/cache-tools! client [{:name "test-tool"}])
       (is (true? (tools/available-tools?-impl client)))))
 
   (testing "returns false when no cached tools"
-    (let [client (create-mock-client {})]
+    (let [client (create-mock-client)]
       (is (false? (tools/available-tools?-impl client)))))
 
   (testing "queries server when no cached tools"
-    (let [client (create-mock-client {})]
+    (let [client (create-mock-client)]
       (with-redefs [tools/list-tools-impl
                     (fn [_client]
                       {:tools [{:name "server-tool"}]})]
         (is (true? (tools/available-tools?-impl client))))))
 
   (testing "returns false on server error"
-    (let [client (create-mock-client {})]
+    (let [client (create-mock-client)]
       (with-redefs [tools/list-tools-impl
                     (fn [_client]
                       (throw (ex-info "Server error" {})))]

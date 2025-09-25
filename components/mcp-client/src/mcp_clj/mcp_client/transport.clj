@@ -13,7 +13,7 @@
       (instance? mcp_clj.json_rpc.http_client.HTTPJSONRPCClient json-rpc-client)
       (http-client/send-request! json-rpc-client method params timeout-ms)
 
-      ;; Stdio client  
+      ;; Stdio client
       (instance? mcp_clj.json_rpc.stdio_client.JSONRPClient json-rpc-client)
       (stdio-client/send-request! json-rpc-client method params timeout-ms)
 
