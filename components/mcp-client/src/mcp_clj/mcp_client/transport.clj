@@ -2,11 +2,13 @@
   "Transport abstraction for MCP client"
   (:require
    [mcp-clj.json-rpc.http-client :as http-client]
-   [mcp-clj.json-rpc.stdio-client :as stdio-client]))
+   [mcp-clj.json-rpc.stdio-client :as stdio-client])
+  (:import
+   [java.util.concurrent CompletableFuture]))
 
 (defn send-request!
   "Send a request through the transport's JSON-RPC client"
-  [transport method params timeout-ms]
+  ^CompletableFuture [transport method params timeout-ms]
   (let [json-rpc-client (:json-rpc-client transport)]
     (cond
       ;; HTTP client
@@ -22,7 +24,7 @@
 
 (defn send-notification!
   "Send a notification through the transport's JSON-RPC client"
-  [transport method params]
+  ^CompletableFuture [transport method params]
   (let [json-rpc-client (:json-rpc-client transport)]
     (cond
       ;; HTTP client
