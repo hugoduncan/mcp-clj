@@ -155,7 +155,7 @@
 
                           ex
                           (binding [*out* *err*]
-                            (println "JSON parse error:" (.getMessage ex)))
+                            (println "JSON parse error:" (ex-message ex)))
 
                           :else
                           (handle-request executor @handlers rpc-call))]
