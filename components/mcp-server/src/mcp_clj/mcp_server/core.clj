@@ -1,6 +1,7 @@
 (ns mcp-clj.mcp-server.core
   "MCP server implementation supporting the Anthropic Model Context Protocol"
   (:require
+   [clojure.set :as set]
    [mcp-clj.json-rpc.http-server :as http-server]
    [mcp-clj.json-rpc.protocols :as json-rpc-protocols]
    [mcp-clj.json-rpc.sse-server :as sse-server]
@@ -157,9 +158,17 @@
   "Handle tools/call request from client"
   [server {:keys [name arguments] :as _params}]
   (log/info :server/tools-call)
-  (if-let [{:keys [implementation]} (get @(:tool-registry server) name)]
+  (if-let [{:keys [implementation inputSchema]} (get
+                                                 @(:tool-registry server)
+                                                 name)]
     (try
-      (implementation arguments)
+      (let [missing-args (set/difference
+                          (set (:required inputSchema))
+                          (set (keys arguments)))]
+        (if (empty? missing-args)
+          (implementation arguments)
+          {:content [(text-map (str "Missing args: " (vec missing-args)))]
+           :isError true}))
       (catch Throwable e
         {:content [(text-map (str "Error: " (.getMessage e)))]
          :isError true}))

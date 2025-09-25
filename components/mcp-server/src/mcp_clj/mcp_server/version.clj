@@ -34,9 +34,10 @@
   (let [client-supported? (supported? client-requested-version)
         negotiated-version (if client-supported?
                              client-requested-version
-                             ;; Find the highest version supported by both
-                             ;; For now, we assume client supports standard versions
-                             ;; In a real implementation, we'd need client's supported versions
+                             ;; Find the highest version supported by both. For
+                             ;; now, we assume client supports standard versions
+                             ;; In a real implementation, we'd need client's
+                             ;; supported versions
                              (get-latest-version))]
     {:negotiated-version negotiated-version
      :client-was-supported? client-supported?

@@ -6,42 +6,34 @@
    [mcp-clj.mcp-client.session :as session]))
 
 (deftest create-client-test
-  (testing "should create client with Claude Code MCP server configuration and automatic initialization"
-    (let [config {:server {:command "echo"
-                           :args ["test"]
-                           :env {"TEST_VAR" "test_value"}}
-                  :client-info {:name "test-client"
-                                :version "1.0.0"}
-                  :capabilities {}}
-          client (core/create-client config)]
+  (testing "should create client with stdio and automatic initialization"
+    (let [config {:server       {:command "echo"
+                                 :args    ["test"]
+                                 :env     {"TEST_VAR" "test_value"}}
+                  :client-info  {:name    "test-client"
+                                 :version "1.0.0"}
+                  :capabilities {}}]
+      (with-open [client (core/create-client config)]
+        (is (some? client))
+        (is (some? (:transport client)))
+        (is (some? (:session client)))
+        (is (some? (:initialization-future client)))
 
-      (is (some? client))
-      (is (some? (:transport client)))
-      (is (some? (:session client)))
-      (is (some? (:initialization-future client)))
-
-      ;; Check initial session state - should be initializing due to automatic initialization
-      (let [session @(:session client)]
-        (is (= :initializing (:state session)))
-        (is (= "2025-06-18" (:protocol-version session)))
-        (is (= {} (:capabilities session))))
-
-      ;; Cleanup
-      (core/close! client)))
+        (testing "should be initializing due to automatic initialization"
+          (let [session @(:session client)]
+            (is (= :initializing (:state session)))
+            (is (= "2025-06-18" (:protocol-version session)))
+            (is (= {} (:capabilities session))))))))
 
   (testing "should create client with minimal server configuration"
-    (let [config {:server {:command "echo" :args ["test"]}
-                  :client-info {:name "minimal-test-client"}
-                  :capabilities {}}
-          client (core/create-client config)]
-
-      (is (some? client))
-      (is (some? (:transport client)))
-      (is (some? (:session client)))
-      (is (some? (:initialization-future client)))
-
-      ;; Cleanup
-      (core/close! client)))
+    (let [config {:server       {:command "echo" :args ["test"]}
+                  :client-info  {:name "minimal-test-client"}
+                  :capabilities {}}]
+      (with-open [client (core/create-client config)]
+        (is (some? client))
+        (is (some? (:transport client)))
+        (is (some? (:session client)))
+        (is (some? (:initialization-future client))))))
 
   (testing "should throw exception for invalid server configuration"
     (is (thrown? Exception
@@ -51,7 +43,8 @@
 
 (deftest client-state-test
   (testing "should provide correct client state predicates"
-    (let [client (core/create-client {:server {:command "echo" :args ["test"]}})]
+    (let [client (core/create-client
+                  {:server {:command "echo" :args ["test"]}})]
 
       ;; Initially might be initializing due to automatic initialization
       (is (not (core/client-ready? client)))

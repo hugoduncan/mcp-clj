@@ -96,7 +96,6 @@
                  :capabilities     {:tools {}}
                  :protocol-version "2024-11-05"
                  :num-threads      2})]
-    (prn :client client)
     ;; Wait for client to be ready
     (client/wait-for-ready client 5000)
     (log/info :test/client-connected {:ready (client/client-ready? client)})
@@ -132,8 +131,8 @@
 
       (testing "client has correct configuration"
         (let [info (client/get-client-info client)]
-          (is (= "integration-test-client" (:name info)))
-          (is (= "1.0.0" (:version info))))))))
+          (is (= "integration-test-client" (:name (:client-info info))))
+          (is (= "1.0.0" (:version (:client-info info)))))))))
 
 (deftest http-tool-discovery-integration-test
   ;; Test tool discovery across HTTP transport
@@ -191,24 +190,28 @@
   (with-http-test-env [server client]
     (testing "HTTP error handling integration"
       (testing "tool not found error"
-        (is (thrown-with-msg? clojure.lang.ExceptionInfo
-                              #"Method not found"
-                              (client/call-tool client "nonexistent-tool" {}))))
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Tool execution failed: nonexistent-tool"
+             (client/call-tool client "nonexistent-tool" {}))))
 
       (testing "invalid tool arguments"
-        (is (thrown-with-msg? clojure.lang.ExceptionInfo
-                              #"Tool execution failed"
-                              (client/call-tool client "add" {:invalid "params"}))))
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Tool execution failed"
+             (client/call-tool client "add" {:invalid "params"}))))
 
       (testing "tool that throws exception"
-        (is (thrown-with-msg? clojure.lang.ExceptionInfo
-                              #"Tool execution failed"
-                              (client/call-tool client "error" {:message "Test error"}))))
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Tool execution failed"
+             (client/call-tool client "error" {:message "Test error"}))))
 
       (testing "missing required parameters"
-        (is (thrown-with-msg? clojure.lang.ExceptionInfo
-                              #"Tool execution failed"
-                              (client/call-tool client "echo" {})))))))
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Tool execution failed"
+             (client/call-tool client "echo" {})))))))
 
 (deftest http-session-management-integration-test
   ;; Test session management across HTTP transport
