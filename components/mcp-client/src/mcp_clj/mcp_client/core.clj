@@ -207,7 +207,9 @@
   ([client] (wait-for-ready client 30000))
   ([client timeout-ms]
    (try
-     (.get (:initialization-future client) timeout-ms TimeUnit/MILLISECONDS)
+     (.get ^CompletableFuture (:initialization-future client)
+           timeout-ms
+           TimeUnit/MILLISECONDS)
      true
      (catch TimeoutException _
        (let [session-state (:state @(:session client))]
@@ -215,7 +217,7 @@
            (throw (ex-info "Client initialization failed"
                            {:session-state session-state}))
            (throw (ex-info "Client initialization timeout"
-                           {:timeout-ms timeout-ms
+                           {:timeout-ms    timeout-ms
                             :session-state session-state})))))
      (catch ExecutionException e
        (throw (.getCause e))))))
