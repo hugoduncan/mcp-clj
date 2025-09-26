@@ -1,16 +1,14 @@
-(ns mcp-clj.server-transport.in-memory
-  "In-memory transport server for unit testing MCP client/server communication"
+(ns mcp-clj.in-memory-transport.server
+  "In-memory server transport for unit testing MCP communication"
   (:require
    [mcp-clj.json-rpc.protocols :as json-rpc-protocols]
    [mcp-clj.log :as log])
   (:import
-   [java.util.concurrent TimeUnit CompletableFuture Executors]
+   [java.util.concurrent TimeUnit Executors]
    [java.util.concurrent.atomic AtomicBoolean]))
 
-;;; Server Implementation
-
 (defrecord InMemoryServer
-           [shared-transport ; SharedTransport instance from client-transport.in-memory
+           [shared-transport ; SharedTransport instance from shared namespace
             server-alive? ; AtomicBoolean for server status  
             handlers] ; Atom containing handler map
 
@@ -32,8 +30,6 @@
   (alive? [_]
     (and (.get server-alive?)
          (.get (:alive? shared-transport)))))
-
-;;; Message Processing
 
 (defn- handle-request
   "Process a client request and send response"
@@ -93,8 +89,6 @@
                      (catch Exception e
                        (log/error :in-memory/server-processor-error {:error (.getMessage e)})))
                    (recur)))))))
-
-;;; Factory Function
 
 (defn create-in-memory-server
   "Create in-memory server transport.

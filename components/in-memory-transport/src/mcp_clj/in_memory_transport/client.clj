@@ -1,34 +1,12 @@
-(ns mcp-clj.client-transport.in-memory
-  "In-memory transport for unit testing MCP client/server communication"
+(ns mcp-clj.in-memory-transport.client
+  "In-memory client transport for unit testing MCP communication"
   (:require
    [mcp-clj.client-transport.protocol :as transport-protocol]
+   [mcp-clj.in-memory-transport.shared :refer [create-shared-transport]]
    [mcp-clj.log :as log])
   (:import
-   [java.util.concurrent LinkedBlockingQueue TimeUnit CompletableFuture Executors]
-   [java.util.concurrent.atomic AtomicBoolean AtomicLong]))
-
-;;; Shared Transport State
-
-(defrecord SharedTransport
-           [client-to-server-queue ; LinkedBlockingQueue for client->server messages
-            server-to-client-queue ; LinkedBlockingQueue for server->client messages
-            alive? ; AtomicBoolean for transport status
-            request-id-counter ; AtomicLong for generating request IDs
-            pending-requests ; Atom containing map of request-id -> CompletableFuture
-            server-handler]) ; Server message handler function
-
-(defn create-shared-transport
-  "Create shared transport state for connecting client and server in-memory"
-  []
-  (->SharedTransport
-   (LinkedBlockingQueue.)
-   (LinkedBlockingQueue.)
-   (AtomicBoolean. true)
-   (AtomicLong. 0)
-   (atom {})
-   (atom nil)))
-
-;;; Client Transport Implementation
+   [java.util.concurrent TimeUnit CompletableFuture Executors]
+   [java.util.concurrent.atomic AtomicBoolean]))
 
 (defrecord InMemoryTransport
            [shared-transport ; SharedTransport instance
@@ -99,8 +77,6 @@
       Object
       (toString [_] "InMemoryJSONRPCClient"))))
 
-;;; Message Processing
-
 (defn- start-client-message-processor!
   "Start processing messages from server to client"
   [transport]
@@ -139,8 +115,6 @@
                      (catch Exception e
                        (log/error :in-memory/client-processor-error {:error (.getMessage e)})))
                    (recur)))))))
-
-;;; Factory Function
 
 (defn create-transport
   "Create in-memory transport for MCP client.

@@ -1,9 +1,10 @@
-(ns mcp-clj.client-transport.in-memory-test
+(ns mcp-clj.in-memory-transport.core-test
   "Tests for in-memory transport implementation"
   (:require
    [clojure.test :refer [deftest testing is]]
-   [mcp-clj.client-transport.in-memory :as in-memory]
-   [mcp-clj.client-transport.protocol :as transport-protocol])
+   [mcp-clj.client-transport.protocol :as transport-protocol]
+   [mcp-clj.in-memory-transport.client :as client]
+   [mcp-clj.in-memory-transport.shared :as shared])
   (:import
    [java.util.concurrent CompletableFuture TimeUnit]))
 
@@ -13,7 +14,7 @@
   ;; Test creating shared transport state for connecting client and server
   (testing "create-shared-transport"
     (testing "creates transport with proper initial state"
-      (let [shared (in-memory/create-shared-transport)]
+      (let [shared (shared/create-shared-transport)]
         (is (some? (:client-to-server-queue shared)))
         (is (some? (:server-to-client-queue shared)))
         (is (.get (:alive? shared)))
@@ -25,9 +26,9 @@
 (deftest test-client-transport-creation
   ;; Test creating client transport with shared state
   (testing "create-transport"
-    (let [shared-transport (in-memory/create-shared-transport)]
+    (let [shared-transport (shared/create-shared-transport)]
       (testing "creates transport successfully with shared state"
-        (let [transport (in-memory/create-transport {:shared shared-transport})]
+        (let [transport (client/create-transport {:shared shared-transport})]
           (is (satisfies? transport-protocol/Transport transport))
           (is (transport-protocol/alive? transport))))
 
@@ -35,13 +36,13 @@
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Missing :shared transport"
-             (in-memory/create-transport {})))))))
+             (client/create-transport {})))))))
 
 (deftest test-client-transport-lifecycle
   ;; Test client transport lifecycle operations
   (testing "client transport lifecycle"
-    (let [shared-transport (in-memory/create-shared-transport)
-          transport (in-memory/create-transport {:shared shared-transport})]
+    (let [shared-transport (shared/create-shared-transport)
+          transport (client/create-transport {:shared shared-transport})]
 
       (testing "transport is initially alive"
         (is (transport-protocol/alive? transport)))
@@ -58,8 +59,8 @@
 (deftest test-transport-sends-messages
   ;; Test that transport can send messages to queues
   (testing "transport sends messages to queues"
-    (let [shared-transport (in-memory/create-shared-transport)
-          transport (in-memory/create-transport {:shared shared-transport})]
+    (let [shared-transport (shared/create-shared-transport)
+          transport (client/create-transport {:shared shared-transport})]
 
       (testing "send-notification puts message in queue"
         (let [future (transport-protocol/send-notification! transport "test" {:data "hello"})]

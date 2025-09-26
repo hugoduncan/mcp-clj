@@ -1,6 +1,7 @@
 {:deps
  {poly/http {:local/root "../../components/http"}
   poly/http-server {:local/root "../../components/http-server"}
+  poly/in-memory-transport {:local/root "../../components/in-memory-transport"}
   poly/json-rpc {:local/root "../../components/json-rpc"}
   poly/log {:local/root "../../components/log"}
   poly/mcp-server {:local/root "../../components/mcp-server"}

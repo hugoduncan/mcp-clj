@@ -1,0 +1,8 @@
+{:deps {poly/client-transport {:local/root "../client-transport"}
+        poly/json-rpc {:local/root "../json-rpc"}
+        poly/log {:local/root "../log"}}
+
+ :aliases
+ {:test {:extra-paths ["test"]
+         :extra-deps
+         {lambdaisland/kaocha {:mvn/version "1.87.1366"}}}}}

@@ -6,6 +6,7 @@
            :source-paths ["components/client-transport/src"
                           "components/http/src"
                           "components/http-server/src"
+                          "components/in-memory-transport/src"
                           "components/interop/src"
                           "components/json-rpc/src"
                           "components/log/src"
@@ -15,6 +16,7 @@
                           "components/tools/src"]
            :test-paths ["components/client-transport/test"
                         "components/http-server/test"
+                        "components/in-memory-transport/test"
                         "components/json-rpc/test"
                         "components/log/test"
                         "components/mcp-client/test"
@@ -29,6 +31,7 @@
            :source-paths ["components/client-transport/src"
                           "components/http/src"
                           "components/http-server/src"
+                          "components/in-memory-transport/src"
                           "components/interop/src"
                           "components/json-rpc/src"
                           "components/log/src"
@@ -38,6 +41,7 @@
                           "components/tools/src"]
            :test-paths ["components/client-transport/test"
                         "components/http-server/test"
+                        "components/in-memory-transport/test"
                         "components/json-rpc/test"
                         "components/log/test"
                         "components/mcp-client/test"

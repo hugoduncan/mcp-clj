@@ -2,7 +2,6 @@
   "Factory for creating MCP client transports with pluggable registry"
   (:require
    [mcp-clj.client-transport.http :as http]
-   [mcp-clj.client-transport.in-memory :as in-memory]
    [mcp-clj.client-transport.protocol :as transport-protocol]
    [mcp-clj.client-transport.stdio :as stdio]))
 
@@ -107,5 +106,13 @@
 ;;; Auto-registration of Built-in Transports
 
 (register-transport! :http http/create-transport)
-(register-transport! :in-memory in-memory/create-transport)
+
+;; Register in-memory transport (lazy-loaded from separate component)
+(defn- create-in-memory-transport
+  [options]
+  (require 'mcp-clj.in-memory-transport.client)
+  (let [create-fn (ns-resolve 'mcp-clj.in-memory-transport.client 'create-transport)]
+    (create-fn options)))
+
+(register-transport! :in-memory create-in-memory-transport)
 (register-transport! :stdio stdio/create-transport)

@@ -10,13 +10,16 @@
                  "components/mcp-server/test"
                  "components/tools/test"]
    :extra-deps
-   {poly/http {:local/root "components/http"}
+   {poly/client-transport {:local/root "components/client-transport"}
+    poly/http {:local/root "components/http"}
     poly/http-server {:local/root "components/http-server"}
+    poly/in-memory-transport {:local/root "components/in-memory-transport"}
     poly/interop {:local/root "components/interop"}
     poly/json-rpc {:local/root "components/json-rpc"}
     poly/log {:local/root "components/log"}
     poly/mcp-client {:local/root "components/mcp-client"}
     poly/mcp-server {:local/root "components/mcp-server"}
+    poly/server-transport {:local/root "components/server-transport"}
     poly/tools {:local/root "components/tools"}
     lambdaisland/kaocha {:mvn/version "1.87.1366"}
     lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}
@@ -28,6 +31,7 @@
               "-XX:+EnableDynamicAgentLoading"]}
   :test {:extra-paths ["components/http/test"
                        "components/http-server/test"
+                       "components/in-memory-transport/test"
                        "components/json-rpc/test"
                        "components/log/test"
                        "components/mcp-client/test"
@@ -37,7 +41,10 @@
          {hato/hato {:mvn/version "1.0.0"}
           org.clojure/test.check {:mvn/version "1.1.1"}
           org.clojure/clojure {:mvn/version "1.12.0"}
+          poly/client-transport {:local/root "components/client-transport"}
+          poly/in-memory-transport {:local/root "components/in-memory-transport"}
           poly/interop {:local/root "components/interop"}
+          poly/server-transport {:local/root "components/server-transport"}
           ;; MCP Java SDK for cross-implementation testing
           io.modelcontextprotocol.sdk/mcp {:mvn/version "0.11.2"}
           ;; MCP Java SDK Spring WebFlux support for HTTP transport
@@ -48,7 +55,10 @@
            {lambdaisland/kaocha {:mvn/version "1.91.1392"}
             lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}
             org.clojure/test.check {:mvn/version "1.1.1"}
-            poly/interop {:local/root "components/interop"}}
+            poly/client-transport {:local/root "components/client-transport"}
+            poly/in-memory-transport {:local/root "components/in-memory-transport"}
+            poly/interop {:local/root "components/interop"}
+            poly/server-transport {:local/root "components/server-transport"}}
            :exec-fn kaocha.runner/exec-fn
            :exec-args {}
            :jvm-opts ["-XX:-OmitStackTraceInFastThrow"
