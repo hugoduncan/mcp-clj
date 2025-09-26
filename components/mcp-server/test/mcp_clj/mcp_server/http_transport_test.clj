@@ -137,7 +137,7 @@
 
 (deftest ^:integ http-with-origin-validation-test
   ;; Test HTTP transport with origin validation
-  (with-test-server [server-with-origins {:allowed-origins ["https://example.com"]}]
+  (with-test-server [server-with-origins {:transport {:type :http :port 0 :allowed-origins ["https://example.com"]}}]
     (testing "HTTP transport with origin validation"
       (let [port (get-server-port server-with-origins)
             ping-request (make-json-rpc-request "ping" {} 1)]

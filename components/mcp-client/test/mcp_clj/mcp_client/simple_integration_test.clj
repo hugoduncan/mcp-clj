@@ -15,7 +15,7 @@
           client-ready-latch (CountDownLatch. 1)
 
           ;; Create MCP server that will run in separate thread
-          mcp-server (server/create-server {:transport :stdio})
+          mcp-server (server/create-server {:transport {:type :stdio}})
 
           ;; Mock stdio server that captures JSON communication
           server-thread (future
