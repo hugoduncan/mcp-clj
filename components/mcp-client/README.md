@@ -1,10 +1,10 @@
 # MCP Client Component
 
-A Clojure implementation of an MCP (Model Context Protocol) client with stdio transport support for the 2025-06-18 protocol version.
+A Clojure implementation of an MCP (Model Context Protocol) client with pluggable transport support (HTTP and stdio) for the 2025-06-18 protocol version.
 
 ## Features
 
-- **Stdio Transport**: Launch and communicate with MCP servers via stdin/stdout
+- **Pluggable Transports**: Support for HTTP and stdio transports with extensible transport registry
 - **Session Management**: Proper state transitions (disconnected → initializing → ready)
 - **Async API**: All operations use CompletableFuture for non-blocking behavior
 - **Protocol Compliance**: Implements MCP 2025-06-18 initialization handshake
@@ -17,14 +17,24 @@ A Clojure implementation of an MCP (Model Context Protocol) client with stdio tr
 ```clojure
 (require '[mcp-clj.mcp-client.core :as client])
 
-;; Create client with Claude Code MCP server configuration
-;; This matches the format used in Claude Code's .mcp.json
-;; Client automatically begins initialization upon creation
-(def client
+;; Create client with stdio transport
+(def stdio-client
   (client/create-client
-   {:server {:command "python"
-            :args ["-m", "mcp_server", "--stdio"]
-            :env {"PYTHONPATH" "/path/to/server"}}
+   {:transport {:type :stdio
+                :command "python"
+                :args ["-m" "mcp_server" "--stdio"]
+                :env {"PYTHONPATH" "/path/to/server"}}
+    :client-info {:name "my-clojure-client"
+                  :title "My Clojure MCP Client"
+                  :version "1.0.0"}
+    :capabilities {}}))
+
+;; Create client with HTTP transport
+(def http-client
+  (client/create-client
+   {:transport {:type :http
+                :url "http://localhost:8080"
+                :num-threads 2}
     :client-info {:name "my-clojure-client"
                   :title "My Clojure MCP Client"
                   :version "1.0.0"}
@@ -45,18 +55,32 @@ A Clojure implementation of an MCP (Model Context Protocol) client with stdio tr
 (client/close! client)
 ```
 
-### Server Configuration
+### Transport Configuration
 
 ```clojure
-;; Claude Code MCP server configuration (recommended)
-;; Matches the format used in Claude Code's .mcp.json
-{:server {:command "uvx"
-          :args ["mcp-server-git", "--repository", "/path/to/repo"]
-          :env {"NODE_ENV" "production"}
-          :cwd "/path/to/working/dir"}}
+;; Stdio transport configuration
+{:transport {:type :stdio
+             :command "uvx"
+             :args ["mcp-server-git" "--repository" "/path/to/repo"]
+             :env {"NODE_ENV" "production"}
+             :cwd "/path/to/working/dir"}}
 
-;; Vector-style configuration (backward compatibility)
-{:server ["python", "-m", "mcp_server", "--stdio"]}
+;; HTTP transport configuration
+{:transport {:type :http
+             :url "http://localhost:8080"
+             :num-threads 2}}
+
+;; Custom transport registration
+(require '[mcp-clj.client-transport.factory :as transport-factory])
+
+;; Register a custom transport type
+(transport-factory/register-transport! :custom
+  (fn [options]
+    (create-custom-transport options)))
+
+;; Use the custom transport
+{:transport {:type :custom
+             :custom-option "value"}}
 ```
 
 ### Session State Management
@@ -84,7 +108,7 @@ The client maintains session state through these transitions:
 ### Components
 
 - **`core.clj`**: Main client API and initialization protocol
-- **`stdio.clj`**: Stdio transport implementation with process management
+- **`client-transport/`**: Pluggable transport system with HTTP and stdio implementations
 - **`session.clj`**: Session state management with proper transitions
 
 ### Key Design Decisions
@@ -93,7 +117,7 @@ The client maintains session state through these transitions:
 - **Future-based API**: Uses CompletableFuture for non-blocking initialization
 - **Minimal capabilities**: Starts with empty capabilities for initialization-only
 - **Process lifecycle**: Simple launch/terminate (no auto-restart)
-- **Server configuration**: Supports Claude Code MCP server format with `:server` key
+- **Pluggable transports**: Registry-based transport system supporting HTTP and stdio
 - **Process management**: Uses `clojure.java.process` for robust process handling
 
 ## Testing
@@ -180,5 +204,5 @@ Client                           Server
 - Tool calling functionality
 - Prompt and resource operations
 - Connection retry and auto-recovery
-- Additional transport types (HTTP, WebSocket)
+- Additional transport types (WebSocket, SSE)
 - Enhanced capability negotiation

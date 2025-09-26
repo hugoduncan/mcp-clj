@@ -13,7 +13,8 @@
                           "components/mcp-server/src"
                           "components/stdio-server/src"
                           "components/tools/src"]
-           :test-paths ["components/http-server/test"
+           :test-paths ["components/client-transport/test"
+                        "components/http-server/test"
                         "components/json-rpc/test"
                         "components/log/test"
                         "components/mcp-client/test"
@@ -35,7 +36,8 @@
                           "components/mcp-server/src"
                           "components/stdio-server/src"
                           "components/tools/src"]
-           :test-paths ["components/http-server/test"
+           :test-paths ["components/client-transport/test"
+                        "components/http-server/test"
                         "components/json-rpc/test"
                         "components/log/test"
                         "components/mcp-client/test"
