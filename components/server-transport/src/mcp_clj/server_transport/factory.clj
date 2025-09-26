@@ -142,7 +142,7 @@
 (defn- create-in-memory-server
   [options handlers]
   (require 'mcp-clj.in-memory-transport.server)
-  (let [create-server (ns-resolve 'mcp-clj.in-memory-transport.server 'create-server)]
+  (let [create-server (ns-resolve 'mcp-clj.in-memory-transport.server 'create-in-memory-server)]
     (create-server options handlers)))
 
 (register-transport! :in-memory create-in-memory-server)

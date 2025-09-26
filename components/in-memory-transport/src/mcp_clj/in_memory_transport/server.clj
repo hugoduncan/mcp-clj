@@ -8,28 +8,7 @@
    [java.util.concurrent.atomic AtomicBoolean]))
 
 (defrecord InMemoryServer
-           [shared-transport ; SharedTransport instance from shared namespace
-            server-alive? ; AtomicBoolean for server status  
-            handlers] ; Atom containing handler map
-
-  json-rpc-protocols/JSONRPCServer
-  (start! [_]
-    (log/info :in-memory/server-started {})
-    ;; Server is "started" immediately for in-memory transport
-    )
-
-  (stop! [_]
-    (.set server-alive? false)
-    (.set (:alive? shared-transport) false)
-    (log/info :in-memory/server-stopped {}))
-
-  (set-handlers! [_ handler-map]
-    (reset! handlers handler-map)
-    (log/debug :in-memory/handlers-set {:handler-count (count handler-map)}))
-
-  (alive? [_]
-    (and (.get server-alive?)
-         (.get (:alive? shared-transport)))))
+           [shared-transport server-alive? handlers])
 
 (defn- handle-request
   "Process a client request and send response"
@@ -39,7 +18,7 @@
         {:keys [id method params]} request]
     (if-let [handler (get handler-map method)]
       (try
-        (let [result (handler params)]
+        (let [result (handler method params)]
           (when id ; Only send response for requests (not notifications)
             (let [response {:jsonrpc "2.0"
                             :id id
@@ -110,3 +89,40 @@
       (start-server-message-processor! server)
       (log/info :in-memory/server-created {})
       server)))
+
+(defn start!
+  "Start the in-memory server (no-op for in-memory transport)"
+  [server]
+  (log/info :in-memory/server-started {}))
+
+(defn stop!
+  "Stop the in-memory server"
+  [server]
+  (.set (:server-alive? server) false)
+  (.set (:alive? (:shared-transport server)) false)
+  (log/info :in-memory/server-stopped {}))
+
+(defn alive?
+  "Check if the in-memory server is alive"
+  [server]
+  (and (.get (:server-alive? server))
+       (.get (:alive? (:shared-transport server)))))
+
+;;; Protocol Implementation
+
+(extend-type InMemoryServer
+  json-rpc-protocols/JsonRpcServer
+  (set-handlers! [server handler-map]
+    (reset! (:handlers server) handler-map)
+    (log/debug :in-memory/handlers-set {:handler-count (count handler-map)}))
+
+  (notify-all! [server method params]
+    (log/debug :in-memory/notify-all {:method method :params params})
+    ;; For in-memory transport, we don't have multiple clients to notify
+    ;; This is a no-op as mentioned in the protocol docs
+    )
+
+  (stop! [server]
+    (.set (:server-alive? server) false)
+    (.set (:alive? (:shared-transport server)) false)
+    (log/info :in-memory/server-stopped {})))

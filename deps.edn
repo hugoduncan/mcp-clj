@@ -4,6 +4,7 @@
   {:extra-paths ["development/src"
                  "components/http/test"
                  "components/http-server/test"
+                 "components/in-memory-transport/test"
                  "components/json-rpc/test"
                  "components/log/test"
                  "components/mcp-client/test"
