@@ -54,9 +54,9 @@
     (try
       (testing "basic directory listing"
         (let [{:keys [implementation]} ls/ls-tool
-              result                   (implementation {:path temp-dir})
-              response-text            (-> result :content first :text)
-              data                     (json/read-str response-text :key-fn keyword)]
+              result (implementation {:path temp-dir})
+              response-text (-> result :content first :text)
+              data (json/read-str response-text :key-fn keyword)]
 
           (is (false? (:isError result)))
           (is (vector? (:files data)))
@@ -78,12 +78,12 @@
     (try
       (testing "depth limit enforcement"
         (let [{:keys [implementation]} ls/ls-tool
-              result                   (implementation
-                                        {:path temp-dir :max-depth 3})
-              response-text            (-> result :content first :text)
-              data                     (json/read-str
-                                        response-text
-                                        :key-fn keyword)]
+              result (implementation
+                      {:path temp-dir :max-depth 3})
+              response-text (-> result :content first :text)
+              data (json/read-str
+                    response-text
+                    :key-fn keyword)]
 
           (is (false? (:isError result)))
 
@@ -115,22 +115,18 @@
         (cleanup-test-directory temp-dir)))))
 
 (deftest ls-tool-single-file-test
-  (let [temp-dir (create-test-directory-structure)]
-    (try
-      (testing "single file handling"
-        (let [file-path (str temp-dir "/file1.txt")
-              {:keys [implementation]} ls/ls-tool
-              result (implementation {:path file-path})
-              response-text (-> result :content first :text)
-              data (json/read-str response-text :key-fn keyword)]
+  (testing "single file handling"
+    (let [test-file "components/tools/test-resources/ls-test/single-test-file.txt"
+          {:keys [implementation]} ls/ls-tool
+          result (implementation {:path test-file})
+          response-text (-> result :content first :text)
+          data (json/read-str response-text :key-fn keyword)]
 
-          (is (false? (:isError result)))
-          (is (= 1 (count (:files data))))
-          (is (= file-path (first (:files data))))
-          (is (false? (:truncated data)))))
-
-      (finally
-        (cleanup-test-directory temp-dir)))))
+      (is (false? (:isError result)))
+      (is (= 1 (count (:files data))))
+      ;; The ls tool returns absolute paths, so we need to check for the ending
+      (is (str/ends-with? (first (:files data)) test-file))
+      (is (false? (:truncated data))))))
 
 (deftest ls-tool-gitignore-test
   (let [temp-dir (create-test-directory-structure)]
@@ -156,7 +152,7 @@
 (deftest ls-tool-error-handling-test
   (testing "non-existent path"
     (let [{:keys [implementation]} ls/ls-tool
-          result                   (implementation {:path "./this/path/does/not/exist"})]
+          result (implementation {:path "./this/path/does/not/exist"})]
 
       (is (true? (:isError result)))
       (is (str/includes?
@@ -165,7 +161,7 @@
 
   (testing "path traversal prevention"
     (let [{:keys [implementation]} ls/ls-tool
-          result                   (implementation {:path "../../../etc"})]
+          result (implementation {:path "../../../etc"})]
 
       (is (true? (:isError result)))
       (is (str/includes?
@@ -174,14 +170,14 @@
 
   (testing "current directory access allowed"
     (let [{:keys [implementation]} ls/ls-tool
-          result                   (implementation {:path "."})]
+          result (implementation {:path "."})]
 
       (is (false? (:isError result)))))
 
   (testing "user.dir access allowed"
     (let [{:keys [implementation]} ls/ls-tool
-          user-dir                 (System/getProperty "user.dir")
-          result                   (implementation {:path user-dir})]
+          user-dir (System/getProperty "user.dir")
+          result (implementation {:path user-dir})]
 
       (is (false? (:isError result))))))
 
