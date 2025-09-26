@@ -46,8 +46,9 @@
 
           ;; Only proceed with client test if server is responding
           (when (= 0 (:exit response))
-            (let [client (client/create-client {:http {:url (str "http://localhost:" port)
-                                                       :num-threads 2}
+            (let [client (client/create-client {:transport {:type :http
+                                                                     :url (str "http://localhost:" port)
+                                                                     :num-threads 2}
                                                 :client-info {:name "test" :version "1.0.0"}
                                                 :capabilities {:tools {}}
                                                 :protocol-version "2024-11-05"})]

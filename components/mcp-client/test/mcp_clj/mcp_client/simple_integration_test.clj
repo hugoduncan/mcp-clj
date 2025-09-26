@@ -93,7 +93,7 @@
   (testing "Client accepts various transport configurations"
     ;; Test map-style transport
     (let [client1 (client/create-client
-                   {:stdio {:type :stdio :command "echo" :args ["test"]}
+                   {:transport {:type :stdio :command "echo" :args ["test"]}
                     :client-info {:name "config-test-1"}})]
       (is (some? client1))
       (is (= "config-test-1" (get-in @(:session client1) [:client-info :name])))
@@ -101,9 +101,9 @@
 
     ;; Test custom protocol version
     (let [client3 (client/create-client
-                   {:stdio {:type :stdio
-                            :command "echo"
-                            :args ["test"]}
+                   {:transport {:type :stdio
+                                :command "echo"
+                                :args ["test"]}
                     :protocol-version "2024-11-05"})]
       (is (some? client3))
       (is (= "2024-11-05" (:protocol-version @(:session client3))))

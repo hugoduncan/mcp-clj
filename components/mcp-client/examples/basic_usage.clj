@@ -10,9 +10,10 @@
   ;; This matches the format used in Claude Code's .mcp.json
   (def client
     (client/create-client
-     {:server {:command "cat"
-               :args []
-               :env {}} ; cat will echo JSON for testing
+     {:transport {:type :stdio
+                  :command "cat"
+                  :args []
+                  :env {}} ; cat will echo JSON for testing
       :client-info {:name "example-client"
                     :version "1.0.0"}
       :capabilities {}}))
@@ -21,8 +22,8 @@
   (client/get-client-info client)
   ;; => {:state :disconnected, :protocol-version "2025-06-18", ...}
 
-  ;; Initialize connection (this will likely fail with "cat" but shows the API)
-  (client/initialize! client)
+  ;; Client automatically initializes on creation
+  ;; (this will likely fail with "cat" but shows the API)
 
   ;; Check if ready (will be false with cat example)  
   (client/client-ready? client)
@@ -39,16 +40,16 @@
 
   (def real-client
     (client/create-client
-     {:server {:command "python"
-               :args ["-m", "mcp_server", "--stdio"]
-               :env {"PYTHONPATH" "/path/to/server"}}
+     {:transport {:type :stdio
+                  :command "python"
+                  :args ["-m", "mcp_server", "--stdio"]
+                  :env {"PYTHONPATH" "/path/to/server"}}
       :client-info {:name "my-clojure-client"
                     :title "My Clojure MCP Client"
                     :version "1.0.0"}
       :capabilities {}}))
 
-  ;; Initialize and wait for ready
-  (client/initialize! real-client)
+  ;; Wait for automatic initialization to complete
   (client/wait-for-ready real-client 5000) ; 5 second timeout
 
   ;; Now client is ready for MCP operations

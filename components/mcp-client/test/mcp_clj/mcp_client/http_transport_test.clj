@@ -48,8 +48,9 @@
        (throw (ex-info "Server did not start - no port available" {})))
      (let [client (client/create-client
                    (merge
-                    {:http {:url (str "http://localhost:" port)
-                            :num-threads 2}
+                    {:transport {:type :http
+                                 :url (str "http://localhost:" port)
+                                 :num-threads 2}
                      :client-info {:name "test-client"
                                    :version "1.0.0"}
                      :capabilities {:tools {}}

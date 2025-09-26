@@ -127,8 +127,16 @@
 ;;; Client Management
 
 (defn create-client
-  "Create MCP client with specified transport and automatically initialize"
-  ^AutoCloseable [{:keys [client-info capabilities protocol-version]
+  "Create MCP client with specified transport and automatically initialize.
+
+  Config options:
+  - :transport - Transport configuration map with :type and type-specific options
+    - For HTTP: {:type :http :url \"http://...\" :num-threads 2}
+    - For Stdio: {:type :stdio :command \"clojure\" :args [\"-M:stdio-server\"]}
+  - :client-info - Client identification information
+  - :capabilities - Client capabilities
+  - :protocol-version - MCP protocol version (defaults to latest)"
+  ^AutoCloseable [{:keys [transport client-info capabilities protocol-version]
                    :or {protocol-version (version/get-latest-version)}
                    :as config}]
   (let [transport (transport-factory/create-transport config)

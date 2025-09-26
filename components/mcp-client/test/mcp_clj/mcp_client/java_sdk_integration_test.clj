@@ -15,7 +15,8 @@
 (defn- create-client
   ^AutoCloseable []
   (client/create-client
-   {:stdio            {:command "clj"
+   {:transport        {:type :stdio
+                       :command "clj"
                        :args    ["-M:dev:test" "-m" "mcp-clj.java-sdk.sdk-server-main"]}
     :client-info      {:name    "java-sdk-integration-test"
                        :version "0.1.0"}

@@ -18,8 +18,9 @@
 (deftest ^:integ ls-tool-integration-test
   (testing "ls tool works through mcp-client connecting to mcp-server"
     (with-open [client (client/create-client
-                        {:stdio {:command "clojure"
-                                 :args ["-M:stdio-server"]}
+                        {:transport {:type :stdio
+                                     :command "clojure"
+                                     :args ["-M:stdio-server"]}
                          :client-info {:name "ls-integration-test-client"
                                        :version "1.0.0"}
                          :capabilities {}})]

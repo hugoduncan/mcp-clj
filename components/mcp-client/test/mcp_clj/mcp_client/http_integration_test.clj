@@ -90,8 +90,9 @@
   [server]
   (let [port (get-server-port server)
         client (client/create-client
-                {:http {:url (str "http://localhost:" port)
-                        :num-threads 2}
+                {:transport {:type :http
+                             :url (str "http://localhost:" port)
+                             :num-threads 2}
                  :client-info {:name "integration-test-client"
                                :version "1.0.0"}
                  :capabilities {:tools {}}

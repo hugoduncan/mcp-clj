@@ -61,6 +61,13 @@ Include REFINE to refine the spec
 	  - remove the redundant mcp-clj.mcp-client.core/create-transport
 	  - Update tests accordingly
 
+- [x] refactor mcp-clj.mcp-client.core so that create-client so that
+      transport options are on a :transport key.  The value is a map
+      with a :type field, and type specific options. The two types we
+      currently have are :http and :stdio.
+	  - update mcp-clj.client-transport.factory/create-transport
+	  - Update tests accordingly
+
 - [ ] extend the interop to enable use of SSE transport ? not sure this
       is worth doing still
 
