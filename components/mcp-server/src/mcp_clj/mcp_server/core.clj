@@ -163,11 +163,13 @@
                                                  name)]
     (try
       (let [missing-args (set/difference
-                          (set (:required inputSchema))
+                          (set (mapv keyword (:required inputSchema)))
                           (set (keys arguments)))]
         (if (empty? missing-args)
           (implementation arguments)
-          {:content [(text-map (str "Missing args: " (vec missing-args)))]
+          {:content [(text-map
+                      (str "Missing args: " (vec missing-args) ", found "
+                           (set (keys arguments))))]
            :isError true}))
       (catch Throwable e
         {:content [(text-map (str "Error: " (.getMessage e)))]
