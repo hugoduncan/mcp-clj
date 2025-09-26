@@ -16,7 +16,7 @@
     http
     (http/create-transport http)
 
-    ;; Stdio transport configuration  
+    ;; Stdio transport configuration
     stdio
     (stdio/create-transport stdio)
 

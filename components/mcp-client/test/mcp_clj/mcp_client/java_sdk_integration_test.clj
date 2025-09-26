@@ -4,19 +4,22 @@
    This tests cross-implementation compatibility by using our Clojure MCP client
    to communicate with the Java SDK MCP server subprocess."
   (:require
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [mcp-clj.mcp-client.core :as client]
-   [mcp-clj.log :as log])
+   [mcp-clj.log :as log]
+   [mcp-clj.mcp-client.core :as client])
   (:import
-   [java.util.concurrent TimeUnit]))
+   [java.lang
+    AutoCloseable]))
 
-(defn- create-client []
+(defn- create-client
+  ^AutoCloseable []
   (client/create-client
-   {:stdio {:command "clj"
-            :args ["-M:dev:test" "-m" "mcp-clj.java-sdk.sdk-server-main"]}
-    :client-info {:name "java-sdk-integration-test"
-                  :version "0.1.0"}
-    :capabilities {}
+   {:stdio            {:command "clj"
+                       :args    ["-M:dev:test" "-m" "mcp-clj.java-sdk.sdk-server-main"]}
+    :client-info      {:name    "java-sdk-integration-test"
+                       :version "0.1.0"}
+    :capabilities     {}
     :protocol-version "2024-11-05"}))
 
 ;;; MCP Protocol Tests
@@ -143,11 +146,12 @@
         (let [futures (doall
                        (for [i (range 5)]
                          (future
-                           (client/call-tool client "echo"
-                                             {:message (str "Concurrent message " i)}))))]
+                           (client/call-tool
+                            client "echo"
+                            {:message (str "Concurrent message " i)}))))]
 
           ;; Wait for all to complete
-          (let [results (doall (map deref futures))]
+          (let [results (mapv deref futures)]
             (is (= 5 (count results)))
 
             ;; Each should be a valid result
@@ -160,19 +164,19 @@
 
               ;; Each message should contain the expected pattern
               (doseq [message messages]
-                (is (clojure.string/includes? message "Concurrent message"))))
+                (is (str/includes? message "Concurrent message"))))
 
             (log/info :integration-test/concurrent-results {:count (count results)}))))
 
       (testing "mixed operation types concurrently"
         (let [list-future (future (client/list-tools client))
               echo-future (future (client/call-tool client "echo" {:message "concurrent"}))
-              add-future (future (client/call-tool client "add" {:a 10 :b 20}))]
+              add-future  (future (client/call-tool client "add" {:a 10 :b 20}))]
 
           ;; Wait for all to complete
           (let [list-result @list-future
                 echo-result @echo-future
-                add-result @add-future]
+                add-result  @add-future]
 
             ;; List tools result
             (is (map? list-result))

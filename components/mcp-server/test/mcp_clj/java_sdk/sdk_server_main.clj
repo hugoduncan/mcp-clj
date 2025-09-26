@@ -75,13 +75,14 @@
         (log/info :sdk-server-main/server-running)
 
         ;; Add shutdown hook for cleanup
-        (.addShutdownHook (Runtime/getRuntime)
-                          (Thread. (fn []
-                                     (log/info :sdk-server-main/shutting-down)
-                                     (try
-                                       (java-sdk/stop-server server)
-                                       (catch Exception e
-                                         (log/error :sdk-server-main/shutdown-error {:error e}))))))
+        (.addShutdownHook
+         (Runtime/getRuntime)
+         (Thread. (fn []
+                    (log/info :sdk-server-main/shutting-down)
+                    (try
+                      (java-sdk/stop-server server)
+                      (catch Exception e
+                        (log/error :sdk-server-main/shutdown-error {:error e}))))))
 
         ;; Keep the process alive
         ;; The server's start method should block, but if not, we wait

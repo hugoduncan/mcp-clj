@@ -11,7 +11,8 @@
    levels))
 
 (def ^:private aspects
-  #{"sse" "http" "rpc" "client" "server" "stdio-server" "tool" "java-sdk"})
+  #{"sse" "http" "rpc" "client" "server" "stdio-server" "tool" "java-sdk"
+    "sdk-server-main"})
 
 (defonce ^:private config (atom {}))
 
@@ -68,6 +69,7 @@
 (enable! :debug "client")
 (enable! :debug "http")
 (enable! :debug "java-sdk")
+(enable! :debug "sdk-server-main")
 
 (comment
   (enable! :info "http")
