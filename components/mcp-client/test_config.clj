@@ -7,9 +7,9 @@
 (println "Testing Claude Code MCP server configuration...")
 (def test-client-1
   (client/create-client
-   {:server {:command "echo"
-             :args ["hello"]
-             :env {"TEST_VAR" "test"}}
+   {:stdio {:command "echo"
+            :args ["hello"]
+            :env {"TEST_VAR" "test"}}
     :client-info {:name "config-test-client"
                   :title "Configuration Test Client"
                   :version "1.0.0"}
@@ -24,7 +24,7 @@
 (println "\nTesting vector server format...")
 (def test-client-2
   (client/create-client
-   {:server ["echo", "vector"]
+   {:stdio ["echo", "vector"]
     :client-info {:name "vector-test-client"}}))
 
 (println "✓ Vector format client created successfully")
