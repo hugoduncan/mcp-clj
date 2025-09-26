@@ -141,9 +141,12 @@
       (#'tools/cache-tools! client [{:name "test-tool"}])
       (is (true? (tools/available-tools?-impl client)))))
 
-  (testing "returns false when no cached tools"
+  (testing "returns false when no cached tools and no server tools"
     (let [client (create-mock-client)]
-      (is (false? (tools/available-tools?-impl client)))))
+      (with-redefs [tools/list-tools-impl
+                    (fn [_client]
+                      {:tools []})]
+        (is (false? (tools/available-tools?-impl client))))))
 
   (testing "queries server when no cached tools"
     (let [client (create-mock-client)]

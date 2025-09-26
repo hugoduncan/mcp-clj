@@ -56,7 +56,6 @@
                       :default kaocha.report/documentation
                       :progress kaocha.report.progress/report
                       :debug kaocha.report/debug}
-  :kaocha.plugin.randomize/randomize? true
+  :kaocha.plugin.randomize/randomize? false
   :kaocha.plugin.profiling/count 10
-  :kaocha.plugin.profiling/profiling? #profile {:default false
-                                                :profile true}}
+  :kaocha.plugin.profiling/profiling? true}
