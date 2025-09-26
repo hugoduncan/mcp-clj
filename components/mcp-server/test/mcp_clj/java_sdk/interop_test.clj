@@ -143,7 +143,7 @@
 
 ;;; Client Operations Tests
 
-(deftest ^:integration test-client-creation-and-types
+(deftest ^:integ test-client-creation-and-types
   "Test client creation in sync and async modes"
   (testing "sync client creation"
     (is (some? *sync-client*))
@@ -155,7 +155,7 @@
     (is (some? (:client *async-client*)))
     (is (= true (:async? *async-client*)))))
 
-(deftest ^:integration test-client-initialization
+(deftest ^:integ test-client-initialization
   "Test client connection and initialization"
   (testing "sync client initialization"
     (let [result (java-sdk/initialize-client *sync-client*)]
@@ -167,7 +167,7 @@
       (is (some? result))
       (log/info :test/async-client-initialized {:result result}))))
 
-(deftest ^:integration test-tool-discovery
+(deftest ^:integ test-tool-discovery
   "Test listing tools from server"
   (testing "sync client tool listing"
     (java-sdk/initialize-client *sync-client*)
@@ -195,7 +195,7 @@
 
 ;;; Data Conversion Tests
 
-(deftest ^:integration test-data-marshalling
+(deftest ^:integ test-data-marshalling
   "Test data conversion between Clojure and Java"
   (testing "simple string arguments"
     (java-sdk/initialize-client *sync-client*)
@@ -232,7 +232,7 @@
 
 ;;; Tool Execution Tests
 
-(deftest ^:integration test-tool-execution-patterns
+(deftest ^:integ test-tool-execution-patterns
   "Test various tool execution patterns"
   (testing "sequential tool calls"
     (java-sdk/initialize-client *sync-client*)
@@ -270,7 +270,7 @@
 
 ;;; Error Handling Tests
 
-(deftest ^:integration test-error-handling
+(deftest ^:integ test-error-handling
   "Test error handling and edge cases"
   (testing "non-existent tool"
     (java-sdk/initialize-client *sync-client*)
@@ -355,7 +355,7 @@
 
 ;;; Resource Cleanup Tests
 
-(deftest ^:integration test-resource-cleanup
+(deftest ^:integ test-resource-cleanup
   "Test proper cleanup of resources"
   (testing "client cleanup"
     (let [transport (java-sdk/create-stdio-client-transport "echo test")
@@ -370,7 +370,7 @@
 
 ;;; HTTP Transport Integration Tests
 
-(deftest ^:integration test-http-transport-object-creation
+(deftest ^:integ test-http-transport-object-creation
   "Test HTTP transport object creation and basic properties"
   (testing "HTTP client transport object creation"
     ;; Test that HTTP client transports can be created with correct configuration
@@ -437,7 +437,7 @@
 
 ;;; Performance and Stress Tests
 
-(deftest ^:integration test-multiple-rapid-calls
+(deftest ^:integ test-multiple-rapid-calls
   "Test multiple rapid tool calls to check for race conditions"
   (testing "rapid sequential calls"
     (java-sdk/initialize-client *sync-client*)

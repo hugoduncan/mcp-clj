@@ -9,7 +9,7 @@
   (:import
    [java.util.concurrent CountDownLatch TimeUnit]))
 
-(deftest ^:integration in-process-server-client-test
+(deftest ^:integ in-process-server-client-test
   (testing "MCP client can initialize with in-process MCP server"
     (let [server-ready-latch (CountDownLatch. 1)
           client-ready-latch (CountDownLatch. 1)
@@ -65,7 +65,7 @@
         (client/close! client)
         (.countDown client-ready-latch)))))
 
-(deftest ^:integration client-session-state-transitions-test
+(deftest ^:integ client-session-state-transitions-test
   (testing "Client session transitions through states correctly"
     (let [client (client/create-client
                   ;; cat will read but not respond properly
@@ -89,7 +89,7 @@
 
       (client/close! client))))
 
-(deftest ^:integration client-configuration-test
+(deftest ^:integ client-configuration-test
   (testing "Client accepts various transport configurations"
     ;; Test map-style transport
     (let [client1 (client/create-client

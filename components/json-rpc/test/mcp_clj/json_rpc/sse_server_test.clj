@@ -144,14 +144,14 @@
 
 ;;; Tests
 
-(deftest connection-establishment-test
+(deftest ^:integ connection-establishment-test
   (testing "SSE connection establishment"
     (is (some? *client-session*) "SSE connection should be established")
     (is (string? (:endpoint *client-session*)) "Should receive endpoint URL")
     (is (str/includes? (:endpoint *client-session*) "session_id=")
         "Endpoint should include session_id")))
 
-(deftest server-request-handling-test
+(deftest ^:integ server-request-handling-test
   (testing "Basic request handling"
     (testing "Echo request"
       (let [test-data {:test "data"}
@@ -181,7 +181,7 @@
         (is (-> result :error :message))
         (is (= -32601 (get-in result [:error :code])))))))
 
-(deftest server-handlers-test
+(deftest ^:integ server-handlers-test
   (testing "Handler management"
     (let [test-handler (fn [_ params] {:processed params})]
       (testing "Add handler"
@@ -202,7 +202,7 @@
           (is (contains? result :error))
           (is (= -32601 (get-in result [:error :code]))))))))
 
-(deftest notification-test
+(deftest ^:integ notification-test
   (testing "Server notifications"
     (testing "Broadcast notification"
       (server/notify-all! *server* "test-event" {:data "test"})
@@ -224,7 +224,7 @@
           (is (= "single-event" (:method notification)))
           (is (= {:data "test"} (:params notification))))))))
 
-(deftest concurrent-requests-test
+(deftest ^:integ concurrent-requests-test
   (testing "Concurrent request handling"
     (let [request-count 5
           latch (CountDownLatch. request-count)
@@ -258,7 +258,7 @@
           (is (every? #(= {:result "ok"} (:result %)) @responses)
               "All requests should complete successfully"))))))
 
-(deftest protocol-implementation-test
+(deftest ^:integ protocol-implementation-test
   (testing "JsonRpcServer protocol implementation"
     (testing "set-handlers! through protocol"
       (let [test-handler (fn [_ params] {:protocol-result params})]

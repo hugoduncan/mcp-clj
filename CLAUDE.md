@@ -28,13 +28,42 @@ This is a Clojure implementation of the Model Context Protocol (MCP) designed as
 ## Common Development Commands
 
 ### Testing
+
+This project uses a two-tier testing strategy to optimize development speed:
+
+**Unit Tests (Default - Fast)**
+- Run by default with `clj -M:kaocha:dev:test`
+- Exclude integration tests (marked with `^:integ` metadata)
+- Test pure functions and isolated components
+- Typically complete in seconds
+
+**Integration Tests (Slower)**
+- Run with `clj -M:kaocha:dev:test --focus :integration`
+- Include tests marked with `^:integ` metadata
+- Start actual servers, external processes, or cross-process communication
+- Examples: HTTP server tests, MCP client-server integration, Java SDK interop
+
 ```bash
-# Run all tests using Kaocha
+# Run only fast unit tests (default)
 clj -M:kaocha:dev:test
+
+# Run only integration tests (slower)
+clj -M:kaocha:dev:test --focus :integration
+
+# Run all tests (unit + integration)
+clj -M:kaocha:dev:test --focus :unit :integration
 
 # Run tests with coverage (uncomment cloverage plugin in tests.edn)
 clj -M:kaocha:dev:test --plugin kaocha.plugin/cloverage
 ```
+
+**Test Classification Guidelines:**
+- Mark tests with `^:integ` if they:
+  - Start MCP servers or HTTP servers
+  - Launch external processes or subprocesses
+  - Use `with-test-server`, `with-http-test-env`, or similar macros
+  - Test cross-process communication
+- Keep unit tests fast and focused on isolated functionality
 
 ```clojure
 ;; Run tests from REPL after code changes
@@ -74,8 +103,11 @@ clj -M:dev
 
 ### Test Organization
 - Tests are co-located with components in `test/` directories
-- Test configuration in `tests.edn` specifies source and test paths for all components
+- Test configuration in `tests.edn` defines separate test suites:
+  - `:unit` - Fast unit tests (excludes `^:integ` metadata, runs by default)
+  - `:integration` - Slower integration tests (focuses on `^:integ` metadata)
 - Uses Kaocha test runner with plugins for randomization, filtering, and profiling
+- Integration tests marked with `^:integ` metadata for server startup or external processes
 
 ### MCP Protocol Integration
 - Implements server-side MCP with support for tools, prompts, and resources

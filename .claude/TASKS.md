@@ -34,6 +34,15 @@ Include REFINE to refine the spec
 
 - [x] extend the interop to enable use of HTTP transport
 
+- [x] I want to speed up tests
+       - mark all tests that
+           - start a mcp server
+		   - start any external process
+         with ^:integ metadata
+	   - update kaocha tests.edn config to separate ^:integ tests and
+         disable them by default.
+       - update CLAUDE.md to describe this testing strategy
+
 - [ ] extend the interop to enable use of SSE transport ? not sure this
       is worth doing still
 

@@ -95,7 +95,7 @@
       (#'stdio-server/handle-json-rpc handler request)
       (is (= ["add" [1 2]] @captured-args)))))
 
-(deftest test-dispatch-rpc-call
+(deftest ^:integ test-dispatch-rpc-call
   (testing "dispatches call successfully"
     (let [server (stdio-server/create-server {})
           handler (fn [_method params]
@@ -122,7 +122,7 @@
              (json/read-str response :key-fn keyword)))
       (stdio-server/stop! server))))
 
-(deftest test-handle-request
+(deftest ^:integ test-handle-request
   (testing "handles valid request"
     (let [server (stdio-server/create-server {})
           handlers {"add" (fn [_method params]
@@ -178,7 +178,7 @@
         (is (= -32000 (-> response :error :code)))
         (is (str/includes? (-> response :error :message) "overloaded"))))))
 
-(deftest test-server-lifecycle
+(deftest ^:integ test-server-lifecycle
   (testing "creates server with default config"
     (let [server (stdio-server/create-server {})]
       (is (stdio-server/stdio-server? server))
@@ -192,7 +192,7 @@
       (is (stdio-server/stdio-server? server))
       (stdio-server/stop! server))))
 
-(deftest test-set-handlers
+(deftest ^:integ test-set-handlers
   (testing "sets valid handlers"
     (let [server (stdio-server/create-server {})
           handlers {"add" (fn [method params] {:sum (+ (first params) (second params))})
@@ -209,7 +209,7 @@
            (stdio-server/set-handlers! server "not-a-map")))
       (stdio-server/stop! server))))
 
-(deftest test-integration
+(deftest ^:integ test-integration
   (testing "full request-response cycle"
     (let [requests   [{:jsonrpc "2.0"
                        :method  "add"
@@ -240,7 +240,7 @@
       (is (str/includes? response "\"sum\":3"))
       (is (str/includes? response "\"message\":\"hello\"")))))
 
-(deftest test-error-handling
+(deftest ^:integ test-error-handling
   (testing "handles malformed JSON gracefully"
     (let [server         (stdio-server/create-server {})
           malformed-json "{invalid: json}"
@@ -266,7 +266,7 @@
 
       (stdio-server/stop! server))))
 
-(deftest test-protocol-implementation
+(deftest ^:integ test-protocol-implementation
   (testing "JsonRpcServer protocol implementation"
     (testing "set-handlers! through protocol"
       (let [server (stdio-server/create-server {})

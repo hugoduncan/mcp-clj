@@ -49,7 +49,7 @@
 
 ;;; Server Behavior Tests via HTTP
 
-(deftest test-http-server-initialization
+(deftest ^:integ test-http-server-initialization
   ;; Test MCP server initialization over HTTP transport
   (testing "Clojure MCP server initialization with Java SDK HTTP client"
     (with-open [client (create-http-client false)]
@@ -62,7 +62,7 @@
         (is (contains? result :capabilities))
         (log/info :http-integration-test/server-initialized {:result result})))))
 
-(deftest test-http-server-tool-discovery
+(deftest ^:integ test-http-server-tool-discovery
   ;; Test tool discovery over HTTP transport
   (testing "server tool discovery via Java SDK HTTP client"
     (with-open [client (create-http-client false)]
@@ -91,7 +91,7 @@
                     {:count (count (:tools tools-response))
                      :names (map :name (:tools tools-response))}))))))
 
-(deftest test-http-server-tool-execution
+(deftest ^:integ test-http-server-tool-execution
   ;; Test tool execution over HTTP transport
   (testing "server tool execution via Java SDK HTTP client"
     (with-open [client (create-http-client false)]
@@ -122,7 +122,7 @@
 
           (log/info :http-integration-test/clj-eval-result {:success true}))))))
 
-(deftest test-http-server-error-handling
+(deftest ^:integ test-http-server-error-handling
   ;; Test error handling over HTTP transport
   (testing "server error handling via Java SDK HTTP client"
     (with-open [client (create-http-client false)]
@@ -157,7 +157,7 @@
             (log/info :http-integration-test/invalid-args-exception
                       {:error (.getMessage e)})))))))
 
-(deftest test-http-server-concurrent-operations
+(deftest ^:integ test-http-server-concurrent-operations
   ;; Test concurrent operations over HTTP transport
   (testing "server concurrent operations via Java SDK HTTP client"
     (with-open [client (create-http-client true)] ; Use async client for concurrency
@@ -207,7 +207,7 @@
 
             (log/info :http-integration-test/mixed-concurrent-success)))))))
 
-(deftest test-http-server-session-robustness
+(deftest ^:integ test-http-server-session-robustness
   ;; Test session robustness over HTTP transport
   (testing "server session robustness via Java SDK HTTP client"
     (with-open [client (create-http-client false)]
@@ -240,7 +240,7 @@
 
           (log/info :http-integration-test/sequential-operations-verified))))))
 
-(deftest test-http-server-with-sse-disabled
+(deftest ^:integ test-http-server-with-sse-disabled
   ;; Test HTTP server without SSE streaming transport
   (testing "HTTP server with SSE disabled via Java SDK client"
     (let [transport (java-sdk/create-http-client-transport
@@ -265,7 +265,7 @@
         (finally
           (java-sdk/close-client client))))))
 
-(deftest test-http-server-origin-validation
+(deftest ^:integ test-http-server-origin-validation
   ;; Test HTTP server with origin validation
   (testing "HTTP server with origin validation"
     (let [;; Create a server with restricted origins

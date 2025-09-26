@@ -74,7 +74,7 @@
 
 ;;; Tests
 
-(deftest http-client-initialization-test
+(deftest ^:integ http-client-initialization-test
   ;; Test that HTTP client initializes correctly
   (testing "HTTP client initialization"
     (with-http-test-env [server client]
@@ -87,7 +87,7 @@
           (is (= "test-client" (:name client-info)))
           (is (= "1.0.0" (:version client-info))))))))
 
-(deftest http-client-tool-discovery-test
+(deftest ^:integ http-client-tool-discovery-test
   ;; Test tool discovery via HTTP
   (testing "HTTP client tool discovery"
     (with-http-test-env [server client]
@@ -100,7 +100,7 @@
             (is (= "test-echo" (:name tool)))
             (is (= "Echo test tool" (:description tool)))))))))
 
-(deftest http-client-tool-execution-test
+(deftest ^:integ http-client-tool-execution-test
   ;; Test tool execution via HTTP
   (testing "HTTP client tool execution"
     (with-http-test-env [server client]
@@ -112,7 +112,7 @@
             (is (= "text" (:type content)))
             (is (= "Echo: Hello, HTTP!" (:text content)))))))))
 
-(deftest http-client-error-handling-test
+(deftest ^:integ http-client-error-handling-test
   ;; Test error handling in HTTP client
   (testing "HTTP client error handling"
     (with-http-test-env [server client]
@@ -126,7 +126,7 @@
                               #"Tool execution failed"
                               (client/call-tool client "test-echo" {:wrong-param "value"})))))))
 
-(deftest http-client-reconnection-test
+(deftest ^:integ http-client-reconnection-test
   ;; Test that client can reconnect with same session
   (testing "HTTP client reconnection"
     (with-http-test-env [server client]

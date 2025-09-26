@@ -21,7 +21,7 @@
 
 ;;; MCP Protocol Tests
 
-(deftest test-client-initialization
+(deftest ^:integ test-client-initialization
   (testing "MCP client initialization with Java SDK server"
     (with-open [client (create-client)]
       ;; Wait for client to be ready
@@ -42,7 +42,7 @@
 
           (log/info :integration-test/client-ready {:client-info client-info}))))))
 
-(deftest test-tool-discovery
+(deftest ^:integ test-tool-discovery
   (testing "tool discovery with Java SDK server"
     (with-open [client (create-client)]
       ;; Wait for client to be ready
@@ -72,7 +72,7 @@
           ;; Verify client knows tools are available
           (is (client/available-tools? client)))))))
 
-(deftest test-tool-calls
+(deftest ^:integ test-tool-calls
   (testing "actual tool calls with Java SDK server"
     (with-open [client (create-client)]
       ;; Wait for client to be ready
@@ -109,7 +109,7 @@
 
           (log/info :integration-test/get-time-result {:result result}))))))
 
-(deftest test-error-handling
+(deftest ^:integ test-error-handling
   (testing "error handling scenarios"
     (with-open [client (create-client)]
       ;; Wait for client to be ready
@@ -133,7 +133,7 @@
             (is (instance? Exception e))
             (log/info :integration-test/invalid-args-error {:error (.getMessage e)})))))))
 
-(deftest test-concurrent-operations
+(deftest ^:integ test-concurrent-operations
   (testing "concurrent tool calls"
     (with-open [client (create-client)]
       ;; Wait for client to be ready
@@ -186,7 +186,7 @@
 
             (log/info :integration-test/mixed-concurrent-success)))))))
 
-(deftest test-session-robustness
+(deftest ^:integ test-session-robustness
   (testing "session robustness and error recovery"
     (with-open [client (create-client)]
       ;; Wait for client to be ready
@@ -219,7 +219,7 @@
           (is (:transport-alive? info1))
           (is (:transport-alive? info2)))))))
 
-(deftest test-protocol-compliance
+(deftest ^:integ test-protocol-compliance
   (testing "MCP protocol compliance features"
     (with-open [client (create-client)]
       ;; Wait for client to be ready
@@ -253,7 +253,7 @@
 
         (log/info :integration-test/capabilities-validated)))))
 
-(deftest test-resource-management
+(deftest ^:integ test-resource-management
   (testing "proper resource management and cleanup"
     (with-open [client (create-client)]
       ;; Wait for client to be ready
@@ -271,7 +271,7 @@
 
         (log/info :integration-test/resource-management-verified)))))
 
-(deftest test-multiple-clients
+(deftest ^:integ test-multiple-clients
   (testing "multiple client instances work independently"
     (testing "two clients can work simultaneously"
       (with-open [client1 (create-client)

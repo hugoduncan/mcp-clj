@@ -49,14 +49,14 @@
 
 ;;; Tests
 
-(deftest http-transport-creation-test
+(deftest ^:integ http-transport-creation-test
   ;; Test creating MCP server with HTTP transport
   (with-test-server [server]
     (testing "HTTP transport server creation"
       (is (some? server))
       (is (pos? (get-server-port server))))))
 
-(deftest mcp-capabilities-endpoint-test
+(deftest ^:integ mcp-capabilities-endpoint-test
   ;; Test GET /mcp endpoint returns MCP transport capabilities
   (with-test-server [server]
     (testing "GET /mcp endpoint"
@@ -69,7 +69,7 @@
           (is (:batch (:capabilities body)))
           (is (:resumable (:capabilities body))))))))
 
-(deftest mcp-initialize-test
+(deftest ^:integ mcp-initialize-test
   ;; Test MCP initialization over HTTP transport
   (with-test-server [server]
     (testing "MCP initialization"
@@ -90,7 +90,7 @@
           (is (some? (get-in body [:result :serverInfo])))
           (is (= "mcp-clj" (get-in body [:result :serverInfo :name]))))))))
 
-(deftest mcp-ping-test
+(deftest ^:integ mcp-ping-test
   ;; Test MCP ping over HTTP transport
   (with-test-server [server]
     (testing "MCP ping"
@@ -104,7 +104,7 @@
           (is (= 2 (:id body)))
           (is (= {} (:result body))))))))
 
-(deftest mcp-list-tools-test
+(deftest ^:integ mcp-list-tools-test
   ;; Test MCP tools/list over HTTP transport
   (with-test-server [server]
     (testing "MCP tools/list"
@@ -119,7 +119,7 @@
           (is (some? (:result body)))
           (is (vector? (get-in body [:result :tools]))))))))
 
-(deftest http-batch-request-test
+(deftest ^:integ http-batch-request-test
   ;; Test JSON-RPC batch requests over HTTP transport
   (with-test-server [server]
     (testing "HTTP batch request"
@@ -135,7 +135,7 @@
           (is (every? #(= "2.0" (:jsonrpc %)) body))
           (is (= #{1 2} (set (map :id body)))))))))
 
-(deftest http-with-origin-validation-test
+(deftest ^:integ http-with-origin-validation-test
   ;; Test HTTP transport with origin validation
   (with-test-server [server-with-origins {:allowed-origins ["https://example.com"]}]
     (testing "HTTP transport with origin validation"

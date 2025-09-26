@@ -51,7 +51,7 @@
 
 ;;; Tests
 
-(deftest http-server-creation-test
+(deftest ^:integ http-server-creation-test
   ;; Test creating an HTTP server with streamable transport
   (testing "create-server"
     (is (map? *server*))
@@ -61,7 +61,7 @@
     (is (contains? *server* :stop))
     (is (pos? (:port *server*)))))
 
-(deftest handler-management-test
+(deftest ^:integ handler-management-test
   ;; Test handler setting and validation
   (testing "set-handlers!"
     (testing "sets valid handlers"
@@ -77,7 +77,7 @@
       (is (thrown? Exception
                    (http-server/set-handlers! *server* "invalid"))))))
 
-(deftest mcp-endpoint-discovery-test
+(deftest ^:integ mcp-endpoint-discovery-test
   ;; Test GET /mcp endpoint returns transport capabilities
   (testing "GET /mcp without SSE accept header"
     (let [response (http-get (str "http://localhost:" (:port *server*) "/"))]
@@ -90,7 +90,7 @@
         (is (:batch (:capabilities body)))
         (is (:resumable (:capabilities body)))))))
 
-(deftest post-message-handling-test
+(deftest ^:integ post-message-handling-test
   ;; Test POST requests to / endpoint
   (testing "POST /"
     (let [handlers {"echo" (fn [_ params] params)
@@ -144,7 +144,7 @@
             (finally
               ((:stop unready-server)))))))))
 
-(deftest origin-validation-test
+(deftest ^:integ origin-validation-test
   ;; Test origin header validation for security
   (testing "origin validation"
     (let [allowed-origins ["https://example.com" "https://trusted.com"]
@@ -175,7 +175,7 @@
         (finally
           ((:stop server)))))))
 
-(deftest session-management-test
+(deftest ^:integ session-management-test
   ;; Test session ID handling and management
   (testing "session management"
     (let [handlers {"test" (fn [_ _] {:result "ok"})}]
@@ -196,7 +196,7 @@
                                   (json/write-str request))]
           (is (= 200 (:status response))))))))
 
-(deftest notification-test
+(deftest ^:integ notification-test
   ;; Test server-side notifications (requires SSE)
   (testing "server notifications"
     (testing "notify-all! works without active sessions"
@@ -208,7 +208,7 @@
     (testing "get-sessions returns empty initially"
       (is (empty? (http-server/get-sessions *server*))))))
 
-(deftest endpoint-routing-test
+(deftest ^:integ endpoint-routing-test
   ;; Test proper routing for different endpoints
   (testing "endpoint routing"
     (testing "returns 404 for unknown endpoints"
@@ -221,7 +221,7 @@
                                 :throw-exceptions false})]
         (is (= 404 (:status response)))))))
 
-(deftest protocol-implementation-test
+(deftest ^:integ protocol-implementation-test
   ;; Test JsonRpcServer protocol implementation
   (testing "JsonRpcServer protocol implementation"
     (testing "set-handlers! through protocol"

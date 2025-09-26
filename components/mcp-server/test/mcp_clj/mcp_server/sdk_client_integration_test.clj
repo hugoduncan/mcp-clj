@@ -24,7 +24,7 @@
 
 ;;; Server Behavior Tests
 
-(deftest test-server-initialization
+(deftest ^:integ test-server-initialization
   (testing "Clojure MCP server initialization with Java SDK client"
     (with-open [client (create-server-client false)]
       ;; Initialize connection
@@ -32,7 +32,7 @@
         (is (some? result))
         (log/info :server-integration-test/server-initialized {:result result})))))
 
-(deftest test-server-tool-discovery
+(deftest ^:integ test-server-tool-discovery
   (testing "server tool discovery via Java SDK client"
     (with-open [client (create-server-client false)]
       ;; Initialize connection
@@ -58,7 +58,7 @@
 
           (log/info :server-integration-test/tools-discovered {:count (count (:tools tools-response))}))))))
 
-(deftest test-server-tool-execution
+(deftest ^:integ test-server-tool-execution
   (testing "server tool execution via Java SDK client"
     (with-open [client (create-server-client false)]
       ;; Initialize connection
@@ -88,7 +88,7 @@
 
           (log/info :server-integration-test/clj-eval-result {:success true}))))))
 
-(deftest test-server-error-handling
+(deftest ^:integ test-server-error-handling
   (testing "server error handling via Java SDK client"
     (with-open [client (create-server-client false)]
       ;; Initialize connection
@@ -118,7 +118,7 @@
             (is (instance? Exception e))
             (log/info :server-integration-test/invalid-args-exception {:error (.getMessage e)})))))))
 
-(deftest test-server-concurrent-operations
+(deftest ^:integ test-server-concurrent-operations
   (testing "server concurrent operations via Java SDK client"
     (with-open [client (create-server-client true)]
       ;; Initialize connection
@@ -166,7 +166,7 @@
 
             (log/info :server-integration-test/mixed-concurrent-success)))))))
 
-(deftest test-server-session-robustness
+(deftest ^:integ test-server-session-robustness
   (testing "server session robustness via Java SDK client"
     (with-open [client (create-server-client false)]
       ;; Initialize connection
@@ -198,7 +198,7 @@
 
           (log/info :server-integration-test/sequential-operations-verified))))))
 
-(deftest test-server-resource-cleanup
+(deftest ^:integ test-server-resource-cleanup
   (testing "server resource management and cleanup"
     ;; This test verifies our server shuts down cleanly when client disconnects
     (let [client (create-server-client false)]

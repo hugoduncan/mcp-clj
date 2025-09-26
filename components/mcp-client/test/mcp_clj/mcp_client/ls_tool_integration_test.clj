@@ -15,7 +15,7 @@
       (.relativize (Paths/get to (into-array String [])))
       str))
 
-(deftest ^:integration ls-tool-integration-test
+(deftest ^:integ ls-tool-integration-test
   (testing "ls tool works through mcp-client connecting to mcp-server"
     (with-open [client (client/create-client
                         {:server       {:command "clojure"

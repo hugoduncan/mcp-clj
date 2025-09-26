@@ -118,7 +118,7 @@
 
 ;;; Integration Tests
 
-(deftest http-server-client-initialization-test
+(deftest ^:integ http-server-client-initialization-test
   ;; Test that both server and client initialize correctly over HTTP
   (with-http-test-env [server client]
     (testing "HTTP server and client initialization"
@@ -134,7 +134,7 @@
           (is (= "integration-test-client" (:name (:client-info info))))
           (is (= "1.0.0" (:version (:client-info info)))))))))
 
-(deftest http-tool-discovery-integration-test
+(deftest ^:integ http-tool-discovery-integration-test
   ;; Test tool discovery across HTTP transport
   (with-http-test-env [server client]
     (testing "HTTP tool discovery integration"
@@ -159,7 +159,7 @@
           (is (map? (:inputSchema echo-tool)))
           (is (= "object" (get-in echo-tool [:inputSchema :type]))))))))
 
-(deftest http-tool-execution-integration-test
+(deftest ^:integ http-tool-execution-integration-test
   ;; Test tool execution across HTTP transport
   (with-http-test-env [server client]
     (testing "HTTP tool execution integration"
@@ -185,7 +185,7 @@
           (is (= "Generated 3 items:" (-> result first :text)))
           (is (= "Item 1, Item 2, Item 3" (-> result second :text))))))))
 
-(deftest http-error-handling-integration-test
+(deftest ^:integ http-error-handling-integration-test
   ;; Test error handling across HTTP transport
   (with-http-test-env [server client]
     (testing "HTTP error handling integration"
@@ -213,7 +213,7 @@
              #"Tool execution failed"
              (client/call-tool client "echo" {})))))))
 
-(deftest http-session-management-integration-test
+(deftest ^:integ http-session-management-integration-test
   ;; Test session management across HTTP transport
   (with-http-test-env [server client]
     (testing "HTTP session management integration"
@@ -234,7 +234,7 @@
           (is (= (count tools1) (count tools2)))
           (is (= (set (map :name tools1)) (set (map :name tools2)))))))))
 
-(deftest http-concurrent-requests-integration-test
+(deftest ^:integ http-concurrent-requests-integration-test
   ;; Test concurrent requests over HTTP transport
   (with-http-test-env [server client]
     (testing "HTTP concurrent requests integration"
@@ -265,7 +265,7 @@
           (let [tool-names-sets (map #(->> % :tools (map :name) set) results)]
             (is (apply = tool-names-sets))))))))
 
-(deftest http-transport-performance-test
+(deftest ^:integ http-transport-performance-test
   ;; Basic performance test for HTTP transport
   (with-http-test-env [server client]
     (testing "HTTP transport performance"

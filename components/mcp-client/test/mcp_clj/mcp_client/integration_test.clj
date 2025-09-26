@@ -6,7 +6,7 @@
 
 ;;; Integration Tests
 
-(deftest ^:integration client-server-initialization-test
+(deftest ^:integ client-server-initialization-test
   (testing "MCP client automatically initializes with real MCP server"
     (with-open [client (client/create-client
                         {:server {:command "clojure"
@@ -47,7 +47,7 @@
                           (.getMessage e)
                           " Session: " session-info)))))))))
 
-(deftest ^:integration client-server-error-handling-test
+(deftest ^:integ client-server-error-handling-test
   (testing "MCP client handles server connection errors gracefully"
     ;; Try to connect to non-existent server
     (with-open [client (client/create-client
@@ -67,7 +67,7 @@
 
       (client/close! client))))
 
-#_(deftest ^:integration multiple-clients-test
+#_(deftest ^:integ multiple-clients-test
     (testing "Multiple clients can connect to server simultaneously"
       (when *server*
         (let [client1 (client/create-client

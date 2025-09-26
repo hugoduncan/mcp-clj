@@ -1,5 +1,6 @@
 #kaocha/v1
- {:tests [{:kaocha.testable/type :kaocha.type/clojure.test
+ {:tests [{:kaocha.testable/id :unit
+           :kaocha.testable/type :kaocha.type/clojure.test
            :ns-patterns ["-test$"]
            :source-paths ["components/http/src"
                           "components/http-server/src"
@@ -17,7 +18,28 @@
                         "components/mcp-server/test"
                         "components/stdio-server/test"
                         "components/tools/test"]
-           :skip-meta [:very-slow]}]
+           :skip-meta [:very-slow :integ]}
+
+          {:kaocha.testable/id :integration
+           :kaocha.testable/type :kaocha.type/clojure.test
+           :ns-patterns ["-test$"]
+           :source-paths ["components/http/src"
+                          "components/http-server/src"
+                          "components/interop/src"
+                          "components/json-rpc/src"
+                          "components/log/src"
+                          "components/mcp-client/src"
+                          "components/mcp-server/src"
+                          "components/stdio-server/src"
+                          "components/tools/src"]
+           :test-paths ["components/http-server/test"
+                        "components/json-rpc/test"
+                        "components/log/test"
+                        "components/mcp-client/test"
+                        "components/mcp-server/test"
+                        "components/stdio-server/test"
+                        "components/tools/test"]
+           :kaocha.filter/focus-meta [:integ]}]
 
   :plugins [:kaocha.plugin/randomize
             :kaocha.plugin/filter
