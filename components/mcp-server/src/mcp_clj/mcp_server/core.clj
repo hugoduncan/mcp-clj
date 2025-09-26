@@ -2,14 +2,12 @@
   "MCP server implementation supporting the Anthropic Model Context Protocol"
   (:require
    [clojure.set :as set]
-   [mcp-clj.json-rpc.http-server :as http-server]
    [mcp-clj.json-rpc.protocols :as json-rpc-protocols]
-   [mcp-clj.json-rpc.sse-server :as sse-server]
-   [mcp-clj.json-rpc.stdio-server :as stdio-server]
    [mcp-clj.log :as log]
    [mcp-clj.mcp-server.prompts :as prompts]
    [mcp-clj.mcp-server.resources :as resources]
    [mcp-clj.mcp-server.version :as version]
+   [mcp-clj.server-transport.factory :as transport-factory]
    [mcp-clj.tools.core :as tools]))
 
 (defrecord ^:private Session
@@ -332,8 +330,11 @@
   (let [rpc-server @(:json-rpc-server server)]
     ;; Close individual sessions only for SSE servers
     (when (contains? rpc-server :session-id->session)
-      (doseq [session (vals @(:session-id->session server))]
-        (sse-server/close! rpc-server (:session-id session))))))
+      ;; We need to dynamically require sse-server when needed
+      (require 'mcp-clj.json-rpc.sse-server)
+      (let [close! (ns-resolve 'mcp-clj.json-rpc.sse-server 'close!)]
+        (doseq [session (vals @(:session-id->session server))]
+          (close! rpc-server (:session-id session)))))))
 
 (defn add-resource!
   "Add or update a resource in a running server"
@@ -353,66 +354,46 @@
   (notify-resources-changed! server)
   server)
 
-(defn- determine-transport
-  "Determine transport type from configuration"
-  [{:keys [transport port]}]
-  (cond
-    (= transport :stdio) :stdio
-    (= transport :sse)   :sse
-    (= transport :http)  :http
-    (some? port)         :sse ; Default to SSE for backward compatibility
-    (nil? transport)     :stdio
-    :else                (throw
-                          (ex-info
-                           "Unsupported transport type"
-                           {:transport transport}))))
-
-(defn- create-json-rpc-server
-  "Create JSON-RPC server based on transport type"
-  [transport {:keys [port on-sse-connect on-sse-close allowed-origins] :as opts}]
-  (case transport
-    :sse (sse-server/create-server
-          {:port port
-           :on-sse-connect on-sse-connect
-           :on-sse-close on-sse-close})
-    :http (http-server/create-server
-           {:port port
-            :allowed-origins (or allowed-origins [])
-            :on-connect on-sse-connect
-            :on-disconnect on-sse-close})
-    :stdio (stdio-server/create-server
-            (into {} (filter (comp some? val) (select-keys opts [:num-threads]))))
-    (throw (ex-info "Unsupported transport type" {:transport transport}))))
 
 (defn create-server
   "Create MCP server instance.
 
   Options:
-  - :transport - Transport type (:sse, :http, or :stdio). Defaults based on presence of :port
-  - :port - Port for SSE/HTTP server (implies :transport :sse if not specified)
-  - :num-threads - Number of threads for request handling
-  - :allowed-origins - Vector of allowed origins for HTTP transport (optional)
+  - :transport - Transport configuration map with :type key (:sse, :http, or :stdio)
   - :tools - Map of tool name to tool definition
   - :prompts - Map of prompt name to prompt definition
   - :resources - Map of resource name to resource definition
 
-  Transport types:
-  - :stdio - Standard input/output (default when no port specified)
-  - :sse - Server-Sent Events over HTTP (deprecated, for backward compatibility)
-  - :http - MCP Streamable HTTP transport (2025-03-26 spec, recommended for HTTP)"
-  [{:keys [transport port num-threads tools prompts resources allowed-origins]
+  Transport configuration:
+  - {:type :stdio :num-threads N} - Standard input/output
+  - {:type :sse :port N :allowed-origins [...]} - Server-Sent Events over HTTP
+  - {:type :http :port N :num-threads N} - MCP Streamable HTTP transport
+
+  Examples:
+    (create-server {:transport {:type :stdio}
+                    :tools {...}})
+    (create-server {:transport {:type :http :port 3001}
+                    :prompts {...}})"
+  [{:keys [transport tools prompts resources]
     :or   {tools     tools/default-tools
            prompts   prompts/default-prompts
            resources resources/default-resources}
     :as   opts}]
+  (when-not transport
+    (throw (ex-info "Missing :transport configuration"
+                    {:config opts
+                     :expected "Map with :type key and transport-specific options"})))
+  (when-not (:type transport)
+    (throw (ex-info "Missing :type in transport configuration"
+                    {:transport transport
+                     :supported-types [:stdio :sse :http]})))
   (doseq [tool (vals tools)]
     (when-not (tools/valid-tool? tool)
       (throw (ex-info "Invalid tool in constructor" {:tool tool}))))
   (doseq [prompt (vals prompts)]
     (when-not (prompts/valid-prompt? prompt)
       (throw (ex-info "Invalid prompt in constructor" {:prompt prompt}))))
-  (let [actual-transport    (determine-transport opts)
-        session-id->session (atom {})
+  (let [session-id->session (atom {})
         tool-registry       (atom tools)
         prompt-registry     (atom prompts)
         resource-registry   (atom resources)
@@ -426,13 +407,13 @@
         ;; Create handlers before creating the JSON-RPC server to avoid race
         ;; conditions
         handlers            (create-handlers server)
-        json-rpc-server     (create-json-rpc-server
-                             actual-transport
-                             {:port            port
-                              :num-threads     num-threads
-                              :allowed-origins allowed-origins
-                              :on-sse-connect  (partial on-sse-connect server)
-                              :on-sse-close    (partial on-sse-close server)})
+        ;; Add callbacks to transport options
+        transport-with-callbacks (merge transport
+                                        {:on-sse-connect (partial on-sse-connect server)
+                                         :on-sse-close   (partial on-sse-close server)})
+        json-rpc-server     (transport-factory/create-transport
+                             transport-with-callbacks
+                             handlers)
         server              (assoc server
                                    :stop #(do
                                             (log/info :server/stopping {})

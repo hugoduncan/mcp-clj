@@ -1,7 +1,8 @@
 {:paths ["src"]
  :deps {org.clojure/clojure {:mvn/version "1.12.0"}
         poly/json-rpc {:local/root "../json-rpc"}
-        poly/tools {:local/root "../tools"}}
+        poly/tools {:local/root "../tools"}
+        poly/server-transport {:local/root "../server-transport"}}
  :aliases
  {:test {:extra-paths ["test"]
          :extra-deps {poly/interop {:local/root "../interop"}}}}}

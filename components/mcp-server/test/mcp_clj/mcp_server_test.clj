@@ -54,9 +54,7 @@
   "Test fixture for server lifecycle"
   [f]
   (let [server (mcp/create-server
-                {:port 0
-                 :threads 2
-                 :queue-size 10
+                {:transport {:type :sse :port 0}
                  :tools {"test-tool" test-tool
                          "error-test-tool" error-test-tool}
                  :prompts {"test-prompt" test-prompt}})]
@@ -430,7 +428,7 @@
                      :implementation (fn [{:keys [value]}]
                                        {:content [{:type "text"
                                                    :text (str "Got: " value)}]})}
-          server (mcp/create-server {:port 0 :threads 2})]
+          server (mcp/create-server {:transport {:type :sse :port 0}})]
       (try
         ;; Test adding a tool
         (mcp/add-tool! server test-tool)

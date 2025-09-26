@@ -36,7 +36,7 @@
 (defn- start-test-server
   "Start an MCP server with HTTP transport for testing"
   [& [opts]]
-  (mcp-core/create-server (merge {:transport :http :port 0} opts)))
+  (mcp-core/create-server (merge {:transport {:type :http :port 0}} opts)))
 
 (defmacro with-test-server
   "Execute body with a test server, ensuring cleanup"

@@ -21,7 +21,7 @@
 (defn- with-http-server
   "Test fixture that creates an MCP server with HTTP transport"
   [f]
-  (let [server (mcp-core/create-server {:transport :http :port 0})
+  (let [server (mcp-core/create-server {:transport {:type :http :port 0}})
         port (-> server :json-rpc-server deref :port)]
     (try
       (binding [*server* server
@@ -270,9 +270,9 @@
   (testing "HTTP server with origin validation"
     (let [;; Create a server with restricted origins
           server-with-origins (mcp-core/create-server
-                               {:transport :http
-                                :port 0
-                                :allowed-origins ["https://trusted.example.com"]})
+                               {:transport {:type :http
+                                           :port 0
+                                           :allowed-origins ["https://trusted.example.com"]}})
           port (-> server-with-origins :json-rpc-server deref :port)]
       (try
         ;; Try to connect - Java SDK client doesn't set Origin headers by default
@@ -301,7 +301,7 @@
   (clojure.test/run-tests 'mcp-clj.mcp-server.sdk-client-http-integration-test)
 
   ;; Test specific functionality with HTTP transport
-  (let [server (mcp-core/create-server {:transport :http :port 8080})]
+  (let [server (mcp-core/create-server {:transport {:type :http :port 8080}})]
     (try
       (let [transport (java-sdk/create-http-client-transport
                        {:url "http://localhost:8080/"})

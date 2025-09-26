@@ -4,6 +4,7 @@
   poly/json-rpc {:local/root "../../components/json-rpc"}
   poly/log {:local/root "../../components/log"}
   poly/mcp-server {:local/root "../../components/mcp-server"}
+  poly/server-transport {:local/root "../../components/server-transport"}
   poly/tools {:local/root "../../components/tools"}
   poly/sse-server {:local/root "../../bases/sse-server"}
   poly/stdio-server {:local/root "../../bases/stdio-server"}}

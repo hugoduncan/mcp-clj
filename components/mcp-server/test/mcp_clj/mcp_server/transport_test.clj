@@ -25,32 +25,44 @@
 
 ;;; Transport Selection Tests
 
-(deftest transport-selection-test
-  (testing "Transport determination logic"
-    (let [determine-transport (fn [{:keys [transport port]}]
-                                (cond
-                                  (= transport :stdio) :stdio
-                                  (= transport :sse) :sse
-                                  (some? port) :sse
-                                  :else :stdio))]
+(deftest transport-configuration-test
+  (testing "Transport configuration validation"
+    (testing "valid transport configurations"
+      (is (some? (mcp/create-server {:transport {:type :stdio}}))
+          "stdio transport should be valid")
 
-      (testing "explicit stdio transport"
-        (is (= :stdio (determine-transport {:transport :stdio}))))
+      (let [server (mcp/create-server {:transport {:type :sse :port 0}})]
+        (is (some? server) "sse transport should be valid")
+        ((:stop server)))
 
-      (testing "explicit sse transport"
-        (is (= :sse (determine-transport {:transport :sse}))))
+      (let [server (mcp/create-server {:transport {:type :http :port 0}})]
+        (is (some? server) "http transport should be valid")
+        ((:stop server))))
 
-      (testing "port implies sse transport"
-        (is (= :sse (determine-transport {:port 3001}))))
+    (testing "invalid transport configurations"
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Missing :transport configuration"
+           (mcp/create-server {}))
+          "missing transport should throw")
 
-      (testing "default is stdio"
-        (is (= :stdio (determine-transport {})))))))
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Missing :type in transport configuration"
+           (mcp/create-server {:transport {:port 3001}}))
+          "missing :type should throw")
+
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Unregistered transport type"
+           (mcp/create-server {:transport {:type :invalid}}))
+          "invalid transport type should throw"))))
 
 ;;; stdio Transport Tests
 
 (deftest stdio-server-creation-test
   (testing "stdio server creation"
-    (let [server (mcp/create-server {:transport :stdio
+    (let [server (mcp/create-server {:transport {:type :stdio}
                                      :tools {"test-add" test-tool}})]
       (is (some? server) "stdio server should be created")
       (is (fn? (:stop server)) "server should have stop function")
@@ -64,15 +76,16 @@
       ;; Clean up
       ((:stop server)))))
 
-(deftest stdio-server-default-test
-  (testing "stdio is default when no port specified"
-    (let [server (mcp/create-server {:tools {"test-add" test-tool}})]
+(deftest stdio-server-explicit-test
+  (testing "stdio server with explicit configuration"
+    (let [server (mcp/create-server {:transport {:type :stdio}
+                                     :tools {"test-add" test-tool}})]
       (is (some? server) "default server should be created")
 
       ;; The json-rpc-server should be a stdio server (no :session-id->session)
       (let [rpc-server @(:json-rpc-server server)]
         (is (not (contains? rpc-server :session-id->session))
-            "default server should be stdio (no session management)"))
+            "stdio server should not have session management"))
 
       ;; Clean up
       ((:stop server)))))
@@ -81,8 +94,7 @@
 
 (deftest sse-server-creation-test
   (testing "SSE server creation"
-    (let [server (mcp/create-server {:transport :sse
-                                     :port 0 ; random port
+    (let [server (mcp/create-server {:transport {:type :sse :port 0}
                                      :tools {"test-add" test-tool}})]
       (is (some? server) "SSE server should be created")
       (is (fn? (:stop server)) "server should have stop function")
@@ -102,16 +114,22 @@
       ;; Clean up
       ((:stop server)))))
 
-(deftest sse-server-port-implies-test
-  (testing "port parameter implies SSE transport"
-    (let [server (mcp/create-server {:port 0
+(deftest http-server-creation-test
+  (testing "HTTP server creation"
+    (let [server (mcp/create-server {:transport {:type :http :port 0}
                                      :tools {"test-add" test-tool}})]
-      (is (some? server) "server with port should be created")
+      (is (some? server) "HTTP server should be created")
+      (is (fn? (:stop server)) "server should have stop function")
 
-      ;; Should be SSE server
+      ;; Test that we can call protocol methods
+      (testing "protocol operations work"
+        (is (nil? (json-rpc-protocols/notify-all!
+                   @(:json-rpc-server server)
+                   "test" {})) "notify-all should work"))
+
+      ;; The json-rpc-server should be an HTTP server
       (let [rpc-server @(:json-rpc-server server)]
-        (is (contains? rpc-server :session-id->session)
-            "server with port should be SSE server"))
+        (is (number? (:port rpc-server)) "HTTP server should have a port"))
 
       ;; Clean up
       ((:stop server)))))
@@ -119,14 +137,16 @@
 ;;; Protocol Polymorphism Tests
 
 (deftest protocol-polymorphism-test
-  (testing "Both server types implement JsonRpcServer protocol"
-    (let [stdio-server (mcp/create-server {:transport :stdio
+  (testing "All server types implement JsonRpcServer protocol"
+    (let [stdio-server (mcp/create-server {:transport {:type :stdio}
                                            :tools {"test-add" test-tool}})
-          sse-server (mcp/create-server {:transport :sse :port 0
-                                         :tools {"test-add" test-tool}})]
+          sse-server (mcp/create-server {:transport {:type :sse :port 0}
+                                         :tools {"test-add" test-tool}})
+          http-server (mcp/create-server {:transport {:type :http :port 0}
+                                          :tools {"test-add" test-tool}})]
 
       (try
-        (testing "Both servers support set-handlers!"
+        (testing "All servers support set-handlers!"
           (is (some? (json-rpc-protocols/set-handlers!
                       @(:json-rpc-server stdio-server)
                       {"new" (fn [m p] {:test "result"})}))
@@ -135,9 +155,14 @@
           (is (some? (json-rpc-protocols/set-handlers!
                       @(:json-rpc-server sse-server)
                       {"new" (fn [r p] {:test "result"})}))
-              "sse server should support set-handlers!"))
+              "sse server should support set-handlers!")
 
-        (testing "Both servers support notify-all!"
+          (is (some? (json-rpc-protocols/set-handlers!
+                      @(:json-rpc-server http-server)
+                      {"new" (fn [r p] {:test "result"})}))
+              "http server should support set-handlers!"))
+
+        (testing "All servers support notify-all!"
           (is (nil? (json-rpc-protocols/notify-all!
                      @(:json-rpc-server stdio-server)
                      "notification" {:data "test"}))
@@ -146,29 +171,39 @@
           (is (nil? (json-rpc-protocols/notify-all!
                      @(:json-rpc-server sse-server)
                      "notification" {:data "test"}))
-              "sse server should support notify-all!"))
+              "sse server should support notify-all!")
 
-        (testing "Both servers support stop!"
+          (is (nil? (json-rpc-protocols/notify-all!
+                     @(:json-rpc-server http-server)
+                     "notification" {:data "test"}))
+              "http server should support notify-all!"))
+
+        (testing "All servers support stop!"
           (is (nil? (json-rpc-protocols/stop! @(:json-rpc-server stdio-server)))
               "stdio server should support stop!")
 
           (is (nil? (json-rpc-protocols/stop! @(:json-rpc-server sse-server)))
-              "sse server should support stop!"))
+              "sse server should support stop!")
+
+          (is (nil? (json-rpc-protocols/stop! @(:json-rpc-server http-server)))
+              "http server should support stop!"))
 
         (finally
           ;; Clean up servers
           (try ((:stop stdio-server)) (catch Exception _))
-          (try ((:stop sse-server)) (catch Exception _)))))))
+          (try ((:stop sse-server)) (catch Exception _))
+          (try ((:stop http-server)) (catch Exception _)))))))
 
 ;;; Integration Tests
 
 (deftest server-functionality-test
-  (testing "Both transports support basic MCP operations"
-    (doseq [transport [:stdio :sse]]
+  (testing "All transports support basic MCP operations"
+    (doseq [transport [:stdio :sse :http]]
       (testing (str "Transport: " transport)
-        (let [server-opts (if (= transport :sse)
-                            {:transport :sse :port 0}
-                            {:transport :stdio})
+        (let [server-opts (case transport
+                            :stdio {:transport {:type :stdio}}
+                            :sse {:transport {:type :sse :port 0}}
+                            :http {:transport {:type :http :port 0}})
               server (mcp/create-server
                       (merge server-opts
                              {:tools {"test-add" test-tool}}))]
@@ -201,17 +236,10 @@
 ;;; Error Handling Tests
 
 (deftest transport-error-handling-test
-  (testing "Invalid transport type"
-    (is (thrown-with-msg?
-         clojure.lang.ExceptionInfo
-         #"Unsupported transport type"
-         (mcp/create-server {:transport :invalid}))
-        "should reject invalid transport types"))
-
   (testing "Invalid tool definitions"
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
          #"Invalid tool in constructor"
-         (mcp/create-server {:transport :stdio
+         (mcp/create-server {:transport {:type :stdio}
                              :tools {"invalid" {:bad "tool"}}}))
         "should reject invalid tools")))

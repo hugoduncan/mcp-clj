@@ -73,6 +73,24 @@ Include REFINE to refine the spec
       :type field in the :transport map. and a factory function to
       instantiate the transport given the options.
 
+- [x] refactor mcp-clj.mcp-server.core so that create-server has
+      transport options that are on a :transport key.  The value is a map
+      with a :type field, and type specific options. The types we
+      currently have are :http, :sse and :stdio.
+	  - should remove the need for determine-transport
+	  - should simplify create-json-rpc-server
+	  - Update tests accordingly
+
+- [ ] refactor mcp-clj.mcp-server.core so that transports are pluggable.
+      Allow registration of transports, providing a keyword, for the
+      :type field in the :transport map. and a factory function to
+      instantiate the transport given the options.
+
+- [ ] I would like to be able to unit test the mcp client talking to
+      the mcp server without any external processes.  Create a transport
+	  that can be used in process to connect the two.
+
+
 - [ ] extend the interop to enable use of SSE transport ? not sure this
       is worth doing still
 
