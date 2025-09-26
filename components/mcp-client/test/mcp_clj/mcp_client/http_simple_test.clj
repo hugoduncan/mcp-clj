@@ -22,10 +22,10 @@
                                       :required   ["msg"]}
                      :implementation (fn [{:keys [msg]}]
                                        {:content [{:type "text" :text msg}]})}}})
-          _      (Thread/sleep 2000) ; Give server time to start
-          port   (when-let [prom (:rpc-server-prom server)]
-                   (when-let [rpc-server @prom]
-                     (:port rpc-server)))]
+          ;; Wait for server to be fully initialized with proper timeout
+          rpc-server (deref (:json-rpc-server server) 5000 nil)
+          port   (when rpc-server
+                   (:port rpc-server))]
 
       (log/info :test/server-started {:port port})
       (is (some? port) "Server should have a port")
