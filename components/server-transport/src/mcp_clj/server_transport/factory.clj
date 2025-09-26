@@ -137,3 +137,12 @@
 (register-transport! :stdio create-stdio-server)
 (register-transport! :sse create-sse-server)
 (register-transport! :http create-http-server)
+
+;; Register in-memory transport
+(defn- create-in-memory-server
+  [options handlers]
+  (require 'mcp-clj.server-transport.in-memory)
+  (let [create-server (ns-resolve 'mcp-clj.server-transport.in-memory 'create-in-memory-server)]
+    (create-server options handlers)))
+
+(register-transport! :in-memory create-in-memory-server)

@@ -81,15 +81,14 @@ Include REFINE to refine the spec
 	  - should simplify create-json-rpc-server
 	  - Update tests accordingly
 
-- [ ] refactor mcp-clj.mcp-server.core so that transports are pluggable.
+- [x] refactor mcp-clj.mcp-server.core so that transports are pluggable.
       Allow registration of transports, providing a keyword, for the
       :type field in the :transport map. and a factory function to
       instantiate the transport given the options.
 
-- [ ] I would like to be able to unit test the mcp client talking to
+- [x] I would like to be able to unit test the mcp client talking to
       the mcp server without any external processes.  Create a transport
-	  that can be used in process to connect the two.
-
+	  that can be used in the current java process to connect the two.
 
 - [ ] extend the interop to enable use of SSE transport ? not sure this
       is worth doing still
