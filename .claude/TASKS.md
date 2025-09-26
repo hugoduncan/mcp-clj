@@ -12,6 +12,15 @@ Include REFINE to refine the spec
       starting to handle requests.  Change the default handlers to be
      `nil`, so we can distinguish between not set, and empty.
 
+- [x] please write a clj-kondo hook to recognise
+
+	  mcp-clj.mcp-server.http-transport-test/with-test-server
+
+      See https://cljdoc.org/d/clj-kondo/clj-kondo/2025.09.22/doc/hooks
+      for doc on hooks.
+
+	  install the hook in @.clj-kondo/config.edn
+
 - [ ] change tool calls to return a promise.  the caller can
       then decide blocking policy.
 
