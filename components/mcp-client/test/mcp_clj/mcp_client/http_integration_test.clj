@@ -74,8 +74,7 @@
 (defn- start-test-server
   "Start HTTP server with test tools"
   [& [opts]]
-  (let [server (server/create-server (merge {:transport :http
-                                             :port 0 ; Random port
+  (let [server (server/create-server (merge {:transport {:type :http :port 0} ; Random port
                                              :tools test-tools}
                                             opts))]
     (let [port (get-server-port server)]

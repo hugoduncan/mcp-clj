@@ -12,8 +12,7 @@
    (create-test-server nil))
   ([tools]
    (server/create-server
-    {:transport :http
-     :port 0 ; Random port
+    {:transport {:type :http :port 0} ; Random port
      :tools (or tools
                 {"test-echo"
                  {:name "test-echo"
