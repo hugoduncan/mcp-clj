@@ -1,5 +1,6 @@
-{:deps {poly/json-rpc {:local/root "../json-rpc"}
-        poly/log      {:local/root "../log"}}
+{:deps {poly/client-transport {:local/root "../client-transport"}
+        poly/json-rpc         {:local/root "../json-rpc"}
+        poly/log              {:local/root "../log"}}
 
  :aliases
  {:dev {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.3.0"}}}

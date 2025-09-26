@@ -1,7 +1,8 @@
-(ns mcp-clj.mcp-client.stdio
-  "MCP client stdio transport - launches server process and communicates via stdin/stdout"
+(ns mcp-clj.client-transport.stdio
+  "Stdio transport implementation for MCP client"
   (:require
    [clojure.java.process :as process]
+   [mcp-clj.client-transport.protocol :as protocol]
    [mcp-clj.json-rpc.stdio-client :as stdio-client]
    [mcp-clj.log :as log])
   (:import
@@ -11,10 +12,6 @@
     OutputStreamWriter]
    [java.util.concurrent
     TimeUnit]))
-
-;;; Configuration
-
-(def ^:private request-timeout-ms 30000)
 
 ;;; Process Management
 
@@ -52,14 +49,40 @@
      :stdin (BufferedWriter. (OutputStreamWriter. (process/stdin process)))
      :stdout (BufferedReader. (InputStreamReader. (process/stdout process)))}))
 
-;;; JSON I/O
-
 ;;; Transport Implementation
 
 (defrecord StdioTransport
            [server-command
             process-info
-            json-rpc-client]) ; JSONRPClient instance
+            json-rpc-client] ; JSONRPClient instance
+
+  protocol/Transport
+  (send-request! [_ method params timeout-ms]
+    (stdio-client/send-request! json-rpc-client method params timeout-ms))
+
+  (send-notification! [_ method params]
+    (stdio-client/send-notification! json-rpc-client method params))
+
+  (close! [_]
+    ;; Close JSON-RPC client (cancels pending requests, closes streams, shuts down executor)
+    (stdio-client/close-json-rpc-client! json-rpc-client)
+
+    ;; Terminate process
+    (log/warn :client/killing-process)
+    (let [^Process process (:process process-info)]
+      (try
+        (.destroy process)
+        (when-not (.waitFor process 5000 TimeUnit/MILLISECONDS)
+          (log/warn :client/process-force-kill))
+        (catch Exception e
+          (log/error :client/process-close-error {:error e})))))
+
+  (alive? [_]
+    (and @(:running json-rpc-client)
+         (.isAlive ^Process (:process process-info))))
+
+  (get-json-rpc-client [_]
+    json-rpc-client))
 
 (defn create-transport
   "Create stdio transport by launching MCP server process"
@@ -71,25 +94,3 @@
      server-command
      process-info
      json-rpc-client)))
-
-(defn close!
-  "Close transport and terminate server process"
-  [transport]
-  ;; Close JSON-RPC client (cancels pending requests, closes streams, shuts down executor)
-  (stdio-client/close-json-rpc-client! (:json-rpc-client transport))
-
-  ;; Terminate process
-  (log/warn :client/killing-process)
-  (let [^Process process (get-in transport [:process-info :process])]
-    (try
-      (.destroy process)
-      (when-not (.waitFor process 5000 TimeUnit/MILLISECONDS)
-        (log/warn :client/process-force-kill))
-      (catch Exception e
-        (log/error :client/process-close-error {:error e})))))
-
-(defn transport-alive?
-  "Check if transport process is still alive"
-  [transport]
-  (and @(:running (:json-rpc-client transport))
-       (.isAlive ^Process (get-in transport [:process-info :process]))))

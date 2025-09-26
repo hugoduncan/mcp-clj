@@ -43,6 +43,11 @@ Include REFINE to refine the spec
          disable them by default.
        - update CLAUDE.md to describe this testing strategy
 
+- [x] mcp-clj.mcp-client.core and mcp-clj.mcp-client.transport conntain
+      many conditionals that test the transport type. Pleas convert
+      these to use a protocol. Put the protocol into a separate
+      namespace in a new, polylith style, client-transport component.
+
 - [ ] extend the interop to enable use of SSE transport ? not sure this
       is worth doing still
 

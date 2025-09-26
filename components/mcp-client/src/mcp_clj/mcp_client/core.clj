@@ -1,12 +1,10 @@
 (ns mcp-clj.mcp-client.core
   "MCP client implementation with initialization support"
   (:require
-   [mcp-clj.json-rpc.http-client :as http-client]
-   [mcp-clj.json-rpc.stdio-client :as stdio-client]
+   [mcp-clj.client-transport.factory :as transport-factory]
+   [mcp-clj.client-transport.protocol :as transport-protocol]
    [mcp-clj.log :as log]
-   [mcp-clj.mcp-client.http :as http]
    [mcp-clj.mcp-client.session :as session]
-   [mcp-clj.mcp-client.stdio :as stdio]
    [mcp-clj.mcp-client.tools :as tools]
    [mcp-clj.mcp-client.transport :as transport]
    [mcp-clj.mcp-server.version :as version])
@@ -29,23 +27,8 @@
 
 (defn- create-transport
   "Create transport based on configuration"
-  [{:keys [server url] :as config}]
-  (cond
-    ;; HTTP transport configuration (URL provided)
-    url
-    (http/create-transport config)
-
-    (and (map? server) (:command server))
-    (stdio/create-transport server)
-
-    :else
-    (throw
-     (ex-info
-      "Unsupported server configuration"
-      {:server server
-       :url    url
-       :supported
-       "Either :url for HTTP or :server map with :command and :args for stdio"}))))
+  [config]
+  (transport-factory/create-transport config))
 
 ;;; Initialization Protocol
 
@@ -176,16 +159,8 @@
     (when-not (= :disconnected (:state @session-atom))
       (swap! session-atom #(session/transition-state! % :disconnected)))
 
-    ;; Close transport based on type
-    (cond
-      (instance? mcp_clj.mcp_client.stdio.StdioTransport transport)
-      (stdio/close! transport)
-
-      (instance? mcp_clj.mcp_client.http.HttpTransport transport)
-      (http/close! transport)
-
-      :else
-      (log/warn :client/unknown-transport {:transport (type transport)}))
+    ;; Close transport using protocol
+    (transport-protocol/close! transport)
 
     (log/info :client/client-closed)))
 
@@ -205,18 +180,7 @@
   (let [session   @(:session client)
         transport (:transport client)]
     (assoc (session/get-session-info session)
-           :transport-alive?
-           (cond
-             (instance? mcp_clj.mcp_client.stdio.StdioTransport transport)
-             (stdio/transport-alive? transport)
-
-             (instance? mcp_clj.mcp_client.http.HttpTransport transport)
-             (http/transport-alive? transport)
-
-             :else
-             (log/warn
-                 :client/unknown-transport
-               {:transport (type transport)})))))
+           :transport-alive? (transport-protocol/alive? transport))))
 
 (defn wait-for-ready
   "Wait for client to be ready, with optional timeout (defaults to 30 seconds).
