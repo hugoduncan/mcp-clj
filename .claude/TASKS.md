@@ -43,10 +43,16 @@ Include REFINE to refine the spec
          disable them by default.
        - update CLAUDE.md to describe this testing strategy
 
-- [x] mcp-clj.mcp-client.core and mcp-clj.mcp-client.transport conntain
+- [x] mcp-clj.mcp-client.core and mcp-clj.mcp-client.transport contain
       many conditionals that test the transport type. Pleas convert
       these to use a protocol. Put the protocol into a separate
       namespace in a new, polylith style, client-transport component.
+
+- [x] Looking at mcp-clj.client-transport.protocol and its
+      implementations in mcp-clj.client-transport.http and
+      mcp-clj.client-transport.stdio, it seems that many of these
+      protocol methods could be pushed down the stack onto the json rpc
+      clients in mcp-clj.json-rpc.*-client.
 
 - [ ] extend the interop to enable use of SSE transport ? not sure this
       is worth doing still

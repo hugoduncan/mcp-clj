@@ -2,7 +2,8 @@
   "Stdio transport implementation for MCP client"
   (:require
    [clojure.java.process :as process]
-   [mcp-clj.client-transport.protocol :as protocol]
+   [mcp-clj.client-transport.protocol :as transport-protocol]
+   [mcp-clj.json-rpc.protocol :as json-rpc-protocol]
    [mcp-clj.json-rpc.stdio-client :as stdio-client]
    [mcp-clj.log :as log])
   (:import
@@ -56,16 +57,16 @@
             process-info
             json-rpc-client] ; JSONRPClient instance
 
-  protocol/Transport
+  transport-protocol/Transport
   (send-request! [_ method params timeout-ms]
-    (stdio-client/send-request! json-rpc-client method params timeout-ms))
+    (json-rpc-protocol/send-request! json-rpc-client method params timeout-ms))
 
   (send-notification! [_ method params]
-    (stdio-client/send-notification! json-rpc-client method params))
+    (json-rpc-protocol/send-notification! json-rpc-client method params))
 
   (close! [_]
     ;; Close JSON-RPC client (cancels pending requests, closes streams, shuts down executor)
-    (stdio-client/close-json-rpc-client! json-rpc-client)
+    (json-rpc-protocol/close! json-rpc-client)
 
     ;; Terminate process
     (log/warn :client/killing-process)
@@ -78,7 +79,7 @@
           (log/error :client/process-close-error {:error e})))))
 
   (alive? [_]
-    (and @(:running json-rpc-client)
+    (and (json-rpc-protocol/alive? json-rpc-client)
          (.isAlive ^Process (:process process-info))))
 
   (get-json-rpc-client [_]

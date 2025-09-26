@@ -5,11 +5,15 @@
    [clojure.string :as str]
    [hato.client :as hato]
    [mcp-clj.json-rpc.executor :as executor]
+   [mcp-clj.json-rpc.protocol :as protocol]
    [mcp-clj.log :as log])
   (:import
    [java.io BufferedReader InputStreamReader]
    [java.net URI]
    [java.util.concurrent CompletableFuture ConcurrentHashMap TimeUnit]))
+
+;;; Forward declarations
+(declare http-send-request! http-send-notification! close-http-json-rpc-client!)
 
 ;;; HTTP JSON-RPC Client
 
@@ -21,7 +25,20 @@
             executor ; executor for async operations
             running ; atom for controlling SSE reader
             sse-connection ; atom holding SSE connection details
-            notification-handler]) ; function to handle notifications ; function to handle notifications
+            notification-handler] ; function to handle notifications
+
+  protocol/JSONRPCClient
+  (send-request! [this method params timeout-ms]
+    (http-send-request! this method params timeout-ms))
+
+  (send-notification! [this method params]
+    (http-send-notification! this method params))
+
+  (close! [this]
+    (close-http-json-rpc-client! this))
+
+  (alive? [this]
+    @(:running this)))
 
 ;;; Request/Response Handling
 
@@ -152,7 +169,7 @@
     ;; Don't start SSE immediately - let it be established after first request with session
     client))
 
-(defn send-request!
+(defn http-send-request!
   "Send JSON-RPC request and return CompletableFuture with response"
   [client method params timeout-ms]
   (let [request-id (generate-request-id client)
@@ -230,7 +247,7 @@
         (throw e)))
     future))
 
-(defn send-notification!
+(defn http-send-notification!
   "Send JSON-RPC notification (no response expected)"
   [client method params]
   (executor/submit! (:executor client)
@@ -272,6 +289,18 @@
 
   ;; Shutdown executor
   (executor/shutdown-executor (:executor client)))
+
+;;; Public API Functions (for backward compatibility)
+
+(defn send-request!
+  "Send JSON-RPC request and return CompletableFuture with response"
+  [client method params timeout-ms]
+  (protocol/send-request! client method params timeout-ms))
+
+(defn send-notification!
+  "Send JSON-RPC notification (no response expected)"
+  [client method params]
+  (protocol/send-notification! client method params))
 
 (defn update-session-id!
   "Update the session ID and restart SSE connection if needed"

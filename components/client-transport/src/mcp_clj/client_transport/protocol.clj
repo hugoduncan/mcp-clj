@@ -19,13 +19,3 @@
 
   (get-json-rpc-client [transport]
     "Get the underlying JSON-RPC client."))
-
-(defprotocol JSONRPCClient
-  "Protocol for JSON-RPC client implementations"
-  (json-rpc-request! [client method params timeout-ms]
-    "Send a JSON-RPC request.
-    Returns a CompletableFuture that resolves to the response.")
-
-  (json-rpc-notify! [client method params]
-    "Send a JSON-RPC notification.
-    Returns a CompletableFuture that resolves when sent."))

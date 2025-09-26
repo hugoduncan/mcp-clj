@@ -2,6 +2,7 @@
   "JSON-RPC client utilities for stdio communication"
   (:require
    [mcp-clj.json-rpc.executor :as executor]
+   [mcp-clj.json-rpc.protocol :as protocol]
    [mcp-clj.json-rpc.stdio :as stdio]
    [mcp-clj.log :as log])
   (:import
@@ -12,6 +13,9 @@
     Future
     TimeUnit]))
 
+;;; Forward declarations
+(declare stdio-send-request! stdio-send-notification! close-json-rpc-client!)
+
 ;;; JSONRPClient Record
 
 (defrecord JSONRPClient
@@ -21,7 +25,20 @@
      input-stream ; BufferedReader for reading responses
      output-stream ; BufferedWriter for sending requests
      running ; atom for controlling message reader loop
-     reader-future]) ; future for background message reader
+     reader-future] ; future for background message reader
+
+  protocol/JSONRPCClient
+  (send-request! [this method params timeout-ms]
+    (stdio-send-request! this method params timeout-ms))
+
+  (send-notification! [this method params]
+    (stdio-send-notification! this method params))
+
+  (close! [this]
+    (close-json-rpc-client! this))
+
+  (alive? [this]
+    @(:running this)))
 
 ;;; JSONRPClient Functions
 
@@ -109,7 +126,7 @@
         (log/debug :rpc/receive {:message message})
         message))))
 
-(defn send-request!
+(defn stdio-send-request!
   "Send JSON-RPC request using JSONRPClient's output stream"
   [json-rpc-client method params timeout-ms]
   (let [request-id (generate-request-id json-rpc-client)
@@ -139,7 +156,7 @@
         (.completeExceptionally future e)
         future))))
 
-(defn send-notification!
+(defn stdio-send-notification!
   "Send JSON-RPC notification using JSONRPClient's output stream"
   [json-rpc-client method params]
   (let [notification {:jsonrpc "2.0"
@@ -167,3 +184,15 @@
   (log/debug :rpc/close-json-rpc-client {:state :shutdown-exec})
   (executor/shutdown-executor (:executor json-rpc-client))
   (log/debug :rpc/close-json-rpc-client {:state :done}))
+
+;;; Public API Functions (for backward compatibility)
+
+(defn send-request!
+  "Send JSON-RPC request using JSONRPClient's output stream"
+  [json-rpc-client method params timeout-ms]
+  (protocol/send-request! json-rpc-client method params timeout-ms))
+
+(defn send-notification!
+  "Send JSON-RPC notification using JSONRPClient's output stream"
+  [json-rpc-client method params]
+  (protocol/send-notification! json-rpc-client method params))
