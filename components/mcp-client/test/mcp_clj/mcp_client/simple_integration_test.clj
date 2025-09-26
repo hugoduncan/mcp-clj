@@ -32,7 +32,7 @@
 
       ;; Create client (this will fail to connect to stdio, but we can test the API)
       (let [client (client/create-client
-                    {:stdio
+                    {:transport
                      {:type :stdio
                       :command "echo"
                       :args ["{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"serverInfo\":{\"name\":\"test-server\",\"version\":\"1.0.0\"}}}"]}
@@ -69,8 +69,8 @@
   (testing "Client session transitions through states correctly"
     (let [client (client/create-client
                   ;; cat will read but not respond properly
-                  {:stdio {:type :stdio
-                           :command "cat"}
+                  {:transport {:type :stdio
+                               :command "cat"}
                    :client-info {:name "state-test-client"}
                    :capabilities {}})]
 
