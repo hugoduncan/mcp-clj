@@ -2,9 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [mcp-clj.mcp-client.core :as client]
-   [mcp-clj.mcp-server.core :as server]
-   [mcp-clj.tools.core :as tools]
-   [mcp-clj.log :as log]))
+   [mcp-clj.mcp-server.core :as server]))
 
 ;;; Test Helpers
 
