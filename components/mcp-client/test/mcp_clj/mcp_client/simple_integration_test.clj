@@ -32,7 +32,7 @@
 
       ;; Create client (this will fail to connect to stdio, but we can test the API)
       (let [client (client/create-client
-                    {:server
+                    {:stdio
                      {:type :stdio
                       :command "echo"
                       :args ["{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"serverInfo\":{\"name\":\"test-server\",\"version\":\"1.0.0\"}}}"]}
@@ -69,8 +69,8 @@
   (testing "Client session transitions through states correctly"
     (let [client (client/create-client
                   ;; cat will read but not respond properly
-                  {:server {:type :stdio
-                            :command "cat"}
+                  {:stdio {:type :stdio
+                           :command "cat"}
                    :client-info {:name "state-test-client"}
                    :capabilities {}})]
 
@@ -93,7 +93,7 @@
   (testing "Client accepts various transport configurations"
     ;; Test map-style transport
     (let [client1 (client/create-client
-                   {:server {:type :stdio :command "echo" :args ["test"]}
+                   {:stdio {:type :stdio :command "echo" :args ["test"]}
                     :client-info {:name "config-test-1"}})]
       (is (some? client1))
       (is (= "config-test-1" (get-in @(:session client1) [:client-info :name])))
@@ -101,9 +101,9 @@
 
     ;; Test custom protocol version
     (let [client3 (client/create-client
-                   {:server {:type :stdio
-                             :command "echo"
-                             :args ["test"]}
+                   {:stdio {:type :stdio
+                            :command "echo"
+                            :args ["test"]}
                     :protocol-version "2024-11-05"})]
       (is (some? client3))
       (is (= "2024-11-05" (:protocol-version @(:session client3))))

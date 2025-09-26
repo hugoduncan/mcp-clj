@@ -53,6 +53,9 @@ clj -M:kaocha:dev:test --focus :integration
 # Run all tests (unit + integration)
 clj -M:kaocha:dev:test --focus :unit :integration
 
+# Run specific namespace
+clj -M:kaocha:dev:test --focus mcp-clj.mcp-client.tools-test
+
 # Run tests with coverage (uncomment cloverage plugin in tests.edn)
 clj -M:kaocha:dev:test --plugin kaocha.plugin/cloverage
 ```

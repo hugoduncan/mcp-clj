@@ -8,8 +8,8 @@
 (deftest smoke-client-creation-test
   (testing "Can create client without starting processes"
     (with-open [client (client/create-client
-                        {:server       {:type :stdio :command "true"}
-                         :client-info  {:name "smoke-test"}
+                        {:stdio {:type :stdio :command "true"}
+                         :client-info {:name "smoke-test"}
                          :capabilities {}})]
 
       (is (some? client))
@@ -26,9 +26,9 @@
 (deftest smoke-session-info-test
   (testing "Can get comprehensive session info"
     (with-open [client (client/create-client
-                        {:server           {:type :stdio :command "true"}
-                         :client-info      {:name "info-test" :version "1.0"}
-                         :capabilities     {:test true}
+                        {:stdio {:type :stdio :command "true"}
+                         :client-info {:name "info-test" :version "1.0"}
+                         :capabilities {:test true}
                          :protocol-version "2024-11-05"})]
       (let [info (client/get-client-info client)]
 
@@ -43,7 +43,7 @@
 (deftest smoke-state-predicates-test
   (testing "Client state predicates work correctly"
     (with-open [client (client/create-client
-                        {:server {:type :stdio :command "true"}})]
+                        {:stdio {:type :stdio :command "true"}})]
 
       ;; Initial state
       (is (not (client/client-ready? client)))
@@ -63,15 +63,15 @@
   (testing "Different transport configurations work"
     ;; Map transport
     (with-open [client1 (client/create-client
-                         {:server
+                         {:stdio
                           {:type :stdio :command "echo" :args ["test"]}})]
       (is (some? client1)))
 
     ;; Vector transport
     (with-open [client2 (client/create-client
-                         {:server {:command "echo" :args ["test"]}})]
+                         {:stdio {:command "echo" :args ["test"]}})]
       (is (some? client2)))
 
     ;; Invalid transport should throw
     (is (thrown? Exception
-                 (client/create-client {:transport {:type :invalid}})))))
+                 (client/create-client {:stdio {:type :invalid}})))))

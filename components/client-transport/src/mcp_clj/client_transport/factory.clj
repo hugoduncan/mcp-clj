@@ -8,23 +8,22 @@
   "Create transport based on configuration.
 
   Supports:
-  - HTTP transport when :url is provided
-  - Stdio transport when :server map with :command is provided"
-  [{:keys [server url] :as config}]
+  - HTTP transport when :http map is provided
+  - Stdio transport when :stdio map is provided"
+  [{:keys [http stdio] :as config}]
   (cond
-    ;; HTTP transport configuration (URL provided)
-    url
-    (http/create-transport config)
+    ;; HTTP transport configuration
+    http
+    (http/create-transport http)
 
-    ;; Stdio transport configuration
-    (and (map? server) (:command server))
-    (stdio/create-transport server)
+    ;; Stdio transport configuration  
+    stdio
+    (stdio/create-transport stdio)
 
     :else
     (throw
      (ex-info
-      "Unsupported server configuration"
-      {:server server
-       :url    url
+      "Unsupported transport configuration"
+      {:config config
        :supported
-       "Either :url for HTTP or :server map with :command and :args for stdio"}))))
+       "Either :http map with :url or :stdio map with :command"}))))

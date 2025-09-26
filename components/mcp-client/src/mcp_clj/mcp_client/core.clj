@@ -23,13 +23,6 @@
   AutoCloseable
   (close [this] (close! this))) ; Session state (atom)
 
-;;; Transport Creation
-
-(defn- create-transport
-  "Create transport based on configuration"
-  [config]
-  (transport-factory/create-transport config))
-
 ;;; Initialization Protocol
 
 (defn- handle-initialize-response
@@ -40,7 +33,7 @@
       (log/info :client/initialize-response {:response response})
 
       ;; Validate protocol version
-      (let [current-session  @session-atom
+      (let [current-session @session-atom
             expected-version (:protocol-version current-session)]
         (when (not= protocolVersion expected-version)
           (throw (ex-info
@@ -58,8 +51,8 @@
                :server-capabilities capabilities))
 
       (log/info :client/session-ready
-        {:server-info  serverInfo
-         :capabilities capabilities}))
+                {:server-info serverInfo
+                 :capabilities capabilities}))
 
     (catch Exception e
       (log/error :client/initialize-error {:error e})
@@ -67,7 +60,7 @@
              #(session/transition-state!
                %
                :error
-               :error-info {:type  :initialization-failed
+               :error-info {:type :initialization-failed
                             :error e})))))
 
 (defn- send-initialized-notification
@@ -84,8 +77,8 @@
   "Start client initialization process and return CompletableFuture"
   [client]
   (let [session-atom (:session client)
-        transport    (:transport client)
-        session      @session-atom]
+        transport (:transport client)
+        session @session-atom]
 
     (if (not= :disconnected (:state session))
       (let [error-future (CompletableFuture.)]
@@ -100,9 +93,9 @@
 
         ;; Send initialize request
         (log/debug :client/initialize {:msg "Send initialize"})
-        (let [init-params     {:protocolVersion (:protocol-version session)
-                               :capabilities    (:capabilities session)
-                               :clientInfo      (:client-info session)}
+        (let [init-params {:protocolVersion (:protocol-version session)
+                           :capabilities (:capabilities session)
+                           :clientInfo (:client-info session)}
               response-future (transport/send-request!
                                transport
                                "initialize"
@@ -117,13 +110,13 @@
                           (let [ready-future (CompletableFuture.)]
                             (try
                               (log/debug :client/initialize
-                                {:msg      "Received response"
-                                 :response response})
+                                         {:msg "Received response"
+                                          :response response})
                               (handle-initialize-response session-atom response)
 
                               ;; Send initialized notification if successful
                               (log/debug :client/initialize
-                                {:session-ready? (session/session-ready? @session-atom)})
+                                         {:session-ready? (session/session-ready? @session-atom)})
                               (when (session/session-ready? @session-atom)
                                 (send-initialized-notification transport)
                                 (.complete ready-future true))
@@ -136,16 +129,16 @@
 (defn create-client
   "Create MCP client with specified transport and automatically initialize"
   ^AutoCloseable [{:keys [client-info capabilities protocol-version]
-                   :or   {protocol-version (version/get-latest-version)}
-                   :as   config}]
-  (let [transport   (create-transport config)
-        session     (session/create-session
-                     (cond->
-                         {:client-info client-info
-                          :capabilities capabilities}
-                       protocol-version
-                       (assoc :protocol-version protocol-version)))
-        client      (->MCPClient transport (atom session) nil)
+                   :or {protocol-version (version/get-latest-version)}
+                   :as config}]
+  (let [transport (transport-factory/create-transport config)
+        session (session/create-session
+                 (cond->
+                  {:client-info client-info
+                   :capabilities capabilities}
+                   protocol-version
+                   (assoc :protocol-version protocol-version)))
+        client (->MCPClient transport (atom session) nil)
         init-future (start-initialization! client)]
     (assoc client :initialization-future init-future)))
 
@@ -177,7 +170,7 @@
 (defn get-client-info
   "Get current client and session information"
   [client]
-  (let [session   @(:session client)
+  (let [session @(:session client)
         transport (:transport client)]
     (assoc (session/get-session-info session)
            :transport-alive? (transport-protocol/alive? transport))))
@@ -200,7 +193,7 @@
            (throw (ex-info "Client initialization failed"
                            {:session-state session-state}))
            (throw (ex-info "Client initialization timeout"
-                           {:timeout-ms    timeout-ms
+                           {:timeout-ms timeout-ms
                             :session-state session-state})))))
      (catch ExecutionException e
        (throw (.getCause e))))))

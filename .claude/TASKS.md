@@ -54,6 +54,13 @@ Include REFINE to refine the spec
       protocol methods could be pushed down the stack onto the json rpc
       clients in mcp-clj.json-rpc.*-client.
 
+- [ ] refactor mcp-clj.mcp-client.core/create-client so that all http
+      transport options are on a :http key and all stdio transport
+      options are on a :stdio key.
+	  - update mcp-clj.client-transport.factory/create-transport
+	  - remove the redundant mcp-clj.mcp-client.core/create-transport
+	  - Update tests accordingly
+
 - [ ] extend the interop to enable use of SSE transport ? not sure this
       is worth doing still
 

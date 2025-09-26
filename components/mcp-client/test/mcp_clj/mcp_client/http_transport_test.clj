@@ -48,12 +48,12 @@
        (throw (ex-info "Server did not start - no port available" {})))
      (let [client (client/create-client
                    (merge
-                    {:url (str "http://localhost:" port)
+                    {:http {:url (str "http://localhost:" port)
+                            :num-threads 2}
                      :client-info {:name "test-client"
                                    :version "1.0.0"}
                      :capabilities {:tools {}}
-                     :protocol-version "2024-11-05"
-                     :num-threads 2}
+                     :protocol-version "2024-11-05"}
                     opts))]
        ;; Wait for client to be ready
        (client/wait-for-ready client 5000)

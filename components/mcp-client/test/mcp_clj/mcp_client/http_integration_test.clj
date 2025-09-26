@@ -88,14 +88,14 @@
 (defn- create-test-client
   "Create HTTP client connected to test server"
   [server]
-  (let [port   (get-server-port server)
+  (let [port (get-server-port server)
         client (client/create-client
-                {:url              (str "http://localhost:" port)
-                 :client-info      {:name    "integration-test-client"
-                                    :version "1.0.0"}
-                 :capabilities     {:tools {}}
-                 :protocol-version "2024-11-05"
-                 :num-threads      2})]
+                {:http {:url (str "http://localhost:" port)
+                        :num-threads 2}
+                 :client-info {:name "integration-test-client"
+                               :version "1.0.0"}
+                 :capabilities {:tools {}}
+                 :protocol-version "2024-11-05"})]
     ;; Wait for client to be ready
     (client/wait-for-ready client 5000)
     (log/info :test/client-connected {:ready (client/client-ready? client)})
@@ -278,8 +278,8 @@
             (client/call-tool client "echo" {:message (str "Call " i)}))
 
           (let [elapsed-ms (/ (- (System/nanoTime) start-time) 1000000.0)]
-            (log/info :test/performance {:calls            call-count
-                                         :elapsed-ms       elapsed-ms
+            (log/info :test/performance {:calls call-count
+                                         :elapsed-ms elapsed-ms
                                          :calls-per-second (/ call-count (/ elapsed-ms 1000))})
 
             ;; Should complete reasonably quickly (less than 5 seconds for 20 calls)

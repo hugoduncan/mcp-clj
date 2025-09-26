@@ -12,20 +12,20 @@
   (testing "Basic HTTP transport test"
     (let [server (server/create-server
                   {:transport :http
-                   :port      0
+                   :port 0
                    :tools
                    {"echo"
-                    {:name           "echo"
-                     :description    "Simple echo"
-                     :inputSchema    {:type       "object"
-                                      :properties {:msg {:type "string"}}
-                                      :required   ["msg"]}
+                    {:name "echo"
+                     :description "Simple echo"
+                     :inputSchema {:type "object"
+                                   :properties {:msg {:type "string"}}
+                                   :required ["msg"]}
                      :implementation (fn [{:keys [msg]}]
                                        {:content [{:type "text" :text msg}]})}}})
           ;; Wait for server to be fully initialized with proper timeout
           rpc-server (deref (:json-rpc-server server) 5000 nil)
-          port   (when rpc-server
-                   (:port rpc-server))]
+          port (when rpc-server
+                 (:port rpc-server))]
 
       (log/info :test/server-started {:port port})
       (is (some? port) "Server should have a port")
@@ -46,11 +46,11 @@
 
           ;; Only proceed with client test if server is responding
           (when (= 0 (:exit response))
-            (let [client (client/create-client {:url              (str "http://localhost:" port)
-                                                :client-info      {:name "test" :version "1.0.0"}
-                                                :capabilities     {:tools {}}
-                                                :protocol-version "2024-11-05"
-                                                :num-threads      2})]
+            (let [client (client/create-client {:http {:url (str "http://localhost:" port)
+                                                       :num-threads 2}
+                                                :client-info {:name "test" :version "1.0.0"}
+                                                :capabilities {:tools {}}
+                                                :protocol-version "2024-11-05"})]
 
               (try
                 ;; Wait for ready

@@ -9,8 +9,8 @@
 (deftest ^:integ client-server-initialization-test
   (testing "MCP client automatically initializes with real MCP server"
     (with-open [client (client/create-client
-                        {:server {:command "clojure"
-                                  :args ["-M:stdio-server"]}
+                        {:stdio {:command "clojure"
+                                 :args ["-M:stdio-server"]}
                          :client-info {:name "integration-test-client"
                                        :title "Integration Test Client"
                                        :version "1.0.0"}
@@ -51,7 +51,7 @@
   (testing "MCP client handles server connection errors gracefully"
     ;; Try to connect to non-existent server
     (with-open [client (client/create-client
-                        {:server {:command "cat"}
+                        {:stdio {:command "cat"}
                          :client-info {:name "error-test-client"}
                          :capabilities {}})]
 

@@ -18,10 +18,10 @@
 (deftest ^:integ ls-tool-integration-test
   (testing "ls tool works through mcp-client connecting to mcp-server"
     (with-open [client (client/create-client
-                        {:server       {:command "clojure"
-                                        :args    ["-M:stdio-server"]}
-                         :client-info  {:name    "ls-integration-test-client"
-                                        :version "1.0.0"}
+                        {:stdio {:command "clojure"
+                                 :args ["-M:stdio-server"]}
+                         :client-info {:name "ls-integration-test-client"
+                                       :version "1.0.0"}
                          :capabilities {}})]
 
       ;; Wait for client to initialize
@@ -77,11 +77,11 @@
                       client
                       "ls"
                       {"path" "." "max-depth" 1})
-              dir    (System/getProperty "user.dir")]
+              dir (System/getProperty "user.dir")]
           (is (vector? result))
 
           ;; With depth 1, should not see deeply nested files
-          (let [data  (:data (first result))
+          (let [data (:data (first result))
                 paths (:files data)]
             (is (every?
                  (comp
@@ -103,7 +103,7 @@
           (tools/call-tool-impl client "ls" {"path" "non-existent-path-12345"})
           (is false "Should have thrown exception")
           (catch clojure.lang.ExceptionInfo e
-            (let [data    (ex-data e)
+            (let [data (ex-data e)
                   content (:content data)]
               (is (= "ls" (:tool-name data)))
               (is (vector? content))
