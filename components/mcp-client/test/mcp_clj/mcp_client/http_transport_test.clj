@@ -1,118 +1,141 @@
 (ns mcp-clj.mcp-client.http-transport-test
   (:require
-   [clojure.test :refer [deftest is testing use-fixtures]]
+   [clojure.test :refer [deftest is testing]]
    [mcp-clj.mcp-client.core :as client]
    [mcp-clj.mcp-server.core :as server]
    [mcp-clj.tools.core :as tools]
    [mcp-clj.log :as log]))
 
-;;; Test Fixtures
+;;; Test Helpers
 
-(def ^:dynamic *server* nil)
-(def ^:dynamic *client* nil)
+(defn- create-test-server
+  "Create and start a test HTTP server with optional tools"
+  ([]
+   (create-test-server nil))
+  ([tools]
+   (server/create-server
+    {:transport :http
+     :port 0 ; Random port
+     :tools (or tools
+                {"test-echo"
+                 {:name "test-echo"
+                  :description "Echo test tool"
+                  :inputSchema {:type "object"
+                                :properties {:message {:type "string"}}
+                                :required ["message"]}
+                  :implementation
+                  (fn [args]
+                    {:content
+                     [{:type "text"
+                       :text (str "Echo: " (:message args))}]})}})})))
 
 (defn- get-server-port
-  "Get the port of the running server"
-  []
-  (when-let [prom (:rpc-server-prom *server*)]
-    (when-let [rpc-server @prom]
-      (:port rpc-server))))
+  "Get the port of the running server, waiting for it to be ready"
+  [server]
+  (when-let [prom (:json-rpc-server server)]
+    ;; Wait for server to start with timeout
+    (let [rpc-server (deref prom 5000 nil)]
+      (when rpc-server
+        ;; Give the server a moment to fully bind to the port
+        (Thread/sleep 100)
+        (:port rpc-server)))))
 
-(defn- with-http-server
-  "Start HTTP server for tests"
-  [f]
-  (let [server (server/create-server {:transport :http
-                                      :port 0 ; Random port
-                                      :tools {"test-echo" {:name "test-echo"
-                                                           :description "Echo test tool"
-                                                           :inputSchema {:type "object"
-                                                                         :properties {:message {:type "string"}}
-                                                                         :required ["message"]}
-                                                           :implementation (fn [args]
-                                                                             {:content [{:type "text"
-                                                                                         :text (str "Echo: " (:message args))}]})}}})]
-    (binding [*server* server]
-      (try
-        (f)
-        (finally
-          ((:stop server)))))))
+(defn- create-test-client
+  "Create and initialize a test HTTP client for the given server"
+  ([server]
+   (create-test-client server {}))
+  ([server opts]
+   (let [port (get-server-port server)]
+     (when-not port
+       (throw (ex-info "Server did not start - no port available" {})))
+     (let [client (client/create-client
+                   (merge
+                    {:url (str "http://localhost:" port)
+                     :client-info {:name "test-client"
+                                   :version "1.0.0"}
+                     :capabilities {:tools {}}
+                     :protocol-version "2024-11-05"
+                     :num-threads 2}
+                    opts))]
+       ;; Wait for client to be ready
+       (client/wait-for-ready client 5000)
+       client))))
 
-(defn- with-http-client
-  "Create HTTP client for tests"
-  [f]
-  (let [port (get-server-port)
-        client (client/create-client {:url (str "http://localhost:" port)
-                                      :client-info {:name "test-client"
-                                                    :version "1.0.0"}
-                                      :capabilities {:tools {}}
-                                      :protocol-version "2024-11-05"
-                                      :num-threads 2})]
-    (binding [*client* client]
-      (try
-        ;; Wait for client to be ready
-        (client/wait-for-ready *client* 5000)
-        (f)
-        (finally
-          (client/close! client))))))
-
-(use-fixtures :each with-http-server with-http-client)
+(defmacro with-http-test-env
+  "Set up HTTP server and client for a test, ensuring cleanup"
+  [[server-sym client-sym & {:keys [server-tools client-opts]}] & body]
+  `(let [~server-sym (create-test-server ~server-tools)]
+     (try
+       (let [~client-sym (create-test-client ~server-sym ~client-opts)]
+         (try
+           ~@body
+           (finally
+             (client/close! ~client-sym))))
+       (finally
+         ((:stop ~server-sym))))))
 
 ;;; Tests
 
 (deftest http-client-initialization-test
   ;; Test that HTTP client initializes correctly
   (testing "HTTP client initialization"
-    (testing "connects to server successfully"
-      (is (client/client-ready? *client*)))
+    (with-http-test-env [server client]
+      (testing "connects to server successfully"
+        (is (client/client-ready? client)))
 
-    (testing "has correct client info"
-      (let [info (client/get-client-info *client*)]
-        (is (= "test-client" (:name info)))
-        (is (= "1.0.0" (:version info)))))))
+      (testing "has correct client info"
+        (let [info (client/get-client-info client)
+              client-info (:client-info info)]
+          (is (= "test-client" (:name client-info)))
+          (is (= "1.0.0" (:version client-info))))))))
 
 (deftest http-client-tool-discovery-test
   ;; Test tool discovery via HTTP
   (testing "HTTP client tool discovery"
-    (testing "lists available tools"
-      (let [result (client/list-tools *client*)]
-        (is (map? result))
-        (is (vector? (:tools result)))
-        (is (= 1 (count (:tools result))))
-        (let [tool (first (:tools result))]
-          (is (= "test-echo" (:name tool)))
-          (is (= "Echo test tool" (:description tool))))))))
+    (with-http-test-env [server client]
+      (testing "lists available tools"
+        (let [result (client/list-tools client)]
+          (is (map? result))
+          (is (vector? (:tools result)))
+          (is (= 1 (count (:tools result))))
+          (let [tool (first (:tools result))]
+            (is (= "test-echo" (:name tool)))
+            (is (= "Echo test tool" (:description tool)))))))))
 
 (deftest http-client-tool-execution-test
   ;; Test tool execution via HTTP
   (testing "HTTP client tool execution"
-    (testing "executes tools successfully"
-      (let [result (client/call-tool *client* "test-echo" {:message "Hello, HTTP!"})]
-        (is (vector? result))
-        (is (= 1 (count result)))
-        (let [content (first result)]
-          (is (= "text" (:type content)))
-          (is (= "Echo: Hello, HTTP!" (:text content))))))))
+    (with-http-test-env [server client]
+      (testing "executes tools successfully"
+        (let [result (client/call-tool client "test-echo" {:message "Hello, HTTP!"})]
+          (is (vector? result))
+          (is (= 1 (count result)))
+          (let [content (first result)]
+            (is (= "text" (:type content)))
+            (is (= "Echo: Hello, HTTP!" (:text content)))))))))
 
 (deftest http-client-error-handling-test
   ;; Test error handling in HTTP client
   (testing "HTTP client error handling"
-    (testing "handles tool not found"
-      (is (thrown-with-msg? clojure.lang.ExceptionInfo
-                            #"Method not found"
-                            (client/call-tool *client* "nonexistent-tool" {}))))
+    (with-http-test-env [server client]
+      (testing "handles tool not found"
+        (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                              #"Tool execution failed"
+                              (client/call-tool client "nonexistent-tool" {}))))
 
-    (testing "handles invalid arguments"
-      (is (thrown-with-msg? clojure.lang.ExceptionInfo
-                            #"Tool execution failed"
-                            (client/call-tool *client* "test-echo" {:wrong-param "value"}))))))
+      (testing "handles invalid arguments"
+        (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                              #"Tool execution failed"
+                              (client/call-tool client "test-echo" {:wrong-param "value"})))))))
 
 (deftest http-client-reconnection-test
   ;; Test that client can reconnect with same session
   (testing "HTTP client reconnection"
-    (testing "maintains session across requests"
-      ;; First call establishes session
-      (let [result1 (client/call-tool *client* "test-echo" {:message "First"})
-            ;; Second call should use same session
-            result2 (client/call-tool *client* "test-echo" {:message "Second"})]
-        (is (= "Echo: First" (-> result1 first :text)))
-        (is (= "Echo: Second" (-> result2 first :text)))))))
+    (with-http-test-env [server client]
+      (testing "maintains session across requests"
+        ;; First call establishes session
+        (let [result1 (client/call-tool client "test-echo" {:message "First"})
+              ;; Second call should use same session
+              result2 (client/call-tool client "test-echo" {:message "Second"})]
+          (is (= "Echo: First" (-> result1 first :text)))
+          (is (= "Echo: Second" (-> result2 first :text))))))))
