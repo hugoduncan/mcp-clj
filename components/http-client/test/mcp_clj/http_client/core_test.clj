@@ -1,7 +1,7 @@
 (ns mcp-clj.http-client.core-test
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.http-client.core :as http-client]))
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.http-client.core :as http-client]))
 
 (deftest create-client-test
   ;; Test basic HTTP client creation functionality

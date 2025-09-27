@@ -182,4 +182,5 @@ clj -M:stdio-server
 - mcp protocol specification is at
   https://github.com/modelcontextprotocol/modelcontextprotocol/tree/main/docs/specification
 
-- use str/includes? rather than .contains
+- use `str/includes?` rather than `.contains`
+- run `cljstyle fix` before committing
