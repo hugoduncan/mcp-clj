@@ -96,6 +96,14 @@ Include REFINE to refine the spec
 	   - replace hato usage with http-client
 	   - remove the hato dependency
 
+- [x] add projects/client to build a client jar
+        - include the mcp-client component
+
+- [ ] add projects/java-sdk-wrapper to build a jar with the SDK interop
+      component
+
+- [ ] add a github action to run the tests
+
 - [ ] extend the interop to enable use of SSE transport ? not sure this
       is worth doing still
 
