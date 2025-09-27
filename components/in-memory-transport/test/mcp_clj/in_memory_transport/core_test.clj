@@ -17,8 +17,8 @@
       (let [shared (shared/create-shared-transport)]
         (is (some? (:client-to-server-queue shared)))
         (is (some? (:server-to-client-queue shared)))
-        (is (.get (:alive? shared)))
-        (is (= 0 (.get (:request-id-counter shared))))
+        (is (shared/transport-alive? shared))
+        (is (= 0 (shared/get-request-id shared)))
         (is (empty? @(:pending-requests shared)))))))
 
 ;;; Unit Tests for Client Transport
@@ -60,8 +60,8 @@
   ;; Test that transport can send messages to queues
   (testing "transport sends messages to queues"
     (let [shared-transport (shared/create-shared-transport)
-          transport        (client/create-transport
-                            {:shared shared-transport})]
+          transport (client/create-transport
+                     {:shared shared-transport})]
 
       (testing "send-notification puts message in queue"
         (let [future (transport-protocol/send-notification!
@@ -69,10 +69,7 @@
           ;; Should complete successfully
           (is (nil? (.get future 1 TimeUnit/SECONDS)))
           ;; Should have message in queue
-          (let [message (.poll
-                         (:client-to-server-queue shared-transport)
-                         100
-                         TimeUnit/MILLISECONDS)]
+          (let [message (shared/poll-from-client! shared-transport 100)]
             (is (some? message))
             (is (= "test" (:method message)))
             (is (= {:data "hello"} (:params message))))))
@@ -86,10 +83,7 @@
           ;; Should create a pending future
           (is (instance? CompletableFuture future))
           ;; Should have message in queue
-          (let [message (.poll
-                         (:client-to-server-queue shared-transport)
-                         100
-                         TimeUnit/MILLISECONDS)]
+          (let [message (shared/poll-from-client! shared-transport 100)]
             (is (some? message))
             (is (= "test-req" (:method message)))
             (is (= {:input "world"} (:params message)))
@@ -102,7 +96,7 @@
   ;; Test that server can send responses back to client
   (testing "server can send responses to client"
     (let [shared-transport (shared/create-shared-transport)
-          transport        (client/create-transport {:shared shared-transport})]
+          transport (client/create-transport {:shared shared-transport})]
 
       (testing "server can put response in server-to-client queue"
         ;; Simulate server putting a response message
@@ -120,8 +114,8 @@
       (testing "client can receive notifications from server"
         ;; Simulate server sending a notification
         (let [notification {:jsonrpc "2.0"
-                           :method "server/notification"
-                           :params {:data "notification data"}}]
+                            :method "server/notification"
+                            :params {:data "notification data"}}]
           (shared/offer-to-client! shared-transport notification)
 
           ;; Client should be able to receive it
@@ -137,7 +131,7 @@
   ;; Test complete round-trip communication
   (testing "bidirectional communication works"
     (let [shared-transport (shared/create-shared-transport)
-          transport        (client/create-transport {:shared shared-transport})]
+          transport (client/create-transport {:shared shared-transport})]
 
       (testing "direct queue operations work"
         ;; Test direct queue operations first
@@ -164,8 +158,8 @@
 
           ;; 3. Simulate server processing and sending response
           (let [response {:jsonrpc "2.0"
-                         :id (:id request-message)
-                         :result {:processed "test-data"}}]
+                          :id (:id request-message)
+                          :result {:processed "test-data"}}]
             (shared/offer-to-client! shared-transport response)
 
             ;; 4. Verify response is available in server-to-client queue

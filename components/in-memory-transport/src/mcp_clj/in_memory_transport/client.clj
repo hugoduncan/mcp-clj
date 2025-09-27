@@ -3,10 +3,10 @@
   (:require
    [mcp-clj.client-transport.protocol :as transport-protocol]
    [mcp-clj.in-memory-transport.shared :as shared]
+   [mcp-clj.in-memory-transport.atomic :as atomic]
    [mcp-clj.log :as log])
   (:import
-   [java.util.concurrent TimeUnit CompletableFuture Executors]
-   [java.util.concurrent.atomic AtomicBoolean]))
+   [java.util.concurrent TimeUnit CompletableFuture Executors]))
 
 (defrecord InMemoryTransport
            [shared-transport ; SharedTransport instance
@@ -64,11 +64,11 @@
             (CompletableFuture/failedFuture e))))))
 
   (close! [_]
-    (.set client-alive? false)
+    (atomic/set-boolean! client-alive? false)
     (log/info :in-memory/client-closed {}))
 
   (alive? [_]
-    (and (.get client-alive?)
+    (and (atomic/get-boolean client-alive?)
          (shared/transport-alive? shared-transport)))
 
   (get-json-rpc-client [_]
@@ -127,7 +127,7 @@
                     {:config {:shared shared}})))
   (let [transport (->InMemoryTransport
                    shared
-                   (AtomicBoolean. true)
+                   (atomic/create-atomic-boolean true)
                    notification-handler)]
     ;; Start message processing
     (start-client-message-processor! transport)

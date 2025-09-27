@@ -3,10 +3,10 @@
   (:require
    [mcp-clj.json-rpc.protocols :as json-rpc-protocols]
    [mcp-clj.log :as log]
-   [mcp-clj.in-memory-transport.shared :as shared])
+   [mcp-clj.in-memory-transport.shared :as shared]
+   [mcp-clj.in-memory-transport.atomic :as atomic])
   (:import
-   [java.util.concurrent Executors]
-   [java.util.concurrent.atomic AtomicBoolean]))
+   [java.util.concurrent Executors]))
 
 (defrecord InMemoryServer
            [shared-transport server-alive? handlers])
@@ -57,7 +57,7 @@
              ^Runnable
              (fn []
                (loop []
-                 (when (and (.get server-alive?) (shared/transport-alive? shared-transport))
+                 (when (and (atomic/get-boolean server-alive?) (shared/transport-alive? shared-transport))
                    (try
                      (when-let [message (shared/poll-from-client! shared-transport 100)]
                        (log/debug :in-memory/server-received-message {:message message})
@@ -83,7 +83,7 @@
                       {:config options})))
     (let [server (->InMemoryServer
                   shared
-                  (AtomicBoolean. true)
+                  (atomic/create-atomic-boolean true)
                   (atom handlers))]
       ;; Start message processing
       (start-server-message-processor! server)
@@ -98,14 +98,14 @@
 (defn stop!
   "Stop the in-memory server"
   [server]
-  (.set (:server-alive? server) false)
+  (atomic/set-boolean! (:server-alive? server) false)
   (shared/set-transport-alive! (:shared-transport server) false)
   (log/info :in-memory/server-stopped {}))
 
 (defn alive?
   "Check if the in-memory server is alive"
   [server]
-  (and (.get (:server-alive? server))
+  (and (atomic/get-boolean (:server-alive? server))
        (shared/transport-alive? (:shared-transport server))))
 
 ;;; Protocol Implementation
@@ -123,6 +123,6 @@
     )
 
   (stop! [server]
-    (.set (:server-alive? server) false)
+    (atomic/set-boolean! (:server-alive? server) false)
     (shared/set-transport-alive! (:shared-transport server) false)
     (log/info :in-memory/server-stopped {})))
