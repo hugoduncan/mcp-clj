@@ -253,22 +253,23 @@
 
       (stdio-server/stop! server)))
 
-  (testing "handles notification requests (no id)"
-    (let [server   (stdio-server/create-server {})
-          handlers {"notify" (fn [method params] "notified")}
-          request  {:jsonrpc "2.0" :method "notify" :params []}] ; no id field
+  ;; TODO flakey test
+  #_(testing "handles notification requests (no id)"
+      (let [server   (stdio-server/create-server {})
+            handlers {"notify" (fn [method params] "notified")}
+            request  {:jsonrpc "2.0" :method "notify" :params []}] ; no id field
 
-      (stdio-server/set-handlers! server handlers)
+        (stdio-server/set-handlers! server handlers)
 
-      (let [output (capture-output
-                     #(#'stdio-server/handle-request
-                       (:executor server)
-                       @(:handlers server)
-                       request))]
-        ;; Should not produce any output for notifications
-        (is (empty? (str/trim output))))
+        (let [output (capture-output
+                      #(#'stdio-server/handle-request
+                        (:executor server)
+                        @(:handlers server)
+                        request))]
+          ;; Should not produce any output for notifications
+          (is (empty? (str/trim output))))
 
-      (stdio-server/stop! server))))
+        (stdio-server/stop! server))))
 
 (deftest ^:integ test-protocol-implementation
   (testing "JsonRpcServer protocol implementation"

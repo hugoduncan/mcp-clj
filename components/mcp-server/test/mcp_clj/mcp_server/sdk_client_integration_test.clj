@@ -18,7 +18,7 @@
   "Create SDK client connected to our Clojure MCP server subprocess"
   ^AutoCloseable [async?]
   (let [transport (java-sdk/create-stdio-client-transport
-                    {:command "clj"
+                    {:command "clojure"
                      :args    ["-M:stdio-server:dev:test"]})
         client    (java-sdk/create-java-client
                     {:transport transport
