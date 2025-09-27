@@ -119,7 +119,7 @@
 (defn- ls-impl
   "Implementation function for ls tool"
   [{:keys [path max-depth max-files] :or {max-depth 10 max-files 100} :as args}]
-  (log/error :tool/ls {:args args})
+  (log/debug :tool/ls {:args args})
   (try
     (let [normalized-path (normalize-path path)
           path-file       (io/file normalized-path)]
