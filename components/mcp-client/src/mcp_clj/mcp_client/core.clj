@@ -219,7 +219,8 @@
 (defn call-tool
   "Execute a tool with the given name and arguments.
 
-  Returns the value of the tool call, or throws on error.
+  Returns a CompletableFuture that will contain the parsed tool result on success.
+  The future will complete exceptionally on error.
   Content can be text, images, audio, or resource references."
   [client tool-name arguments]
   (tools/call-tool-impl client tool-name arguments))

@@ -2,9 +2,10 @@
   "In-memory server transport for unit testing MCP communication"
   (:require
    [mcp-clj.json-rpc.protocols :as json-rpc-protocols]
-   [mcp-clj.log :as log])
+   [mcp-clj.log :as log]
+   [mcp-clj.in-memory-transport.shared :as shared])
   (:import
-   [java.util.concurrent TimeUnit Executors]
+   [java.util.concurrent Executors]
    [java.util.concurrent.atomic AtomicBoolean]))
 
 (defrecord InMemoryServer
@@ -23,7 +24,7 @@
             (let [response {:jsonrpc "2.0"
                             :id id
                             :result result}]
-              (.offer (:server-to-client-queue shared-transport) response)
+              (shared/offer-to-client! shared-transport response)
               (log/debug :in-memory/response-sent {:request-id id :method method}))))
         (catch Exception e
           (when id
@@ -32,7 +33,7 @@
                                   :error {:code -32603
                                           :message "Internal error"
                                           :data {:error (.getMessage e)}}}]
-              (.offer (:server-to-client-queue shared-transport) error-response)
+              (shared/offer-to-client! shared-transport error-response)
               (log/error :in-memory/handler-error
                          {:request-id id
                           :method method
@@ -44,22 +45,21 @@
                               :error {:code -32601
                                       :message "Method not found"
                                       :data {:method method}}}]
-          (.offer (:server-to-client-queue shared-transport) error-response)
+          (shared/offer-to-client! shared-transport error-response)
           (log/warn :in-memory/method-not-found {:method method}))))))
 
 (defn- start-server-message-processor!
   "Start processing messages from client to server"
   [server]
   (let [{:keys [shared-transport server-alive?]} server
-        {:keys [client-to-server-queue alive?]} shared-transport
         executor (Executors/newSingleThreadExecutor)]
     (.submit executor
              ^Runnable
              (fn []
                (loop []
-                 (when (and (.get server-alive?) (.get alive?))
+                 (when (and (.get server-alive?) (shared/transport-alive? shared-transport))
                    (try
-                     (when-let [message (.poll client-to-server-queue 100 TimeUnit/MILLISECONDS)]
+                     (when-let [message (shared/poll-from-client! shared-transport 100)]
                        (log/debug :in-memory/server-received-message {:message message})
                        (handle-request server message))
                      (catch InterruptedException _
@@ -71,10 +71,10 @@
 
 (defn create-in-memory-server
   "Create in-memory server transport.
-  
+
   Options:
   - :shared - SharedTransport instance (required)
-  
+
   The shared transport should be the same instance used by the client."
   [options handlers]
   (let [{:keys [shared]} options]
@@ -99,14 +99,14 @@
   "Stop the in-memory server"
   [server]
   (.set (:server-alive? server) false)
-  (.set (:alive? (:shared-transport server)) false)
+  (shared/set-transport-alive! (:shared-transport server) false)
   (log/info :in-memory/server-stopped {}))
 
 (defn alive?
   "Check if the in-memory server is alive"
   [server]
   (and (.get (:server-alive? server))
-       (.get (:alive? (:shared-transport server)))))
+       (shared/transport-alive? (:shared-transport server))))
 
 ;;; Protocol Implementation
 
@@ -124,5 +124,5 @@
 
   (stop! [server]
     (.set (:server-alive? server) false)
-    (.set (:alive? (:shared-transport server)) false)
+    (shared/set-transport-alive! (:shared-transport server) false)
     (log/info :in-memory/server-stopped {})))

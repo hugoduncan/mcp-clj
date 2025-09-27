@@ -2,7 +2,7 @@
   "In-memory client transport for unit testing MCP communication"
   (:require
    [mcp-clj.client-transport.protocol :as transport-protocol]
-   [mcp-clj.in-memory-transport.shared :refer [create-shared-transport]]
+   [mcp-clj.in-memory-transport.shared :as shared]
    [mcp-clj.log :as log])
   (:import
    [java.util.concurrent TimeUnit CompletableFuture Executors]
@@ -15,20 +15,20 @@
 
   transport-protocol/Transport
   (send-request! [_ method params timeout-ms]
-    (if-not (.get (:alive? shared-transport))
+    (if-not (shared/transport-alive? shared-transport)
       (CompletableFuture/failedFuture
        (ex-info "Transport is closed" {:transport :in-memory}))
-      (let [request-id (.incrementAndGet (:request-id-counter shared-transport))
+      (let [request-id (shared/next-request-id! shared-transport)
             future (CompletableFuture.)
             request {:jsonrpc "2.0"
                      :id request-id
                      :method method
                      :params params}]
         ;; Register pending request
-        (swap! (:pending-requests shared-transport) assoc request-id future)
+        (shared/add-pending-request! shared-transport request-id future)
         ;; Send request to server
         (try
-          (.offer (:client-to-server-queue shared-transport) request)
+          (shared/offer-to-server! shared-transport request)
           (log/debug :in-memory/request-sent {:request-id request-id :method method})
           ;; Set timeout if specified
           (when (and timeout-ms (pos? timeout-ms))
@@ -37,7 +37,7 @@
                          ^Runnable
                          (fn []
                            (when-not (.isDone future)
-                             (swap! (:pending-requests shared-transport) dissoc request-id)
+                             (shared/remove-pending-request! shared-transport request-id)
                              (.completeExceptionally future
                                                      (ex-info "Request timeout"
                                                               {:request-id request-id
@@ -46,18 +46,18 @@
                          TimeUnit/MILLISECONDS)))
           future
           (catch Exception e
-            (swap! (:pending-requests shared-transport) dissoc request-id)
+            (shared/remove-pending-request! shared-transport request-id)
             (CompletableFuture/failedFuture e))))))
 
   (send-notification! [_ method params]
-    (if-not (.get (:alive? shared-transport))
+    (if-not (shared/transport-alive? shared-transport)
       (CompletableFuture/failedFuture
        (ex-info "Transport is closed" {:transport :in-memory}))
       (let [notification {:jsonrpc "2.0"
                           :method method
                           :params params}]
         (try
-          (.offer (:client-to-server-queue shared-transport) notification)
+          (shared/offer-to-server! shared-transport notification)
           (log/debug :in-memory/notification-sent {:method method})
           (CompletableFuture/completedFuture nil)
           (catch Exception e
@@ -69,7 +69,7 @@
 
   (alive? [_]
     (and (.get client-alive?)
-         (.get (:alive? shared-transport))))
+         (shared/transport-alive? shared-transport)))
 
   (get-json-rpc-client [_]
     ;; Return a minimal client-like object for compatibility
@@ -80,21 +80,20 @@
 (defn- start-client-message-processor!
   "Start processing messages from server to client"
   [transport]
-  (let [{:keys [server-to-client-queue pending-requests alive?]} (:shared-transport transport)
+  (let [shared-transport (:shared-transport transport)
         executor (Executors/newSingleThreadExecutor)]
     (.submit executor
              ^Runnable
              (fn []
                (loop []
-                 (when (.get alive?)
+                 (when (shared/transport-alive? shared-transport)
                    (try
-                     (when-let [message (.poll server-to-client-queue 100 TimeUnit/MILLISECONDS)]
+                     (when-let [message (shared/poll-from-server! shared-transport 100)]
                        (log/debug :in-memory/client-received-message {:message message})
                        (cond
                          ;; Response to request
                          (:id message)
-                         (when-let [future (get @pending-requests (:id message))]
-                           (swap! pending-requests dissoc (:id message))
+                         (when-let [future (shared/remove-pending-request! shared-transport (:id message))]
                            (if (:error message)
                              (.completeExceptionally future
                                                      (ex-info "Server error"
