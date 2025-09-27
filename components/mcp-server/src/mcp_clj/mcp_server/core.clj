@@ -82,8 +82,10 @@
 
     ;; Tool implementation returned {:result "..."} format
     (contains? result :result)
-    {:content [(text-map (str (:result result)))]
-     :isError false}
+    (do
+      (assert false)
+      {:content [(text-map (str (:result result)))]
+       :isError false})
 
     ;; Tool implementation returned string directly
     (string? result)

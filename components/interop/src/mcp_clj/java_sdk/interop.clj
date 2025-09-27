@@ -28,16 +28,31 @@
     StdioServerTransportProvider
     WebFluxSseServerTransportProvider
     WebFluxStatelessServerTransport
-    WebFluxStreamableServerTransportProvider] ;; Jackson for JSON
+    WebFluxStreamableServerTransportProvider]
    [io.modelcontextprotocol.spec
     McpSchema
+    McpSchema$AudioContent
+    McpSchema$BlobResourceContents
     McpSchema$CallToolRequest
     McpSchema$CallToolResult
+    McpSchema$Content
+    McpSchema$EmbeddedResource
+    McpSchema$ImageContent
+    McpSchema$InitializeResult
+    McpSchema$ListToolsResult
+    McpSchema$ResourceLink
+    McpSchema$ServerCapabilities$PromptCapabilities
+    McpSchema$ServerCapabilities$ResourceCapabilities
+    McpSchema$ServerCapabilities$ToolCapabilities
+    McpSchema$ServerCapabilities
     McpSchema$ServerCapabilities$Builder
-    McpSchema$Tool] ;; Spring WebFlux
+    McpSchema$TextContent
+    McpSchema$TextResourceContents
+    McpSchema$Tool
+    McpServerTransportProvider]
    [org.springframework.web.reactive.function.client
     WebClient
-    WebClient$Builder] ;; Java standard library
+    WebClient$Builder]
    [java.lang AutoCloseable]
    [java.util List
     Map]
@@ -121,38 +136,60 @@
       (log/error :java-sdk/future-error {:error e})
       (throw e))))
 
-#_(defn- java-content->clj
-    "Convert Java content object to Clojure map"
-    [content]
-     ;; Convert Java content objects to Clojure maps
-     ;; The exact structure depends on the Java SDK implementation
-    (try
-      {:type (.getType content)
-       :text (.getText content)}
-      (catch Exception e
-        (log/warn :java-sdk/content-conversion-error {:error e :content content})
-        {:type "text" :text (str content)})))
+(defn- java-content->clj
+  [^McpSchema$Content content]
+  (let [m (.meta content)]
+    (cond->
+        (condp = (.type content)
+          "text"
+          (let [^McpSchema$TextContent text-content content]
+            {:type "text"
+             :text (.text text-content)})
+
+          "image"
+          (let [^McpSchema$ImageContent image-content content]
+            {:data (.data image-content)
+             :mime-type (.mimeType image-content)})
+
+          "audio"
+          (let [^McpSchema$AudioContent audio-content content]
+            {:data (.data audio-content)
+             :mime-type (.mimeType audio-content)})
+
+          "resource"
+          (let [^McpSchema$EmbeddedResource embedded-resource content
+                resource (.resource embedded-resource)
+                base {:uri (.uri resource)
+                      :mime-type (.mimeType resource)
+                      :meta (into {} (.meta resource))}]
+            (cond
+              (instance? McpSchema$TextResourceContents resource)
+              (assoc base
+                     :text (.text ^McpSchema$TextResourceContents resource))
+              (instance? McpSchema$BlobResourceContents resource)
+              (assoc base
+                     :blob (.blob ^McpSchema$BlobResourceContents resource))))
+
+          "resource_link"
+          (let [^McpSchema$ResourceLink link content]
+            {:name (.name link)
+             :title (.title link)
+             :uri (.uri link)
+             :descritpion (.description link)
+             :mime-type (.mimeType link)
+             :size (.size link)})
+
+          {:type "text"
+           :text (str content)})
+      (and m (seq m))
+      (assoc :meta m))))
 
 (defn- java-tool-result->clj
   "Convert Java tool call result to Clojure map"
-  [result]
+  [^McpSchema$CallToolResult result]
   (try
-    (if (instance? McpSchema$CallToolResult result)
-      {:content (mapv (fn [content-item]
-                        (cond
-                          ;; Handle TextContent
-                          (instance? io.modelcontextprotocol.spec.McpSchema$TextContent content-item)
-                          {:type "text"
-                           :text (.text content-item)}
-
-                          ;; Handle other content types - convert to text for now
-                          :else
-                          {:type "text"
-                           :text (str content-item)}))
-                      (.content result))
-       :isError (.isError result)}
-      ;; Fallback for non-CallToolResult objects
-      {:content [{:type "text" :text (str result)}]})
+    {:content (mapv java-content->clj (.content result))
+     :isError (.isError result)}
     (catch Exception e
       (log/error :java-sdk/result-conversion-error {:error e})
       {:content [{:type "text" :text "Error converting result"}]
@@ -160,28 +197,28 @@
 
 (defn- java-tools-result->clj
   "Convert Java tools list result to Clojure map"
-  [result]
+  [^McpSchema$ListToolsResult result]
   (try
     {:tools (mapv (fn [^McpSchema$Tool tool]
-                    {:name (.name tool)
-                     :title (.title tool)
-                     :description (.description tool)
-                     :input-schema (when-let [schema (.inputSchema tool)]
-                                     (try
-                                       ;; Convert JsonSchema to string then parse back to avoid type issues
-                                       (-> schema .toString)
-                                       (catch Exception e
-                                         (str schema))))
+                    {:name          (.name tool)
+                     :title         (.title tool)
+                     :description   (.description tool)
+                     :input-schema  (when-let [schema (.inputSchema tool)]
+                                      (try
+                                        ;; Convert JsonSchema to string then parse back to avoid type issues
+                                        (-> schema .toString)
+                                        (catch Exception e
+                                          (str schema))))
                      :output-schema (when-let [schema (.outputSchema tool)]
                                       (try
                                         (-> schema .toString)
                                         (catch Exception e
                                           (str schema))))
-                     :meta (try
-                             (when-let [meta-obj (._meta tool)]
-                               (str meta-obj))
-                             (catch Exception e
-                               nil))})
+                     :meta          (try
+                                      (when-let [meta-obj (.meta tool)]
+                                        (str meta-obj))
+                                      (catch Exception e
+                                        nil))})
                   (.tools result))}
     (catch Exception e
       (log/error :java-sdk/tools-result-conversion-error {:error e})
@@ -189,7 +226,7 @@
 
 (defn- java-init-result->clj
   "Convert Java SDK initialization result to Clojure map"
-  [init-result]
+  [^McpSchema$InitializeResult init-result]
   (when init-result
     (let [server-info (.serverInfo init-result)
           capabilities (.capabilities init-result)]
@@ -197,13 +234,25 @@
                     :version (when server-info (.version server-info))
                     :title (when server-info (.title server-info))}
        :protocolVersion (.protocolVersion init-result)
-       :capabilities {:tools (when-let [tools-cap (and capabilities (.tools capabilities))]
-                               {:listChanged (.listChanged tools-cap)})
-                      :resources (when-let [resources-cap (and capabilities (.resources capabilities))]
-                                   {:listChanged (.listChanged resources-cap)
-                                    :subscribe (.subscribe resources-cap)})
-                      :prompts (when-let [prompts-cap (and capabilities (.prompts capabilities))]
-                                 {:listChanged (.listChanged prompts-cap)})}
+       :capabilities {:tools
+                      (when-let
+                       [^McpSchema$ServerCapabilities$ToolCapabilities
+                        tools-cap
+                        (and capabilities (.tools capabilities))]
+                        {:listChanged (.listChanged tools-cap)})
+                      :resources
+                      (when-let
+                       [^McpSchema$ServerCapabilities$ResourceCapabilities
+                        resources-cap
+                        (and capabilities (.resources capabilities))]
+                        {:listChanged (.listChanged resources-cap)
+                         :subscribe (.subscribe resources-cap)})
+                      :prompts
+                      (when-let
+                       [^McpSchema$ServerCapabilities$PromptCapabilities
+                        prompts-cap
+                        (and capabilities (.prompts capabilities))]
+                        {:listChanged (.listChanged prompts-cap)})}
        :instructions (.instructions init-result)})))
 
 ;;; Client API
@@ -247,7 +296,8 @@
         builder (ServerParameters/builder cmd)
         server-params (if args
                         (-> builder
-                            (.args (into-array String args))
+                            (.args
+                             ^"[Ljava.lang.String;" (into-array String args))
                             (.build))
                         (.build builder))]
 
@@ -329,14 +379,25 @@
 (defn list-tools
   "List available tools from the server.
 
-  Returns tools list converted to Clojure map."
+  Returns a CompletableFuture that will contain tools list converted to
+  Clojure map."
   [^JavaSdkClient client-record]
   (log/info :java-sdk/listing-tools)
   (if (:async? client-record)
-    (let [result (await-future (.listTools ^McpAsyncClient (:client client-record)) 30)]
-      (java-tools-result->clj result))
-    (let [result (.listTools ^McpSyncClient (:client client-record))]
-      (java-tools-result->clj result))))
+    ;; For async client, the result is already a CompletableFuture/Mono
+    (let [mono   (.listTools ^McpAsyncClient (:client client-record))
+          future (.toFuture mono)]
+      ;; Convert Mono to CompletableFuture if needed and transform result
+      (->  future
+           (.thenApply (reify java.util.function.Function
+                         (apply [_ result]
+                           (java-tools-result->clj result))))))
+    ;; For sync client, wrap the synchronous call in a CompletableFuture
+    (CompletableFuture/supplyAsync
+     (reify java.util.function.Supplier
+       (get [_]
+         (let [result (.listTools ^McpSyncClient (:client client-record))]
+           (java-tools-result->clj result)))))))
 
 (defn call-tool
   "Call a tool through the Java SDK client.
@@ -346,7 +407,8 @@
   - tool-name: Name of the tool to call
   - arguments: Map of arguments for the tool
 
-  Returns tool result converted to Clojure map."
+  Returns a CompletableFuture that will contain tool result converted to
+  Clojure map."
   [^JavaSdkClient client-record ^String tool-name arguments]
   (log/info :java-sdk/calling-tool {:tool tool-name :args arguments})
   (let [^McpSchema$CallToolRequest request
@@ -355,14 +417,21 @@
             (.arguments (clj->java-map arguments))
             (.build))]
     (if (:async? client-record)
+      ;; For async client, the result is already a CompletableFuture/Mono
       (let [^McpAsyncClient client (:client client-record)
-            result (await-future
-                    (.callTool client request)
-                    30)]
-        (java-tool-result->clj result))
-      (let [^McpSyncClient client (:client client-record)
-            result (.callTool client request)]
-        (java-tool-result->clj result)))))
+            future-or-mono         (.callTool client request)
+            future                 (.toFuture future-or-mono)]
+        (-> future
+            (.thenApply (reify java.util.function.Function
+                          (apply [_ result]
+                            (java-tool-result->clj result))))))
+      ;; For sync client, wrap the synchronous call in a CompletableFuture
+      (CompletableFuture/supplyAsync
+       (reify java.util.function.Supplier
+         (get [_]
+           (let [^McpSyncClient client (:client client-record)
+                 result                (.callTool client request)]
+             (java-tool-result->clj result))))))))
 
 (defn close-client
   "Close the Java SDK client."
@@ -384,7 +453,8 @@
   [{:keys [name version async? transport]
     :or {name "java-sdk-server" version "0.1.0" async? true}}]
   (log/info :java-sdk/creating-server {:name name :version version :async? async?})
-  (let [transport (or transport (create-stdio-server-transport))
+  (let [^McpServerTransportProvider transport
+        (or transport (create-stdio-server-transport))
         server (if async?
                  (-> (McpServer/async transport)
                      (.serverInfo name version)
@@ -440,9 +510,11 @@
     (throw (ex-info "Invalid server record" {:server-record server-record})))
   (log/info :java-sdk/registering-tool {:name name})
   ;; Convert input-schema map to JSON string for Java SDK
-  (let [schema-json (if (string? input-schema)
-                      input-schema
-                      (.writeValueAsString (ObjectMapper.) input-schema))
+  (let [^String schema-json (if (string? input-schema)
+                              input-schema
+                              (.writeValueAsString
+                               (ObjectMapper.)
+                               input-schema))
         tool (-> (McpSchema$Tool/builder)
                  (.name name)
                  (.description description)

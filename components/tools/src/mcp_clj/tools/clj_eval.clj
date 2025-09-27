@@ -27,11 +27,9 @@
   "Implementation function for clj-eval tool"
   (fn [{:keys [code]}]
     (let [{:keys [success result error]} (safe-eval code)]
-      (binding [*out* *err*]
-        (prn :code code :success success :error error))
       (if success
-        (cond-> {:content [{:type "text"
-                            :text result}]}
+        (cond-> {:content [{:type "text" :text result}]
+                 :isError false}
           (re-find #"EVAL FAILED:" result)
           (assoc :isError true))
         {:content [{:type "text"

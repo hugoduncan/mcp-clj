@@ -31,7 +31,7 @@
     - :client-was-supported? - Whether the client's version was supported
     - :supported-versions - List of all supported versions"
   [client-requested-version]
-  (let [client-supported? (supported? client-requested-version)
+  (let [client-supported?  (supported? client-requested-version)
         negotiated-version (if client-supported?
                              client-requested-version
                              ;; Find the highest version supported by both. For
@@ -39,9 +39,9 @@
                              ;; In a real implementation, we'd need client's
                              ;; supported versions
                              (get-latest-version))]
-    {:negotiated-version negotiated-version
+    {:negotiated-version    negotiated-version
      :client-was-supported? client-supported?
-     :supported-versions supported-versions}))
+     :supported-versions    supported-versions}))
 
 ;;; Version comparison utilities
 
@@ -89,10 +89,11 @@
 
 (defmethod handle-version-specific-behavior :default
   [protocol-version feature-type context]
-  (throw (ex-info (str "Unsupported feature for protocol version: " protocol-version)
-                  {:protocol-version protocol-version
-                   :feature-type feature-type
-                   :context context})))
+  (throw
+   (ex-info (str "Unsupported feature for protocol version: " protocol-version)
+            {:protocol-version protocol-version
+             :feature-type     feature-type
+             :context          context})))
 
 ;;; Capabilities handling
 

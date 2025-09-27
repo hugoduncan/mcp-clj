@@ -53,7 +53,7 @@
       (client/wait-for-ready client 10000) ; 10 second timeout
 
       (testing "list available tools"
-        (let [tools-response @(client/list-tools client)] ; Deref the CompletableFuture
+        (let [tools-response @(client/list-tools client)]
           (is (map? tools-response))
           (is (contains? tools-response :tools))
           (is (sequential? (:tools tools-response)))
@@ -71,7 +71,8 @@
               (is (some? (:name tool)))
               (is (some? (:description tool)))))
 
-          (log/info :integration-test/tools-discovered {:tools (:tools tools-response)})
+          (log/info :integration-test/tools-discovered
+            {:tools (:tools tools-response)})
 
           ;; Verify client knows tools are available
           (is (client/available-tools? client)))))))
@@ -83,13 +84,17 @@
       (client/wait-for-ready client 10000) ; 10 second timeout
 
       (testing "echo tool call"
-        (let [future (client/call-tool client "echo" {:message "Hello from Clojure MCP client!"})
-              result (:content @future)] ; Deref the CompletableFuture and get :content
+        (let [future (client/call-tool
+                      client
+                      "echo"
+                      {:message "Hello from Clojure MCP client!"})
+              result (:content @future)]
           (is (sequential? result))
 
           (let [first-content (first result)]
             (is (= "text" (:type first-content)))
-            (is (= "Echo: Hello from Clojure MCP client!" (:text first-content))))
+            (is (= "Echo: Hello from Clojure MCP client!"
+                   (:text first-content))))
 
           (log/info :integration-test/echo-result {:result result})))
 
