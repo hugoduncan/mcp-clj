@@ -57,7 +57,7 @@
       ;; Return a failed future for immediate exceptions
       (java.util.concurrent.CompletableFuture/failedFuture e))))
 
-(defn- parse-tool-content
+(defn parse-tool-content
   "Parse tool content, converting JSON strings to Clojure data structures.
 
   Tools may return content as JSON strings in text fields. This function

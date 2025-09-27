@@ -9,9 +9,9 @@
   "Start stdio MCP server (uses stdin/stdout)"
   [_]
   (try
-    (log/warn :stdio-server {:msg "Starting"})
+    (log/info :stdio-server {:msg "Starting"})
     (with-open [server (mcp-server/create-server {:transport {:type :stdio}})]
-      (log/warn :stdio-server {:msg "Started"})
+      (log/info :stdio-server {:msg "Started"})
       (.addShutdownHook
        (Runtime/getRuntime)
        (Thread. #(do

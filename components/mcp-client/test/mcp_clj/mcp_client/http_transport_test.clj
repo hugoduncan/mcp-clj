@@ -13,18 +13,19 @@
   ([tools]
    (server/create-server
     {:transport {:type :http :port 0} ; Random port
-     :tools (or tools
-                {"test-echo"
-                 {:name "test-echo"
-                  :description "Echo test tool"
-                  :inputSchema {:type "object"
-                                :properties {:message {:type "string"}}
-                                :required ["message"]}
-                  :implementation
-                  (fn [args]
-                    {:content
-                     [{:type "text"
-                       :text (str "Echo: " (:message args))}]})}})})))
+     :tools     (or tools
+                    {"test-echo"
+                     {:name        "test-echo"
+                      :description "Echo test tool"
+                      :inputSchema {:type       "object"
+                                    :properties {:message {:type "string"}}
+                                    :required   ["message"]}
+                      :implementation
+                      (fn [args]
+                        {:content
+                         [{:type "text"
+                           :text (str "Echo: " (:message args))}]
+                         :isError false})}})})))
 
 (defn- get-server-port
   "Get the port of the running server, waiting for it to be ready"
@@ -92,7 +93,7 @@
   (testing "HTTP client tool discovery"
     (with-http-test-env [server client]
       (testing "lists available tools"
-        (let [result (client/list-tools client)]
+        (let [result @(client/list-tools client)]
           (is (map? result))
           (is (vector? (:tools result)))
           (is (= 1 (count (:tools result))))
@@ -105,10 +106,14 @@
   (testing "HTTP client tool execution"
     (with-http-test-env [server client]
       (testing "executes tools successfully"
-        (let [result (client/call-tool client "test-echo" {:message "Hello, HTTP!"})]
-          (is (vector? result))
-          (is (= 1 (count result)))
-          (let [content (first result)]
+        (let [result @(client/call-tool
+                       client
+                       "test-echo"
+                       {:message "Hello, HTTP!"})]
+          (is (map? result))
+          (is (not (:isError result)))
+          (is (= 1 (count (:content result))))
+          (let [content (first (:content result))]
             (is (= "text" (:type content)))
             (is (= "Echo: Hello, HTTP!" (:text content)))))))))
 
@@ -117,14 +122,19 @@
   (testing "HTTP client error handling"
     (with-http-test-env [server client]
       (testing "handles tool not found"
-        (is (thrown-with-msg? clojure.lang.ExceptionInfo
-                              #"Tool execution failed"
-                              (client/call-tool client "nonexistent-tool" {}))))
+        (let [resp @(client/call-tool client "nonexistent-tool" {})]
+          (is (:isError resp))
+          (is (= "Tool not found: nonexistent-tool"
+                 (-> resp :content first :text)))))
 
       (testing "handles invalid arguments"
-        (is (thrown-with-msg? clojure.lang.ExceptionInfo
-                              #"Tool execution failed"
-                              (client/call-tool client "test-echo" {:wrong-param "value"})))))))
+        (let [resp @(client/call-tool
+                     client
+                     "test-echo"
+                     {:wrong-param "value"})]
+          (is (:isError resp))
+          (is (= "Missing args: [:message], found #{:wrong-param}"
+                 (-> resp :content first :text))))))))
 
 (deftest ^:integ http-client-reconnection-test
   ;; Test that client can reconnect with same session
@@ -132,8 +142,8 @@
     (with-http-test-env [server client]
       (testing "maintains session across requests"
         ;; First call establishes session
-        (let [result1 (client/call-tool client "test-echo" {:message "First"})
+        (let [result1 @(client/call-tool client "test-echo" {:message "First"})
               ;; Second call should use same session
-              result2 (client/call-tool client "test-echo" {:message "Second"})]
-          (is (= "Echo: First" (-> result1 first :text)))
-          (is (= "Echo: Second" (-> result2 first :text))))))))
+              result2 @(client/call-tool client "test-echo" {:message "Second"})]
+          (is (= "Echo: First" (-> result1 :content first :text)))
+          (is (= "Echo: Second" (-> result2 :content first :text))))))))

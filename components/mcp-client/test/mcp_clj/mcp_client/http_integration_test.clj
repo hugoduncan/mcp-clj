@@ -11,54 +11,58 @@
 
 (def test-tools
   "Test tools for integration testing"
-  {"echo" {:name "echo"
-           :description "Echo the input message with optional prefix"
-           :inputSchema {:type "object"
-                         :properties {:message {:type "string"
-                                                :description "Message to echo"}
-                                      :prefix {:type "string"
-                                               :description "Optional prefix for the message"}}
-                         :required ["message"]}
+  {"echo" {:name           "echo"
+           :description    "Echo the input message with optional prefix"
+           :inputSchema    {:type       "object"
+                            :properties {:message {:type        "string"
+                                                   :description "Message to echo"}
+                                         :prefix  {:type        "string"
+                                                   :description "Optional prefix for the message"}}
+                            :required   ["message"]}
            :implementation (fn [{:keys [message prefix]}]
-                             {:content [{:type "text"
-                                         :text (str (when prefix (str prefix ": ")) message)}]})}
+                             {:content
+                              [{:type "text"
+                                :text (str (when prefix (str prefix ": ")) message)}]
+                              :isError false})}
 
-   "add" {:name "add"
-          :description "Add two numbers together"
-          :inputSchema {:type "object"
-                        :properties {:a {:type "number"
-                                         :description "First number"}
-                                     :b {:type "number"
-                                         :description "Second number"}}
-                        :required ["a" "b"]}
+   "add" {:name           "add"
+          :description    "Add two numbers together"
+          :inputSchema    {:type       "object"
+                           :properties {:a {:type        "number"
+                                            :description "First number"}
+                                        :b {:type        "number"
+                                            :description "Second number"}}
+                           :required   ["a" "b"]}
           :implementation (fn [{:keys [a b]}]
                             {:content [{:type "text"
-                                        :text (str "Result: " (+ a b))}]})}
+                                        :text (str "Result: " (+ a b))}]
+                             :isError false})}
 
-   "error" {:name "error"
-            :description "Tool that always throws an error for testing error handling"
-            :inputSchema {:type "object"
-                          :properties {:message {:type "string"
-                                                 :description "Error message to throw"}}
-                          :required ["message"]}
+   "error" {:name           "error"
+            :description    "Tool that always throws an error for testing error handling"
+            :inputSchema    {:type       "object"
+                             :properties {:message {:type        "string"
+                                                    :description "Error message to throw"}}
+                             :required   ["message"]}
             :implementation (fn [{:keys [message]}]
                               (throw (ex-info message {:type :test-error})))}
 
-   "complex" {:name "complex"
-              :description "Tool that returns complex structured data"
-              :inputSchema {:type "object"
-                            :properties {:count {:type "integer"
-                                                 :description "Number of items to generate"
-                                                 :minimum 1
-                                                 :maximum 10}}
-                            :required ["count"]}
+   "complex" {:name           "complex"
+              :description    "Tool that returns complex structured data"
+              :inputSchema    {:type       "object"
+                               :properties {:count {:type        "integer"
+                                                    :description "Number of items to generate"
+                                                    :minimum     1
+                                                    :maximum     10}}
+                               :required   ["count"]}
               :implementation (fn [{:keys [count]}]
                                 {:content [{:type "text"
                                             :text (str "Generated " count " items:")}
                                            {:type "text"
                                             :text (->> (range count)
                                                        (map #(str "Item " (inc %)))
-                                                       (clojure.string/join ", "))}]})}})
+                                                       (clojure.string/join ", "))}]
+                                 :isError false})}})
 
 ;;; Test Helper Functions
 
@@ -195,28 +199,27 @@
   (with-http-test-env [server client]
     (testing "HTTP error handling integration"
       (testing "tool not found error"
-        (is (thrown-with-msg?
-             clojure.lang.ExceptionInfo
-             #"Tool execution failed: nonexistent-tool"
-             @(client/call-tool client "nonexistent-tool" {}))))
+        (let [resp @(client/call-tool client "nonexistent-tool" {})]
+          (is (:isError resp))
+          (is (= "Tool not found: nonexistent-tool"
+                 (-> resp :content first :text)))))
 
       (testing "invalid tool arguments"
-        (is (thrown-with-msg?
-             clojure.lang.ExceptionInfo
-             #"Tool execution failed"
-             @(client/call-tool client "add" {:invalid "params"}))))
+        (let [resp @(client/call-tool client "add" {:invalid "params"})]
+          (is (:isError resp))
+          (is (= "Missing args: [:b :a], found #{:invalid}"
+                 (-> resp :content first :text)))))
 
       (testing "tool that throws exception"
-        (is (thrown-with-msg?
-             clojure.lang.ExceptionInfo
-             #"Tool execution failed"
-             @(client/call-tool client "error" {:message "Test error"}))))
+        (let [resp @(client/call-tool client "error" {:message "Test error"})]
+          (is (:isError resp))
+          (is (= "Error: Test error" (-> resp :content first :text)))))
 
       (testing "missing required parameters"
-        (is (thrown-with-msg?
-             clojure.lang.ExceptionInfo
-             #"Tool execution failed"
-             @(client/call-tool client "echo" {})))))))
+        (let [resp @(client/call-tool client "echo" {})]
+          (is (:isError resp))
+          (is (= "Missing args: [:message], found #{}"
+                 (-> resp :content first :text))))))))
 
 (deftest ^:integ http-session-management-integration-test
   ;; Test session management across HTTP transport
@@ -249,9 +252,8 @@
       (testing "concurrent tool calls work correctly"
         (let [futures (doall
                        (for [i (range 5)]
-                         (future
-                           (:content @(client/call-tool client "add" {:a i :b (+ i 10)})))))
-              results (mapv deref futures)]
+                         (client/call-tool client "add" {:a i :b (+ i 10)})))
+              results (mapv (comp :text first :content deref) futures)]
 
           ;; Verify all futures completed successfully
           (is (= 5 (count results)))

@@ -42,9 +42,7 @@
                  (:client-info client-info)))
           (is (some? (:server-info client-info)))
           (is (map? (:server-capabilities client-info)))
-          (is (:transport-alive? client-info))
-
-          (log/info :integration-test/client-ready {:client-info client-info}))))))
+          (is (:transport-alive? client-info)))))))
 
 (deftest ^:integ test-tool-discovery
   (testing "tool discovery with Java SDK server"
@@ -100,7 +98,7 @@
 
       (testing "add tool call"
         (let [future (client/call-tool client "add" {:a 42 :b 13})
-              result (:content @future)] ; Deref the CompletableFuture and get :content
+              result (:content @future)]
           (is (sequential? result))
 
           (let [first-content (first result)]
@@ -212,17 +210,17 @@
           (catch Exception _))
 
         ;; Client should still work for valid operations
-        (let [result (client/call-tool client "echo" {:message "after error"})]
-          (is (= "Echo: after error" (-> result first :text))))
+        (let [result @(client/call-tool client "echo" {:message "after error"})]
+          (is (= "Echo: after error" (-> result :content first :text))))
 
         ;; Tool listing should still work
-        (let [tools (client/list-tools client)]
+        (let [tools @(client/list-tools client)]
           (is (map? tools))
           (is (sequential? (:tools tools)))))
 
       (testing "client info remains consistent"
         (let [info1 (client/get-client-info client)
-              _ (client/call-tool client "echo" {:message "test"})
+              _     @(client/call-tool client "echo" {:message "test"})
               info2 (client/get-client-info client)]
 
           ;; Core info should remain the same
@@ -279,10 +277,11 @@
         (is (not (client/client-error? client)))
 
         ;; Perform an operation to ensure everything works
-        (let [result (client/call-tool client "echo" {:message "cleanup test"})]
-          (is (= "Echo: cleanup test" (-> result first :text))))
-
-        (log/info :integration-test/resource-management-verified)))))
+        (let [result @(client/call-tool
+                       client
+                       "echo"
+                       {:message "cleanup test"})]
+          (is (= "Echo: cleanup test" (-> result :content first :text))))))))
 
 (deftest ^:integ test-multiple-clients
   (testing "multiple client instances work independently"
@@ -299,23 +298,14 @@
         (is (client/client-ready? client2))
 
         ;; Both should be able to make calls independently
-        (let [result1 (client/call-tool client1 "echo" {:message "from client 1"})
-              result2 (client/call-tool client2 "echo" {:message "from client 2"})]
+        (let [result1 (client/call-tool
+                       client1
+                       "echo"
+                       {:message "from client 1"})
+              result2 (client/call-tool
+                       client2
+                       "echo"
+                       {:message "from client 2"})]
 
-          (is (= "Echo: from client 1" (-> result1 first :text)))
-          (is (= "Echo: from client 2" (-> result2 first :text)))
-
-          (log/info :integration-test/multiple-clients-verified))))))
-
-(comment
-  ;; Manual testing examples
-
-  ;; Run a single test
-  (clojure.test/run-tests 'mcp-clj.mcp-client.java-sdk-integration-test)
-
-  ;; Test specific functionality
-  (with-open [client (create-client)]
-    (client/wait-for-ready client 10000)
-    (println "Tools:" (client/list-tools client))
-    (println "Echo:" (client/call-tool client "echo" {:message "test"}))
-    (println "Add:" (client/call-tool client "add" {:a 1 :b 2}))))
+          (is (= "Echo: from client 1" (-> @result1 :content first :text)))
+          (is (= "Echo: from client 2" (-> @result2 :content first :text))))))))

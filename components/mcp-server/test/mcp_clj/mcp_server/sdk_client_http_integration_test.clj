@@ -11,7 +11,8 @@
    [clojure.test :refer [deftest is testing use-fixtures]]
    [mcp-clj.java-sdk.interop :as java-sdk]
    [mcp-clj.log :as log]
-   [mcp-clj.mcp-server.core :as mcp-core]))
+   [mcp-clj.mcp-server.core :as mcp-core])
+  (:import    [java.lang AutoCloseable]))
 
 ;;; Test Fixtures and Helpers
 
@@ -36,15 +37,15 @@
 
 (defn- create-http-client
   "Create SDK client connected to our Clojure MCP server via HTTP"
-  [async?]
+  ^AutoCloseable [async?]
   (let [transport (java-sdk/create-http-client-transport
-                   {:url (str "http://localhost:" *server-port* "/")
-                    :use-sse false
+                   {:url                        (str "http://localhost:" *server-port* "/")
+                    :use-sse                    false
                     :open-connection-on-startup false
-                    :resumable-streams false})
-        client (java-sdk/create-java-client
-                {:transport transport
-                 :async? async?})]
+                    :resumable-streams          false})
+        client    (java-sdk/create-java-client
+                   {:transport transport
+                    :async?    async?})]
     client))
 
 ;;; Server Behavior Tests via HTTP
@@ -59,8 +60,7 @@
         (is (contains? result :serverInfo))
         (is (= "mcp-clj" (get-in result [:serverInfo :name])))
         (is (contains? result :protocolVersion))
-        (is (contains? result :capabilities))
-        (log/info :http-integration-test/server-initialized {:result result})))))
+        (is (contains? result :capabilities))))))
 
 (deftest ^:integ test-http-server-tool-discovery
   ;; Test tool discovery over HTTP transport
@@ -70,7 +70,7 @@
       (java-sdk/initialize-client client)
 
       (testing "list server tools"
-        (let [tools-response (java-sdk/list-tools client)]
+        (let [tools-response @(java-sdk/list-tools client)]
           (is (map? tools-response))
           (is (contains? tools-response :tools))
           (is (sequential? (:tools tools-response)))
@@ -85,11 +85,7 @@
               (is (contains? tool :name))
               (is (contains? tool :description))
               (is (some? (:name tool)))
-              (is (some? (:description tool)))))
-
-          (log/info :http-integration-test/tools-discovered
-                    {:count (count (:tools tools-response))
-                     :names (map :name (:tools tools-response))}))))))
+              (is (some? (:description tool))))))))))
 
 (deftest ^:integ test-http-server-tool-execution
   ;; Test tool execution over HTTP transport
@@ -99,7 +95,7 @@
       (java-sdk/initialize-client client)
 
       (testing "ls tool call over HTTP"
-        (let [result (java-sdk/call-tool client "ls" {:path "."})]
+        (let [result @(java-sdk/call-tool client "ls" {:path "."})]
           (is (map? result))
           (is (contains? result :content))
           (is (sequential? (:content result)))
@@ -107,20 +103,19 @@
           (let [first-content (first (:content result))]
             (is (= "text" (:type first-content)))
             (is (string? (:text first-content)))
-            (is (> (count (:text first-content)) 0)))
-
-          (log/info :http-integration-test/ls-result {:success true})))
+            (is (> (count (:text first-content)) 0)))))
 
       (testing "clj-eval tool call over HTTP"
-        (let [result (java-sdk/call-tool client "clj-eval" {:code "(+ 1 2 3)"})]
+        (let [result @(java-sdk/call-tool
+                       client
+                       "clj-eval"
+                       {:code "(+ 1 2 3)"})]
           (is (map? result))
           (is (contains? result :content))
 
           (let [first-content (first (:content result))]
             (is (= "text" (:type first-content)))
-            (is (= "6" (:text first-content))))
-
-          (log/info :http-integration-test/clj-eval-result {:success true}))))))
+            (is (= "6" (:text first-content)))))))))
 
 (deftest ^:integ test-http-server-error-handling
   ;; Test error handling over HTTP transport
@@ -130,32 +125,21 @@
       (java-sdk/initialize-client client)
 
       (testing "non-existent tool call over HTTP"
-        (try
-          (let [result (java-sdk/call-tool client "non-existent-tool" {:param "value"})]
-            (log/info :http-integration-test/non-existent-tool-result {:result result})
-            ;; Server should return an error response
-            (is (contains? result :content))
-            (when (contains? result :isError)
-              (is (:isError result))))
-          (catch Exception e
-            ;; Or it might throw an exception
-            (is (instance? Exception e))
-            (log/info :http-integration-test/non-existent-tool-exception
-                      {:error (.getMessage e)}))))
+        (let [result @(java-sdk/call-tool
+                       client
+                       "non-existent-tool"
+                       {:param "value"})]
+          (is (contains? result :content))
+          (when (contains? result :isError)
+            (is (:isError result)))))
 
       (testing "invalid tool arguments for clj-eval over HTTP"
-        (try
-          ;; Try to call clj-eval without required code parameter
-          (let [result (java-sdk/call-tool client "clj-eval" {:invalid "args"})]
-            (log/info :http-integration-test/invalid-args-result {:result result})
-            ;; Should get an error response
-            (is (contains? result :content))
-            (when (contains? result :isError)
-              (is (:isError result))))
-          (catch Exception e
-            (is (instance? Exception e))
-            (log/info :http-integration-test/invalid-args-exception
-                      {:error (.getMessage e)})))))))
+        ;; Try to call clj-eval without required code parameter
+        (let [result @(java-sdk/call-tool client "clj-eval" {:invalid "args"})]
+          ;; Should get an error response
+          (is (contains? result :content))
+          (when (contains? result :isError)
+            (is (:isError result))))))))
 
 (deftest ^:integ test-http-server-concurrent-operations
   ;; Test concurrent operations over HTTP transport
@@ -167,45 +151,43 @@
       (testing "multiple concurrent tool calls over HTTP"
         (let [futures (doall
                        (for [i (range 3)]
-                         (future
-                           (java-sdk/call-tool client "clj-eval"
-                                               {:code (str "(+ " i " 10)")}))))]
+                         (java-sdk/call-tool
+                          client "clj-eval"
+                          {:code (str "(+ " i " 10)")})))
+              results (mapv deref futures)]
 
           ;; Wait for all to complete
-          (let [results (doall (map deref futures))]
-            (is (= 3 (count results)))
+          (is (= 3 (count results)))
 
-            ;; Each should be a valid result
-            (doseq [result results]
-              (is (map? result))
-              (is (contains? result :content))
-              (is (sequential? (:content result))))
+          ;; Each should be a valid result
+          (doseq [result results]
+            (is (map? result))
+            (is (contains? result :content))
+            (is (sequential? (:content result))))
 
-            (log/info :http-integration-test/concurrent-results
-                      {:count (count results)}))))
+          (log/info :http-integration-test/concurrent-results
+            {:count (count results)})))
 
       (testing "mixed operation types concurrently over HTTP"
-        (let [list-future (future (java-sdk/list-tools client))
-              ls-future (future (java-sdk/call-tool client "ls" {:path "."}))
-              eval-future (future (java-sdk/call-tool client "clj-eval" {:code "42"}))]
+        (let [list-future (java-sdk/list-tools client)
+              ls-future   (java-sdk/call-tool client "ls" {:path "."})
+              eval-future (java-sdk/call-tool client "clj-eval" {:code "42"})
+              list-result @list-future
+              ls-result   @ls-future
+              eval-result @eval-future]
 
-          ;; Wait for all to complete
-          (let [list-result @list-future
-                ls-result @ls-future
-                eval-result @eval-future]
+          ;; List tools result
+          (is (map? list-result))
+          (is (contains? list-result :tools))
 
-            ;; List tools result
-            (is (map? list-result))
-            (is (contains? list-result :tools))
+          ;; ls result
+          (is (map? ls-result))
+          (is (contains? ls-result :content))
 
-            ;; ls result
-            (is (map? ls-result))
-            (is (contains? ls-result :content))
+          ;; eval result
+          (is (= "42" (-> eval-result :content first :text)))
 
-            ;; eval result
-            (is (= "42" (-> eval-result :content first :text)))
-
-            (log/info :http-integration-test/mixed-concurrent-success)))))))
+          (log/info :http-integration-test/mixed-concurrent-success))))))
 
 (deftest ^:integ test-http-server-session-robustness
   ;; Test session robustness over HTTP transport
@@ -221,35 +203,36 @@
           (catch Exception _))
 
         ;; Server should still work for valid operations
-        (let [result (java-sdk/call-tool client "clj-eval" {:code "(str \"after-error\")"})]
+        (let [result @(java-sdk/call-tool
+                       client
+                       "clj-eval"
+                       {:code "(str \"after-error\")"})]
           (is (= "after-error" (-> result :content first :text))))
 
         ;; Tool listing should still work
-        (let [tools (java-sdk/list-tools client)]
+        (let [tools @(java-sdk/list-tools client)]
           (is (map? tools))
           (is (sequential? (:tools tools)))))
 
       (testing "server handles multiple sequential operations over HTTP"
-        (let [result1 (java-sdk/call-tool client "clj-eval" {:code "1"})
-              result2 (java-sdk/call-tool client "clj-eval" {:code "2"})
-              result3 (java-sdk/call-tool client "clj-eval" {:code "3"})]
+        (let [result1 @(java-sdk/call-tool client "clj-eval" {:code "1"})
+              result2 @(java-sdk/call-tool client "clj-eval" {:code "2"})
+              result3 @(java-sdk/call-tool client "clj-eval" {:code "3"})]
 
           (is (= "1" (-> result1 :content first :text)))
           (is (= "2" (-> result2 :content first :text)))
-          (is (= "3" (-> result3 :content first :text)))
-
-          (log/info :http-integration-test/sequential-operations-verified))))))
+          (is (= "3" (-> result3 :content first :text))))))))
 
 (deftest ^:integ test-http-server-with-sse-disabled
   ;; Test HTTP server without SSE streaming transport
   (testing "HTTP server with SSE disabled via Java SDK client"
     (let [transport (java-sdk/create-http-client-transport
-                     {:url (str "http://localhost:" *server-port* "/")
-                      :use-sse false ; Explicitly disable SSE
+                     {:url                        (str "http://localhost:" *server-port* "/")
+                      :use-sse                    false ; Explicitly disable SSE
                       :open-connection-on-startup false})
-          client (java-sdk/create-java-client
-                  {:transport transport
-                   :async? false})]
+          client    (java-sdk/create-java-client
+                     {:transport transport
+                      :async?    false})]
       (try
         ;; Initialize connection
         (let [init-result (java-sdk/initialize-client client)]
@@ -257,10 +240,8 @@
           (is (= "mcp-clj" (get-in init-result [:serverInfo :name]))))
 
         ;; Test tool execution without SSE
-        (let [result (java-sdk/call-tool client "clj-eval" {:code "(* 6 7)"})]
+        (let [result @(java-sdk/call-tool client "clj-eval" {:code "(* 6 7)"})]
           (is (= "42" (-> result :content first :text))))
-
-        (log/info :http-integration-test/non-sse-transport-verified)
 
         (finally
           (java-sdk/close-client client))))))

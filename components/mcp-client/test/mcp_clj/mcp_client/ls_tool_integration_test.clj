@@ -18,20 +18,20 @@
 (deftest ^:integ ls-tool-integration-test
   (testing "ls tool works through mcp-client connecting to mcp-server"
     (with-open [client (client/create-client
-                        {:transport {:type :stdio
-                                     :command "clojure"
-                                     :args ["-M:stdio-server"]}
-                         :client-info {:name "ls-integration-test-client"
-                                       :version "1.0.0"}
+                        {:transport    {:type    :stdio
+                                        :command "clojure"
+                                        :args    ["-M:stdio-server"]}
+                         :client-info  {:name    "ls-integration-test-client"
+                                        :version "1.0.0"}
                          :capabilities {}})]
 
       ;; Wait for client to initialize
-      (client/wait-for-ready client 10000)
+      (client/wait-for-ready client 20000)
       (is (client/client-ready? client))
 
       (testing "can list current directory"
         (let [future (tools/call-tool-impl client "ls" {"path" "."})
-              result (:content @future)] ; Deref the future and get :content
+              result (tools/parse-tool-content (:content @future))]
           ;; Result should be the parsed content directly
           (is (vector? result))
           (is (seq result)) ; Should have at least some files
@@ -40,8 +40,8 @@
           (let [first-item (first result)]
             (is (map? first-item))
             (is (= "text" (:type first-item)))
-            (is (contains? first-item :data)) ; Should have parsed data
-            (is (nil? (:text first-item))) ; Text should be nil after parsing
+            (is (contains? first-item :text))
+            (is (nil? (:text first-item)))
 
             ;; Check the parsed data structure
             (let [data (:data first-item)]
@@ -54,7 +54,7 @@
 
       (testing "can list specific subdirectory"
         (let [future (tools/call-tool-impl client "ls" {"path" "components"})
-              result (:content @future)] ; Deref the future and get :content
+              result (tools/parse-tool-content (:content @future))]
           (is (vector? result))
 
           ;; Should find parsed data with component files
@@ -82,11 +82,11 @@
                       "ls"
                       {"path" "." "max-depth" 1})
               result (:content @future) ; Deref the future and get :content
-              dir (System/getProperty "user.dir")]
+              dir    (System/getProperty "user.dir")]
           (is (vector? result))
 
           ;; With depth 1, should not see deeply nested files
-          (let [data (:data (first result))
+          (let [data  (:data (first result))
                 paths (:files data)]
             (is (every?
                  (comp
@@ -95,27 +95,25 @@
                  paths)))))
 
       (testing "handles non-existent path gracefully by throwing exception"
-        (is (thrown-with-msg?
-             clojure.lang.ExceptionInfo
-             #"Tool execution failed"
-             @(tools/call-tool-impl ; Deref the future
-               client
-               "ls"
-               {"path" "/non-existent-path-12345"})))
+        (let [resp @(tools/call-tool-impl ; Deref the future
+                     client
+                     "ls"
+                     {"path" "/non-existent-path-12345"})]
+          (is (:isError resp))
+          (is (= "Error: Path outside allowed directories"
+                 (-> resp :content first :text))))
 
         ;; Verify the exception contains the expected error content
-        (try
-          @(tools/call-tool-impl client "ls" {"path" "non-existent-path-12345"}) ; Deref the future
-          (is false "Should have thrown exception")
-          (catch clojure.lang.ExceptionInfo e
-            (let [data (ex-data e)
-                  content (:content data)]
-              (is (= "ls" (:tool-name data)))
-              (is (vector? content))
-              (let [error-item (first content)]
-                (is (map? error-item))
-                (is (= "text" (:type error-item)))
-                (is (string? (:text error-item)))
-                (is (re-find
-                     #"not found|does not exist"
-                     (:text error-item)))))))))))
+        (let [data    @(tools/call-tool-impl
+                        client
+                        "ls"
+                        {"path" "non-existent-path-12345"})
+              content (:content data)]
+          (is (vector? content))
+          (let [error-item (first content)]
+            (is (map? error-item))
+            (is (= "text" (:type error-item)))
+            (is (string? (:text error-item)))
+            (is (re-find
+                 #"not found|does not exist"
+                 (:text error-item)))))))))

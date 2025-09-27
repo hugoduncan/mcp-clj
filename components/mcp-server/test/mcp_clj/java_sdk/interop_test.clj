@@ -24,10 +24,12 @@
   "Start SDK server subprocess for testing"
   []
   (log/info :test/starting-server-process)
-  (let [pb (ProcessBuilder. (into-array String
-                                        ["clj" "-M:dev:test" "-m"
-                                         "mcp-clj.java-sdk.sdk-server-main"]))
-        _ (.redirectErrorStream pb true)
+  (let [pb      (ProcessBuilder.
+                 ^"[Ljava.lang.String;"
+                 (into-array String
+                             ["clj" "-M:dev:test" "-m"
+                              "mcp-clj.java-sdk.sdk-server-main"]))
+        _       (.redirectErrorStream pb true)
         process (.start pb)]
 
     (Thread/sleep 3000) ; Give server time to start
@@ -41,7 +43,7 @@
 
 (defn stop-test-server-process
   "Stop SDK server subprocess"
-  [process]
+  [^Process process]
   (when (and process (.isAlive process))
     (log/info :test/stopping-server-process)
     (.destroy process)
@@ -171,7 +173,7 @@
   "Test listing tools from server"
   (testing "sync client tool listing"
     (java-sdk/initialize-client *sync-client*)
-    (let [result (java-sdk/list-tools *sync-client*)]
+    (let [result @(java-sdk/list-tools *sync-client*)]
       (is (map? result))
       (is (contains? result :tools))
       (is (sequential? (:tools result)))
@@ -186,7 +188,7 @@
 
   (testing "async client tool listing"
     (java-sdk/initialize-client *async-client*)
-    (let [result (java-sdk/list-tools *async-client*)]
+    (let [result @(java-sdk/list-tools *async-client*)]
       (is (map? result))
       (is (contains? result :tools))
       (is (= 3 (count (:tools result))))
@@ -199,7 +201,10 @@
   "Test data conversion between Clojure and Java"
   (testing "simple string arguments"
     (java-sdk/initialize-client *sync-client*)
-    (let [result (java-sdk/call-tool *sync-client* "echo" {:message "Hello World"})]
+    (let [result @(java-sdk/call-tool
+                   *sync-client*
+                   "echo"
+                   {:message "Hello World"})]
       (is (map? result))
       (is (contains? result :content))
       (let [content (first (:content result))]
@@ -208,7 +213,7 @@
 
   (testing "numeric arguments"
     (java-sdk/initialize-client *sync-client*)
-    (let [result (java-sdk/call-tool *sync-client* "add" {:a 42 :b 13})]
+    (let [result @(java-sdk/call-tool *sync-client* "add" {:a 42 :b 13})]
       (is (map? result))
       (is (contains? result :content))
       (let [content (first (:content result))]
@@ -218,14 +223,14 @@
   (testing "special characters and unicode"
     (java-sdk/initialize-client *sync-client*)
     (let [message "Special chars: åäö 中文 🚀 \n\t\"quotes\""
-          result (java-sdk/call-tool *sync-client* "echo" {:message message})]
+          result  @(java-sdk/call-tool *sync-client* "echo" {:message message})]
       (is (map? result))
       (let [content (first (:content result))]
         (is (= (str "Echo: " message) (:text content))))))
 
   (testing "empty and nil values"
     (java-sdk/initialize-client *sync-client*)
-    (let [result (java-sdk/call-tool *sync-client* "echo" {:message ""})]
+    (let [result @(java-sdk/call-tool *sync-client* "echo" {:message ""})]
       (is (map? result))
       (let [content (first (:content result))]
         (is (= "Echo: " (:text content)))))))
@@ -237,8 +242,9 @@
   (testing "sequential tool calls"
     (java-sdk/initialize-client *sync-client*)
     (let [results (doall (for [i (range 3)]
-                           (java-sdk/call-tool *sync-client* "echo"
-                                               {:message (str "Message " i)})))]
+                           @(java-sdk/call-tool
+                             *sync-client* "echo"
+                             {:message (str "Message " i)})))]
       (is (= 3 (count results)))
       (doseq [[i result] (map-indexed vector results)]
         (let [content (first (:content result))]
@@ -248,23 +254,29 @@
     (java-sdk/initialize-client *sync-client*)
 
     ;; Call echo
-    (let [echo-result (java-sdk/call-tool *sync-client* "echo" {:message "test"})]
+    (let [echo-result @(java-sdk/call-tool
+                        *sync-client*
+                        "echo"
+                        {:message "test"})]
       (is (some? echo-result))
       (is (= "Echo: test" (-> echo-result :content first :text))))
 
     ;; Call add
-    (let [add-result (java-sdk/call-tool *sync-client* "add" {:a 10 :b 5})]
+    (let [add-result @(java-sdk/call-tool *sync-client* "add" {:a 10 :b 5})]
       (is (some? add-result))
       (is (= "15" (-> add-result :content first :text))))
 
     ;; Call get-time
-    (let [time-result (java-sdk/call-tool *sync-client* "get-time" {})]
+    (let [time-result @(java-sdk/call-tool *sync-client* "get-time" {})]
       (is (some? time-result))
       (is (string? (-> time-result :content first :text)))))
 
   (testing "async tool execution"
     (java-sdk/initialize-client *async-client*)
-    (let [result (java-sdk/call-tool *async-client* "echo" {:message "async test"})]
+    (let [result @(java-sdk/call-tool
+                   *async-client*
+                   "echo"
+                   {:message "async test"})]
       (is (map? result))
       (is (= "Echo: async test" (-> result :content first :text))))))
 
@@ -302,7 +314,7 @@
     (java-sdk/initialize-client *sync-client*)
     ;; nil arguments might be handled gracefully rather than throwing
     (try
-      (let [result (java-sdk/call-tool *sync-client* "echo" nil)]
+      (let [result @(java-sdk/call-tool *sync-client* "echo" nil)]
         ;; If no exception, check that we get some kind of result
         (is (map? result)))
       (catch Exception e
@@ -311,8 +323,9 @@
 
   (testing "tool call with nil tool name"
     (java-sdk/initialize-client *sync-client*)
-    (is (thrown? Exception
-                 (java-sdk/call-tool *sync-client* nil {:message "test"})))))
+    (is (thrown?
+         Exception
+         @(java-sdk/call-tool *sync-client* nil {:message "test"})))))
 
 ;;; Server Wrapper Tests
 
@@ -437,35 +450,16 @@
 
 ;;; Performance and Stress Tests
 
-(deftest ^:integ test-multiple-rapid-calls
-  "Test multiple rapid tool calls to check for race conditions"
-  (testing "rapid sequential calls"
+(deftest ^:integ test-multiple-parallel-calls
+  (testing "Parallel calls"
     (java-sdk/initialize-client *sync-client*)
     (let [results (doall
                    (for [i (range 10)]
-                     (java-sdk/call-tool *sync-client* "echo"
-                                         {:message (str "rapid-" i)})))]
+                     (java-sdk/call-tool
+                      *sync-client* "echo"
+                      {:message (str "rapid-" i)})))]
       (is (= 10 (count results)))
       (doseq [result results]
-        (is (map? result))
-        (is (contains? result :content))
-        (is (string? (-> result :content first :text)))))))
-
-(comment
-  ;; Manual testing utilities
-
-  ;; Test transport creation
-  (java-sdk/create-stdio-client-transport "echo test")
-
-  ;; Test server startup
-  (def process (start-test-server-process))
-  (stop-test-server-process process)
-
-  ;; Test full client workflow
-  (let [client (create-test-client false)]
-    (try
-      (java-sdk/initialize-client client)
-      (java-sdk/list-tools client)
-      (java-sdk/call-tool client "echo" {:message "test"})
-      (finally
-        (java-sdk/close-client client)))))
+        (is (map? @result))
+        (is (contains? @result :content))
+        (is (string? (-> @result :content first :text)))))))

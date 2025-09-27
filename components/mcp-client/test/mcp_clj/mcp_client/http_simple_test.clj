@@ -20,7 +20,9 @@
                                           :properties {:msg {:type "string"}}
                                           :required   ["msg"]}
                          :implementation (fn [{:keys [msg]}]
-                                           {:content [{:type "text" :text msg}]})}}})
+                                           {:content
+                                            [{:type "text" :text msg}]
+                                            :isError false})}}})
           ;; Wait for server to be fully initialized with proper timeout
           rpc-server (deref (:json-rpc-server server) 5000 nil)
           port       (when rpc-server
@@ -67,7 +69,7 @@
 
                 (testing "can call tool"
                   (let [result @(client/call-tool client "echo" {:msg "Hello"})]
-                    (is (= "Hello" (-> result first :text)))))
+                    (is (= "Hello" (-> result :content first :text)))))
 
                 (finally
                   (client/close! client))))))
