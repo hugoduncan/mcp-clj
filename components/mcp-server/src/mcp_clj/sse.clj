@@ -1,10 +1,11 @@
 (ns mcp-clj.sse
   (:require
-   [mcp-clj.log :as log])
+    [mcp-clj.log :as log])
   (:import
-   [java.io Closeable
-    OutputStream
-    OutputStreamWriter]))
+    (java.io
+      Closeable
+      OutputStream
+      OutputStreamWriter)))
 
 (defn message
   [data]
@@ -37,7 +38,8 @@
                            "Connection"    "keep-alive"
                            "Content-Type"  "text/event-stream"}
         initialised       (promise)]
-    {:reply!   (fn reply! [response]
+    {:reply!   (fn reply!
+                 [response]
                  (log/info :sse/reply! response)
                  (try
                    @initialised
@@ -52,7 +54,8 @@
                        (on-response-done)
                        (.close ^Closeable output-stream)
                        (throw e)))))
-     :close!   (fn close []
+     :close!   (fn close
+                 []
                  (log/info :sse/close!)
                  (try
                    (on-response-done)

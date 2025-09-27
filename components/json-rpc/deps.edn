@@ -1,6 +1,9 @@
 {:paths ["src"]
  :deps  {org.clojure/clojure   {:mvn/version "1.12.0"}
-         org.clojure/data.json {:mvn/version "2.5.0"}}
+         org.clojure/data.json {:mvn/version "2.5.0"}
+         poly/http-client      {:local/root "../http-client"}}
  :aliases
- {:test {:extra-paths ["test"]
-         :extra-deps  {}}}}
+ {:dev  {:extra-paths ["test"]
+         :extra-deps  {hato/hato {:mvn/version "1.0.0"}}}
+  :test {:extra-paths ["test"]
+         :extra-deps  {hato/hato {:mvn/version "1.0.0"}}}}}

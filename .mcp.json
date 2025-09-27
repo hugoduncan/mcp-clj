@@ -1,0 +1,19 @@
+{
+    "mcpServers": {
+	"clojure-mcp": {
+	    "type": "stdio",
+	    "command": "/bin/zsh",
+	    "args": [
+		"-c",
+		"clj -X:mcp-hd"
+	    ],
+	    "env": {}
+	},
+	"clj-kondo": {
+	    "command": "npx",
+	    "args": ["clj-kondo-mcp"],
+	    "disabled": false,
+	    "autoApprove": []
+	}
+    }
+}

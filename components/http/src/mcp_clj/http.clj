@@ -1,6 +1,6 @@
 (ns mcp-clj.http
   (:require
-   [clojure.data.json :as json]))
+    [clojure.data.json :as json]))
 
 (defn response
   "Return a minimal status 200 response map with the given body."

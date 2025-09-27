@@ -1,13 +1,16 @@
 (ns mcp-clj.http-server.adapter-test
   "Tests for adapter for Java's HttpServer"
   (:require
-   [clojure.test :refer [deftest testing is use-fixtures]]
-   [mcp-clj.http :as http]
-   [mcp-clj.http-server.adapter :as adapter])
+    [clojure.test :refer [deftest testing is use-fixtures]]
+    [mcp-clj.http :as http]
+    [mcp-clj.http-server.adapter :as adapter])
   (:import
-   [java.net URL HttpURLConnection]))
+    (java.net
+      HttpURLConnection
+      URL)))
 
-(defn test-handler [request]
+(defn test-handler
+  [request]
   (case (:uri request)
     "/" (-> (http/response "Hello World")
             (http/content-type "text/plain"))
@@ -20,17 +23,17 @@
                   (http/content-type "text/event-stream"))
 
     "/echo-headers" (-> (http/response
-                         (pr-str {:headers (:headers request)}))
+                          (pr-str {:headers (:headers request)}))
                         (http/content-type "application/edn"))
 
     "/echo-query" (-> (http/response
                         (pr-str {:query-string (:query-string request)
-                                :query-params ((:query-params request))}))
-                       (http/content-type "application/edn"))
+                                 :query-params ((:query-params request))}))
+                      (http/content-type "application/edn"))
 
     "/post-echo" (-> (http/response
                        (slurp (:body request)))
-                      (http/content-type "text/plain"))
+                     (http/content-type "text/plain"))
 
     "/throw-error" (throw (RuntimeException. "Deliberate test error"))
 
@@ -41,7 +44,8 @@
 (def ^:dynamic *server* nil)
 (def ^:dynamic *port* nil)
 
-(defn server-fixture [f]
+(defn server-fixture
+  [f]
   (println "Starting test server")
   (let [server-map (adapter/run-server test-handler {:port 0})
         port       (:port server-map)]
@@ -58,16 +62,19 @@
 
 (use-fixtures :each server-fixture)
 
-(defn make-connection [method path]
+(defn make-connection
+  [method path]
   (let [url  (URL. (str "http://localhost:" *port* path))
         conn ^HttpURLConnection (.openConnection url)]
     (.setRequestMethod conn method)
     conn))
 
-(defn http-get [path]
+(defn http-get
+  [path]
   (make-connection "GET" path))
 
-(defn http-post [path body]
+(defn http-post
+  [path body]
   (let [conn (make-connection "POST" path)]
     (.setDoOutput conn true)
     (when body

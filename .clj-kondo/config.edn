@@ -1,0 +1,10 @@
+{:hooks
+ {:analyze-call
+  {mcp-clj.mcp-server.http-transport-test/with-test-server
+   hooks.mcp-clj.mcp-server.http-transport-test/with-test-server
+
+   mcp-clj.mcp-client.http-integration-test/with-http-test-env
+   hooks.mcp-clj.mcp-client.http-integration-test/with-http-test-env
+
+   mcp-clj.mcp-client.http-transport-test/with-http-test-env
+   hooks.mcp-clj.mcp-client.http-transport-test/with-http-test-env}}}

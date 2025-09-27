@@ -1,0 +1,15 @@
+{:deps {poly/client-transport {:local/root "../client-transport"}
+        poly/json-rpc         {:local/root "../json-rpc"}
+        poly/log              {:local/root "../log"}}
+
+ :aliases
+ {:dev {:extra-deps {org.clojure/tools.namespace {:mvn/version "1.3.0"}}}
+
+  :test {:extra-paths ["test"]
+         :extra-deps
+         {lambdaisland/kaocha                     {:mvn/version "1.87.1366"}
+          com.fasterxml.jackson.core/jackson-core {:mvn/version "2.20.0"}}}
+
+  :integration {:extra-paths ["test"]
+                :extra-deps  {poly/mcp-server     {:local/root "../mcp-server"}
+                              lambdaisland/kaocha {:mvn/version "1.87.1366"}}}}}

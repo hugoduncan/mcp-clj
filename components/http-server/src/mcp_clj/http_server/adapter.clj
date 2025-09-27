@@ -1,14 +1,16 @@
 (ns mcp-clj.http-server.adapter
   "Adapter for Java's com.sun.net.httpserver.HttpServer with SSE support"
   (:require
-   [clojure.string :as str]
-   [mcp-clj.log :as log])
+    [clojure.string :as str]
+    [mcp-clj.log :as log])
   (:import
-   [com.sun.net.httpserver HttpExchange
-    HttpHandler
-    HttpServer]
-   [java.net InetSocketAddress
-    URLDecoder]))
+    (com.sun.net.httpserver
+      HttpExchange
+      HttpHandler
+      HttpServer)
+    (java.net
+      InetSocketAddress
+      URLDecoder)))
 
 (defn- set-response-header!
   [^HttpExchange exchange k v]
@@ -46,15 +48,16 @@
    :remote-addr       (-> exchange .getRemoteAddress .getAddress .getHostAddress)
    :uri               (.getPath (.getRequestURI exchange))
    :query-string      (.getRawQuery (.getRequestURI exchange))
-   :query-params      (fn query-params []
-                            (parse-query
-                             (.getRawQuery (.getRequestURI exchange))))
+   :query-params      (fn query-params
+                        []
+                        (parse-query
+                          (.getRawQuery (.getRequestURI exchange))))
    :scheme            :http
    :request-method    (-> exchange .getRequestMethod .toLowerCase keyword)
    :headers           (into {}
                             (for [k    (.keySet (.getRequestHeaders exchange))
                                   :let [vs (.get (.getRequestHeaders exchange) k)]]
-                                  [(str/lower-case k) (str (first vs))]))
+                              [(str/lower-case k) (str (first vs))]))
    :body              (.getRequestBody exchange)
    :on-response-done  (fn [] (close-response-body! exchange))
    :on-response-error (fn [] (close-response-body! exchange))
@@ -98,16 +101,17 @@
                    join? false}}]
   (let [server     (HttpServer/create (InetSocketAddress. port) 0)
         handler-fn (reify HttpHandler
-                     (handle [_ exchange]
+                     (handle
+                       [_ exchange]
                        (try
                          (let [request  (exchange->request-map exchange)
                                response (handler request)]
                            (log/info
-                               :http/request
+                             :http/request
                              {:request
                               (select-keys
-                               request
-                               [:uri :method :headers])
+                                request
+                                [:uri :method :headers])
                               :response response})
                            (if (fn? (:body response))
                              (send-streaming-response exchange response)
@@ -122,9 +126,9 @@
     (.start server)
     (when join?
       (.awaitTermination
-       (.getExecutor server)
-       Long/MAX_VALUE
-       java.util.concurrent.TimeUnit/SECONDS))
+        (.getExecutor server)
+        Long/MAX_VALUE
+        java.util.concurrent.TimeUnit/SECONDS))
     {:server server
      :port   (.getPort (.getAddress server))
      :stop   (fn [] (.stop server 0))}))
