@@ -4,7 +4,9 @@
    [clojure.data.json :as json]
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [mcp-clj.log :as log]))
+   [mcp-clj.log :as log])
+  (:import
+   [java.io File]))
 
 (def ^:private allowed-roots
   "Allowed directory roots for security"
@@ -57,7 +59,7 @@
 
 (defn- should-exclude-file?
   "Check if a file should be excluded based on our filtering rules"
-  [file gitignore-patterns]
+  [^File file gitignore-patterns]
   (let [filename (.getName file)]
     (or (= filename ".DS_Store")
         (matches-gitignore? (.getPath file) gitignore-patterns))))
@@ -65,8 +67,8 @@
 (defn- collect-files
   "Recursively collect files with limits"
   [root-dir max-depth max-files]
-  (let [result (atom {:files []
-                      :total-files 0
+  (let [result (atom {:files             []
+                      :total-files       0
                       :max-depth-reached false
                       :max-files-reached false})]
     (letfn [(walk-dir [dir current-depth gitignore-patterns]
@@ -74,9 +76,9 @@
                          (< (count (:files @result)) max-files))
                 (try
                   (let [dir-gitignore (into gitignore-patterns (read-gitignore dir))
-                        files (.listFiles (io/file dir))]
+                        files         (.listFiles (io/file dir))]
                     (when files
-                      (doseq [file files]
+                      (doseq [^File file files]
                         (when (< (count (:files @result)) max-files)
                           (cond
                             (.isFile file)
@@ -91,17 +93,17 @@
                                        (< (inc current-depth) max-depth))
                               (walk-dir (.getPath file) (inc current-depth) dir-gitignore))))))
 
-; Check if we can't traverse deeper due to max-depth limit
+                                        ; Check if we can't traverse deeper due to max-depth limit
                     (let [remaining-files (.listFiles (io/file dir))]
                       (when (and remaining-files
-                                 (some (fn [file]
+                                 (some (fn [^File file]
                                          (and (.isDirectory file)
                                               (not (should-exclude-file? file dir-gitignore))
                                               (>= (inc current-depth) max-depth))) ; can't go deeper
                                        remaining-files))
                         (swap! result assoc :max-depth-reached true))))
                   (catch Exception e
-                    ; Skip directories we can't read
+                                        ; Skip directories we can't read
                     nil))))]
 
       (walk-dir root-dir 0 #{}))

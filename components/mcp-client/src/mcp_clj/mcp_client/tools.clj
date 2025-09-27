@@ -32,10 +32,10 @@
 (defn list-tools-impl
   "Discover available tools from the server.
 
-  Returns a CompletableFuture that will contain a map with :tools key containing vector of tool definitions.
-  Each tool has :name, :description, and :inputSchema."
-  [client]
-  (log/info :client/list-tools-start)
+  Returns a CompletableFuture that will contain a map with :tools key
+  containing vector of tool definitions.  Each tool
+  has :name, :description, and :inputSchema."
+  ^CompletableFuture [client]
   (try
     (let [transport (:transport client)
           response (transport/send-request!
@@ -50,11 +50,8 @@
                       (if-let [tools (:tools result)]
                         (do
                           (cache-tools! client tools)
-                          (log/info :client/list-tools-success {:count (count tools)})
                           {:tools tools})
-                        (do
-                          (log/info :client/list-tools-empty)
-                          {:tools []}))))))
+                        {:tools []})))))
     (catch Exception e
       (log/error :client/list-tools-error {:error (.getMessage e)})
       ;; Return a failed future for immediate exceptions
@@ -90,21 +87,21 @@
     content))
 
 (defn- parse-response [result tool-name]
-  (let [is-error       (:isError result false)
+  (let [is-error (:isError result false)
         parsed-content (parse-tool-content
                         (:content result))]
     (if is-error
       (do
         (log/error :client/call-tool-error
-          {:tool-name tool-name
-           :content   parsed-content})
-        (throw
-         (ex-info (str "Tool execution failed: " tool-name)
-                  {:tool-name tool-name
-                   :content   parsed-content})))
+                   {:tool-name tool-name
+                    :content parsed-content})
+        ;; Return error map instead of throwing
+        {:isError true
+         :tool-name tool-name
+         :content parsed-content})
       (do
         (log/info :client/call-tool-success
-          {:tool-name tool-name})
+                  {:tool-name tool-name})
         ;; Extract the actual value from the tool response
         ;; For simple text responses, return just the text
         ;; For complex responses, return the content structure
@@ -122,10 +119,10 @@
   "Execute a tool with the given name and arguments.
 
   Returns a CompletableFuture that will contain the tool result on success.
-  The future will complete exceptionally on error.
+  For errors, the future contains a map with :isError true.
 
   For tools that return JSON strings, the JSON is parsed into Clojure data."
-  [client tool-name arguments]
+  ^CompletableFuture [client tool-name arguments]
   (log/info :client/call-tool-start {:tool-name tool-name})
   (try
     (let [transport (:transport client)

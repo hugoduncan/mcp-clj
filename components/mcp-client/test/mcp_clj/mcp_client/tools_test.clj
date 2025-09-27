@@ -46,27 +46,27 @@
   [handler]
   ;; Ensure transport is registered before creating client/server
   (ensure-in-memory-transport-registered!)
-  (let [shared-transport    (shared/create-shared-transport)
-        session             (atom {})
+  (let [shared-transport (shared/create-shared-transport)
+        session (atom {})
         ;; Create server using lazy-loaded function
-        create-server-fn    (do
-                              (require 'mcp-clj.in-memory-transport.server)
-                              (ns-resolve
-                               'mcp-clj.in-memory-transport.server
-                               'create-in-memory-server))
-        server              (create-server-fn
-                             {:shared shared-transport}
-                             {"tools/list" handler
-                              "tools/call" handler})
+        create-server-fn (do
+                           (require 'mcp-clj.in-memory-transport.server)
+                           (ns-resolve
+                            'mcp-clj.in-memory-transport.server
+                            'create-in-memory-server))
+        server (create-server-fn
+                {:shared shared-transport}
+                {"tools/list" handler
+                 "tools/call" handler})
         ;; Create transport using lazy-loaded function
         create-transport-fn (do (require 'mcp-clj.in-memory-transport.client)
                                 (ns-resolve
                                  'mcp-clj.in-memory-transport.client
                                  'create-transport))
-        transport           (create-transport-fn {:shared shared-transport})]
-    {:session          session
-     :transport        transport
-     :server           server
+        transport (create-transport-fn {:shared shared-transport})]
+    {:session session
+     :transport transport
+     :server server
      :shared-transport shared-transport}))
 
 (deftest call-tool-success-test
@@ -74,44 +74,45 @@
   (testing "successful tool execution returns CompletableFuture with content"
     (let [handler (fn [method params]
                     {:content "success result" :isError false})
-          client (create-test-client-with-handler handler)]
+          client  (create-test-client-with-handler handler)]
       (try
         (let [future (tools/call-tool-impl client "test-tool" {})]
           (is (instance? CompletableFuture future))
-          (is (= "success result" (.get future 1 TimeUnit/SECONDS))))
+          (is (= {:content "success result", :isError false}
+                 (.get future 1 TimeUnit/SECONDS))))
         (finally
           (stop-server! (:server client))))))
 
-  (testing "tool execution with JSON content parsing"
+  (testing "tool execution with no JSON content parsing"
     (let [handler (fn [method params]
                     {:content [{:type "text" :text "{\"key\": \"value\"}"}]
                      :isError false})
-          client (create-test-client-with-handler handler)]
+          client  (create-test-client-with-handler handler)]
       (try
         ;; Should return the parsed content - access the data field from first item
         (let [future (tools/call-tool-impl client "test-tool" {})
               result (.get future 1 TimeUnit/SECONDS)]
-          (is (vector? result))
-          (is (= 1 (count result)))
-          (let [first-item (first result)]
+          (is (vector? (:content result)))
+          (is (= 1 (count (:content result))))
+          (let [first-item (first (:content result))]
             (is (= "text" (:type first-item)))
-            (is (nil? (:text first-item))) ; text should be nil after parsing
-            (is (= {:key "value"} (:data first-item)))))
+            (is (= "{\"key\": \"value\"}" (:text first-item)))))
         (finally
           (stop-server! (:server client)))))))
 
 (deftest call-tool-error-test
-  ;; Tests tool execution returns future that throws on error when dereferenced
-  (testing "tool execution returns future that throws on error when dereferenced"
+  ;; Tests tool execution returns future with error map when isError is true
+  (testing "tool execution returns future with error map when isError is true"
     (let [handler (fn [method params]
                     {:content "error message" :isError true})
           client (create-test-client-with-handler handler)]
       (try
-        (let [future (tools/call-tool-impl client "test-tool" {})]
+        (let [future (tools/call-tool-impl client "test-tool" {})
+              result (.get future 1 TimeUnit/SECONDS)]
           (is (instance? CompletableFuture future))
-          (is (thrown-with-msg? java.util.concurrent.ExecutionException
-                                #"Tool execution failed: test-tool"
-                                (.get future 1 TimeUnit/SECONDS))))
+          (is (map? result))
+          (is (true? (:isError result)))
+          (is (= "error message" (:content result))))
         (finally
           (stop-server! (:server client)))))))
 
@@ -163,34 +164,37 @@
     (let [handler (fn [method params]
                     {:content "tool result"
                      :isError false})
-          client (create-test-client-with-handler handler)]
+          client  (create-test-client-with-handler handler)]
       (try
         (let [future (tools/call-tool-impl client "test-tool" {:input "test"})]
           (is (instance? CompletableFuture future))
-          (is (= "tool result" (.get future 1 TimeUnit/SECONDS))))
+          (is (= {:content "tool result", :isError false}
+                 (.get future 1 TimeUnit/SECONDS))))
         (finally
           (stop-server! (:server client))))))
 
-  (testing "tool call with error response returns future that throws"
+  (testing "tool call with error response returns future with error map"
     (let [handler (fn [method params]
                     {:content "Tool execution failed"
                      :isError true})
-          client (create-test-client-with-handler handler)]
+          client  (create-test-client-with-handler handler)]
       (try
-        (let [future (tools/call-tool-impl client "failing-tool" {})]
+        (let [future (tools/call-tool-impl client "failing-tool" {})
+              result (.get future 1 TimeUnit/SECONDS)]
           (is (instance? CompletableFuture future))
-          (is (thrown-with-msg?
-               java.util.concurrent.ExecutionException #"Tool execution failed"
-               (.get future 1 TimeUnit/SECONDS))))
+          (is (map? result))
+          (is (true? (:isError result)))
+          (is (= "Tool execution failed" (:content result))))
         (finally
           (stop-server! (:server client))))))
 
   (testing "tool call with handler exception"
     (let [handler (fn [method params]
                     (throw (ex-info "Handler error" {})))
-          client (create-test-client-with-handler handler)]
+          client  (create-test-client-with-handler handler)]
       (try
-        (let [future (tools/call-tool-impl client "test-tool" {})]
+        (let [^CompletableFuture future
+              (tools/call-tool-impl client "test-tool" {})]
           (is (instance? CompletableFuture future))
           ;; The server wraps exceptions in an error response
           (is (thrown? Exception (.get future 1 TimeUnit/SECONDS))))

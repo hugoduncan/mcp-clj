@@ -14,15 +14,15 @@
   Can be called multiple times safely - registration is idempotent."
   []
   (client-transport-factory/register-transport! :in-memory
-    (fn [options]
-      (require 'mcp-clj.in-memory-transport.client)
-      (let [create-fn (ns-resolve 'mcp-clj.in-memory-transport.client 'create-transport)]
-        (create-fn options))))
+                                                (fn [options]
+                                                  (require 'mcp-clj.in-memory-transport.client)
+                                                  (let [create-fn (ns-resolve 'mcp-clj.in-memory-transport.client 'create-transport)]
+                                                    (create-fn options))))
   (server-transport-factory/register-transport! :in-memory
-    (fn [options handlers]
-      (require 'mcp-clj.in-memory-transport.server)
-      (let [create-server (ns-resolve 'mcp-clj.in-memory-transport.server 'create-in-memory-server)]
-        (create-server options handlers)))))
+                                                (fn [options handlers]
+                                                  (require 'mcp-clj.in-memory-transport.server)
+                                                  (let [create-server (ns-resolve 'mcp-clj.in-memory-transport.server 'create-in-memory-server)]
+                                                    (create-server options handlers)))))
 
 ;;; Ensure transport is registered at namespace load time
 (ensure-in-memory-transport-registered!)
@@ -35,16 +35,21 @@
            :inputSchema    {:type       "object"
                             :properties {:message {:type "string"}}}
            :implementation (fn [args]
-                             (binding [*out* *err*]
-                               (prn "echo" args))
-                             {:result (str "Echo: " (:message args))})}
+                             {:content
+                              [{:type "text"
+                                :text (str "Echo: " (:message args))}]
+                              :isError false})}
 
    "add" {:name           "add"
           :description    "Add two numbers"
           :inputSchema    {:type       "object"
                            :properties {:a {:type "number"}
                                         :b {:type "number"}}}
-          :implementation (fn [{:keys [a b]}] {:result (+ a b)})}
+          :implementation (fn [{:keys [a b]}]
+                            {:content
+                             [{:type "text"
+                               :text (str (+ a b))}]
+                             :isError false})}
 
    "error-tool" {:name           "error-tool"
                  :description    "Tool that throws an error"
@@ -114,39 +119,44 @@
 
 (deftest client-tool-operations-test
   ;; Test tool listing and calling operations
-  (testing "MCP client can list and call tools"
+  (testing "MCP client"
     (let [test-env (create-test-client-server)]
       (try
         (let [{:keys [client]} test-env]
-          ;; Wait for initialization
           (client/wait-for-ready client 5000)
 
-          ;; Test listing tools
           (let [tools-response @(client/list-tools client)]
-            (is (some? tools-response))
-            (is (= 3 (count (:tools tools-response))))
-            (let [tool-names (set (map :name (:tools tools-response)))]
-              (is (contains? tool-names "echo"))
-              (is (contains? tool-names "add"))
-              (is (contains? tool-names "error-tool"))))
+            (testing "can list tools"
+              (is (some? tools-response))
+              (is (= 3 (count (:tools tools-response))))
+              (let [tool-names (set (map :name (:tools tools-response)))]
+                (is (contains? tool-names "echo"))
+                (is (contains? tool-names "add"))
+                (is (contains? tool-names "error-tool")))))
 
           ;; Test calling echo tool
-          (let [echo-result @(client/call-tool client "echo" {:message "hello world"})]
-            (is (some? echo-result))
-            (is (= "Echo: hello world" (-> echo-result :content first :text))))
+          (testing "can call tools"
+            (let [echo-result @(client/call-tool
+                                client
+                                "echo"
+                                {:message "hello world"})]
+              (is (some? echo-result))
+              (is (= {:content [{:text "Echo: hello world", :type "text"}]
+                      :isError false}
+                     echo-result)))
 
-          ;; Test calling add tool
-          (let [add-result @(client/call-tool client "add" {:a 5 :b 3})]
-            (is (some? add-result))
-            (is (= "8" (-> add-result :content first :text))))
+            ;; Test calling add tool
+            (let [add-result @(client/call-tool client "add" {:a 5 :b 3})]
+              (is (some? add-result))
+              (is (= {:content [{:text "8", :type "text"}]
+                      :isError false}
+                     add-result)))
 
-          ;; Test calling non-existent tool
-          (is (thrown? Exception
-                       @(client/call-tool client "nonexistent" {})))
+            ;; Test calling non-existent tool
+            (is (:isError @(client/call-tool client "nonexistent" {})))
 
-          ;; Test calling tool that throws error
-          (is (thrown? Exception
-                       @(client/call-tool client "error-tool" {}))))
+            ;; Test calling tool that throws error
+            (is (:isError @(client/call-tool client "error-tool" {})))))
 
         (finally
           (cleanup-test-env test-env))))))
@@ -167,13 +177,13 @@
                                 "echo"
                                 {:message (str "message-" %)})
                               (range 5))
-                add-futures  (mapv
-                              #(client/call-tool client "add" {:a % :b (inc %)})
-                              (range 3))]
+                add-futures (mapv
+                             #(client/call-tool client "add" {:a % :b (inc %)})
+                             (range 3))]
 
             ;; Wait for all to complete
             (let [echo-results (mapv #(deref % 2000 :timeout) echo-futures)
-                  add-results  (mapv #(deref % 2000 :timeout) add-futures)]
+                  add-results (mapv #(deref % 2000 :timeout) add-futures)]
 
               ;; All should complete successfully
               (is (every? #(not= :timeout %) echo-results))
@@ -186,7 +196,8 @@
 
               ;; Check add results
               (doseq [[i result] (map-indexed vector add-results)]
-                (is (= (str (+ i (inc i))) (-> result :content first :text)))))))
+                (is (= (str (+ i (inc i)))
+                       (-> result :content first :text)))))))
 
         (finally
           (cleanup-test-env test-env))))))
@@ -227,14 +238,17 @@
     (ensure-in-memory-transport-registered!)
     (let [shared-transport (shared/create-shared-transport)
           test-server (server/create-server
-                       {:transport {:type :in-memory :shared shared-transport}
+                       {:transport {:type :in-memory
+                                    :shared shared-transport}
                         :tools test-tools})
           client1 (client/create-client
-                   {:transport {:type :in-memory :shared shared-transport}
+                   {:transport {:type :in-memory
+                                :shared shared-transport}
                     :client-info {:name "client-1" :version "1.0.0"}
                     :capabilities {}})
           client2 (client/create-client
-                   {:transport {:type :in-memory :shared shared-transport}
+                   {:transport {:type :in-memory
+                                :shared shared-transport}
                     :client-info {:name "client-2" :version "1.0.0"}
                     :capabilities {}})]
 
@@ -254,10 +268,16 @@
           (is (= "client-2" (get-in info2 [:client-info :name]))))
 
         ;; Both should be able to call tools
-        (let [result1 @(client/call-tool client1 "echo" {:message "from client 1"})
-              result2 @(client/call-tool client2 "echo" {:message "from client 2"})]
-          (is (= "Echo: from client 1" (-> result1 :content first :text)))
-          (is (= "Echo: from client 2" (-> result2 :content first :text))))
+        (let [result1 (client/call-tool
+                       client1
+                       "echo"
+                       {:message "from client 1"})
+              result2 (client/call-tool
+                       client2
+                       "echo"
+                       {:message "from client 2"})]
+          (is (= "Echo: from client 1" (-> @result1 :content first :text)))
+          (is (= "Echo: from client 2" (-> @result2 :content first :text))))
 
         (finally
           (client/close! client1)
