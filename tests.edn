@@ -15,6 +15,7 @@
                           "components/stdio-server/src"
                           "components/tools/src"]
            :test-paths ["components/client-transport/test"
+                        "components/http-client/test"
                         "components/http-server/test"
                         "components/in-memory-transport/test"
                         "components/json-rpc/test"

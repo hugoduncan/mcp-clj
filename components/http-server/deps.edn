@@ -1,1 +1,4 @@
-{:deps {mcp-clj/http {:local/root "../http"}}}
+{:deps {poly/http {:local/root "../http"}}
+ :aliases
+ {:test {:extra-paths ["test"]
+         :extra-deps  {hato/hato {:mvn/version "1.0.0"}}}}}

@@ -5,4 +5,5 @@
         poly/server-transport {:local/root "../server-transport"}}
  :aliases
  {:test {:extra-paths ["test"]
-         :extra-deps {poly/interop {:local/root "../interop"}}}}}
+         :extra-deps {poly/interop {:local/root "../interop"}
+                      hato/hato {:mvn/version "1.0.0"}}}}}

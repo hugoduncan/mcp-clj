@@ -90,6 +90,12 @@ Include REFINE to refine the spec
       the mcp server without any external processes.  Create a transport
 	  that can be used in the current java process to connect the two.
 
+- [x] remove the dependency on hato from mcp-clj.json-rpc.http-client
+       - create a http-client polylith style component with hato like
+         functions implemented using jdk syandard functions
+	   - replace hato usage with http-client
+	   - remove the hato dependency
+
 - [ ] extend the interop to enable use of SSE transport ? not sure this
       is worth doing still
 
