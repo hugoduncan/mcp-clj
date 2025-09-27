@@ -170,3 +170,39 @@
 
       ;; Cleanup
       (transport-protocol/close! transport))))
+
+(deftest test-session-handling
+  ;; Test that in-memory transport properly handles session IDs in requests
+  (testing "in-memory transport includes session ID in request objects"
+    (let [shared-transport (shared/create-shared-transport)
+          received-requests (atom [])
+          test-handlers {"test-method" (fn [request params]
+                                         (swap! received-requests conj {:request request :params params})
+                                         {:result "success"})}]
+
+      ;; Create server with handlers that capture requests
+      (require 'mcp-clj.in-memory-transport.server)
+      (let [create-server (ns-resolve 'mcp-clj.in-memory-transport.server 'create-in-memory-server)
+            server (create-server {:shared shared-transport} test-handlers)
+            client-transport (client/create-transport {:shared shared-transport})]
+
+        (try
+          ;; Send a test request
+          (let [request-future (transport-protocol/send-request!
+                                client-transport "test-method" {:test "data"} 5000)]
+
+            ;; Wait for completion
+            (.get request-future 5 TimeUnit/SECONDS)
+
+            ;; Verify the request object contains session ID
+            (is (= 1 (count @received-requests)))
+            (let [{:keys [request params]} (first @received-requests)]
+              (is (map? request) "Request should be a map")
+              (is (contains? request :query-params) "Request should contain query-params")
+              (is (= "in-memory-session" (get-in request [:query-params "session_id"]))
+                  "Request should contain the in-memory session ID")
+              (is (= "test-method" (:method request)) "Request should contain method")
+              (is (= {:test "data"} params) "Params should be passed correctly")))
+
+          (finally
+            (transport-protocol/close! client-transport)))))))

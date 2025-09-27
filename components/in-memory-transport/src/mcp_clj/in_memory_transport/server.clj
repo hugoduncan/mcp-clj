@@ -19,7 +19,13 @@
         {:keys [id method params]} request]
     (if-let [handler (get handler-map method)]
       (try
-        (let [result (handler method params)]
+        ;; Create a proper request object with session info for MCP server compatibility
+        ;; The in-memory transport uses a single implicit session per connection
+        (let [request-obj {:query-params {"session_id" "in-memory-session"}
+                           :method method
+                           :params params
+                           :id id}
+              result (handler request-obj params)]
           (when id ; Only send response for requests (not notifications)
             (let [response {:jsonrpc "2.0"
                             :id id
@@ -74,10 +80,12 @@
 
   Options:
   - :shared - SharedTransport instance (required)
+  - :on-connect - Function called when client connects (optional)
+  - :on-disconnect - Function called when client disconnects (optional)
 
   The shared transport should be the same instance used by the client."
   [options handlers]
-  (let [{:keys [shared]} options]
+  (let [{:keys [shared on-connect on-disconnect]} options]
     (when-not shared
       (throw (ex-info "Missing :shared transport in server configuration"
                       {:config options})))

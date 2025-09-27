@@ -142,7 +142,12 @@
 (defn- create-in-memory-server
   [options handlers]
   (require 'mcp-clj.in-memory-transport.server)
-  (let [create-server (ns-resolve 'mcp-clj.in-memory-transport.server 'create-in-memory-server)]
-    (create-server options handlers)))
+  (let [create-server (ns-resolve 'mcp-clj.in-memory-transport.server 'create-in-memory-server)
+        ;; Map SSE callbacks to generic connection callbacks for in-memory transport
+        adapted-options (-> options
+                            (assoc :on-connect (:on-sse-connect options))
+                            (assoc :on-disconnect (:on-sse-close options))
+                            (dissoc :on-sse-connect :on-sse-close))]
+    (create-server adapted-options handlers)))
 
 (register-transport! :in-memory create-in-memory-server)

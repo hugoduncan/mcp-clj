@@ -248,7 +248,15 @@
 (defn- request-handler
   "Wrap a handler to support async responses and session updates"
   [server handler request params]
-  (let [session (request-session server request)
+  (let [session-id (request-session-id request)
+        session (request-session server request)
+        ;; Create session on-demand if missing (for in-memory transport)
+        session (or session
+                    (when session-id
+                      (let [new-session (->Session session-id false nil nil nil)]
+                        (swap! (:session-id->session server) assoc session-id new-session)
+                        (log/info :server/session-created {:session-id session-id})
+                        new-session)))
         protocol-version (:protocol-version session)
         ;; Use version-aware handler for tool calls if protocol version is available
         actual-handler (if (and protocol-version (= handler handle-call-tool))
@@ -379,7 +387,6 @@
   (notify-resources-changed! server)
   server)
 
-
 (defn create-server
   "Create MCP server instance.
 
@@ -400,10 +407,10 @@
     (create-server {:transport {:type :http :port 3001}
                     :prompts {...}})"
   [{:keys [transport tools prompts resources]
-    :or   {tools     tools/default-tools
-           prompts   prompts/default-prompts
-           resources resources/default-resources}
-    :as   opts}]
+    :or {tools tools/default-tools
+         prompts prompts/default-prompts
+         resources resources/default-resources}
+    :as opts}]
   (when-not transport
     (throw (ex-info "Missing :transport configuration"
                     {:config opts
@@ -419,32 +426,32 @@
     (when-not (prompts/valid-prompt? prompt)
       (throw (ex-info "Invalid prompt in constructor" {:prompt prompt}))))
   (let [session-id->session (atom {})
-        tool-registry       (atom tools)
-        prompt-registry     (atom prompts)
-        resource-registry   (atom resources)
-        rpc-server-prom     (promise)
-        server              (->MCPServer
-                             rpc-server-prom
-                             session-id->session
-                             tool-registry
-                             prompt-registry
-                             resource-registry)
+        tool-registry (atom tools)
+        prompt-registry (atom prompts)
+        resource-registry (atom resources)
+        rpc-server-prom (promise)
+        server (->MCPServer
+                rpc-server-prom
+                session-id->session
+                tool-registry
+                prompt-registry
+                resource-registry)
         ;; Create handlers before creating the JSON-RPC server to avoid race
         ;; conditions
-        handlers            (create-handlers server)
+        handlers (create-handlers server)
         ;; Add callbacks to transport options
         transport-with-callbacks (merge transport
                                         {:on-sse-connect (partial on-sse-connect server)
-                                         :on-sse-close   (partial on-sse-close server)})
-        json-rpc-server     (transport-factory/create-transport
-                             transport-with-callbacks
-                             handlers)
-        server              (assoc server
-                                   :stop #(do
-                                            (log/info :server/stopping {})
-                                            (stop! server)
-                                            (json-rpc-protocols/stop! json-rpc-server)
-                                            (log/info :server/stopped {})))]
+                                         :on-sse-close (partial on-sse-close server)})
+        json-rpc-server (transport-factory/create-transport
+                         transport-with-callbacks
+                         handlers)
+        server (assoc server
+                      :stop #(do
+                               (log/info :server/stopping {})
+                               (stop! server)
+                               (json-rpc-protocols/stop! json-rpc-server)
+                               (log/info :server/stopped {})))]
     ;; Set handlers immediately after creating the JSON-RPC server to minimize
     ;; race window
     (json-rpc-protocols/set-handlers! json-rpc-server handlers)
