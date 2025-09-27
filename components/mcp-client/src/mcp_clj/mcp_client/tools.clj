@@ -29,26 +29,33 @@
 (defn list-tools-impl
   "Discover available tools from the server.
 
-  Returns a map with :tools key containing vector of tool definitions.
+  Returns a CompletableFuture that will contain a map with :tools key containing vector of tool definitions.
   Each tool has :name, :description, and :inputSchema."
   [client]
   (log/info :client/list-tools-start)
   (try
     (let [transport (:transport client)
-          json-rpc-client (:json-rpc-client transport)
-          ;; Use the core namespace's send-request! function
           response (transport/send-request!
                     transport
                     "tools/list"
                     {}
                     30000)]
-      (when-let [tools (:tools @response)]
-        (cache-tools! client tools)
-        (log/info :client/list-tools-success {:count (count tools)})
-        {:tools tools}))
+      ;; Transform the response future to handle caching and return tools
+      (.thenApply response
+                  (reify java.util.function.Function
+                    (apply [_ result]
+                      (if-let [tools (:tools result)]
+                        (do
+                          (cache-tools! client tools)
+                          (log/info :client/list-tools-success {:count (count tools)})
+                          {:tools tools})
+                        (do
+                          (log/info :client/list-tools-empty)
+                          {:tools []}))))))
     (catch Exception e
       (log/error :client/list-tools-error {:error (.getMessage e)})
-      (throw e))))
+      ;; Return a failed future for immediate exceptions
+      (java.util.concurrent.CompletableFuture/failedFuture e))))
 
 (defn- parse-tool-content
   "Parse tool content, converting JSON strings to Clojure data structures.
@@ -82,52 +89,52 @@
 (defn call-tool-impl
   "Execute a tool with the given name and arguments.
 
-  Returns the parsed content directly on success.
-  Throws ex-info on error with the error content as the message.
+  Returns a CompletableFuture that will contain the parsed content on success.
+  The future will complete exceptionally on error.
 
   For tools that return JSON strings, the JSON is parsed into Clojure data."
   [client tool-name arguments]
   (log/info :client/call-tool-start {:tool-name tool-name})
   (try
     (let [transport (:transport client)
-          json-rpc-client (:json-rpc-client transport)
-          params {:name tool-name :arguments (or arguments {})}
-          ;; Use the core namespace's send-request! function
-          response (transport/send-request!
-                    transport
-                    "tools/call"
-                    params
-                    30000)
-          result (deref response 30000 ::timeout)]
-
-      (when (= result ::timeout)
-        (throw (ex-info (str "Tool call timed out: " tool-name)
-                        {:tool-name tool-name
-                         :timeout 30000})))
-
-      (let [is-error (:isError result false)
-            parsed-content (parse-tool-content (:content result))]
-        (if is-error
-          (do
-            (log/error :client/call-tool-error {:tool-name tool-name
-                                                :content parsed-content})
-            (throw (ex-info (str "Tool execution failed: " tool-name)
-                            {:tool-name tool-name
-                             :content parsed-content})))
-          (do
-            (log/info :client/call-tool-success {:tool-name tool-name})
-            parsed-content))))
+          params    {:name tool-name :arguments (or arguments {})}
+          response  (transport/send-request!
+                     transport
+                     "tools/call"
+                     params
+                     30000)]
+      ;; Transform the response future to handle parsing and errors
+      (.thenApply response
+                  (reify java.util.function.Function
+                    (apply [_ result]
+                      (let [is-error       (:isError result false)
+                            parsed-content (parse-tool-content
+                                            (:content result))]
+                        (if is-error
+                          (do
+                            (log/error :client/call-tool-error
+                              {:tool-name tool-name
+                               :content   parsed-content})
+                            (throw
+                             (ex-info (str "Tool execution failed: " tool-name)
+                                      {:tool-name tool-name
+                                       :content   parsed-content})))
+                          (do
+                            (log/info :client/call-tool-success
+                              {:tool-name tool-name})
+                            {:content parsed-content})))))))
     (catch Exception e
-      (if (instance? clojure.lang.ExceptionInfo e)
-        (throw e) ; Re-throw tool errors
-        (do
-          (log/error :client/call-tool-error {:tool-name tool-name
-                                              :error (.getMessage e)
-                                              :ex e})
-          (throw (ex-info (str "Tool call failed: " tool-name)
-                          {:tool-name tool-name
-                           :error (.getMessage e)}
-                          e)))))))
+      ;; Return a failed future for immediate exceptions (like transport errors)
+      (log/error :client/call-tool-error {:tool-name tool-name
+                                          :error     (.getMessage e)
+                                          :ex        e})
+      (java.util.concurrent.CompletableFuture/failedFuture
+       (if (instance? clojure.lang.ExceptionInfo e)
+         e
+         (ex-info (str "Tool call failed: " tool-name)
+                  {:tool-name tool-name
+                   :error     (.getMessage e)}
+                  e))))))
 
 (defn available-tools?-impl
   "Check if any tools are available from the server.
@@ -138,8 +145,9 @@
   (try
     (if-let [cached-tools (get-cached-tools client)]
       (boolean (seq cached-tools))
-      (when-let [result (list-tools-impl client)]
-        (boolean (seq (:tools result)))))
+      (when-let [result-future (list-tools-impl client)]
+        (let [result @result-future]
+          (boolean (seq (:tools result))))))
     (catch Exception e
       (log/debug :client/available-tools-error {:error (.getMessage e)})
       false)))

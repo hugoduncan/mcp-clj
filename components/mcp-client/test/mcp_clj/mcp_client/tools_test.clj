@@ -1,85 +1,111 @@
 (ns mcp-clj.mcp-client.tools-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [mcp-clj.client-transport.protocol :as transport-protocol]
+   [mcp-clj.client-transport.factory :as client-transport-factory]
+   [mcp-clj.in-memory-transport.shared :as shared]
    [mcp-clj.mcp-client.tools :as tools]
-   [mcp-clj.json-rpc.stdio-client :as stdio-client])
+   [mcp-clj.server-transport.factory :as server-transport-factory])
   (:import
-   [java.util.concurrent CompletableFuture ConcurrentHashMap]
-   [java.io StringWriter BufferedWriter]))
+   [java.util.concurrent CompletableFuture TimeUnit]))
 
-;; Mock transport that implements the protocol
-(defrecord MockTransport [json-rpc-client response-atom]
-  transport-protocol/Transport
-  (send-request! [_ method params timeout-ms]
-    ;; Return whatever response was set in the test
-    @response-atom)
-  (send-notification! [_ method params]
-    (CompletableFuture/completedFuture nil))
-  (close! [_] nil)
-  (alive? [_] true)
-  (get-json-rpc-client [_] json-rpc-client))
-
-(defn- create-mock-client
-  "Create a mock client for testing"
+;;; Transport registration function for robust test isolation
+(defn ensure-in-memory-transport-registered!
+  "Ensure in-memory transport is registered in both client and server factories.
+  Can be called multiple times safely - registration is idempotent."
   []
-  (let [session (atom {})
-        string-writer (StringWriter.)
-        buffered-writer (BufferedWriter. string-writer)
-        ;; Create a proper JSONRPClient record instance
-        mock-json-rpc-client (stdio-client/->JSONRPClient
-                              (ConcurrentHashMap.) ; pending-requests
-                              (atom 0) ; request-id-counter
-                              nil ; executor
-                              nil ; input-stream
-                              buffered-writer ; output-stream
-                              (atom false) ; running
-                              nil) ; reader-future
-        response-atom (atom (CompletableFuture/completedFuture {}))]
-    {:session session
-     :transport (->MockTransport mock-json-rpc-client response-atom)
-     :response-atom response-atom}))
+  (client-transport-factory/register-transport! :in-memory
+    (fn [options]
+      (require 'mcp-clj.in-memory-transport.client)
+      (let [create-fn (ns-resolve 'mcp-clj.in-memory-transport.client 'create-transport)]
+        (create-fn options))))
+  (server-transport-factory/register-transport! :in-memory
+    (fn [options handlers]
+      (require 'mcp-clj.in-memory-transport.server)
+      (let [create-server (ns-resolve 'mcp-clj.in-memory-transport.server 'create-in-memory-server)]
+        (create-server options handlers)))))
+
+;;; Ensure transport is registered at namespace load time
+(ensure-in-memory-transport-registered!)
+
+(defn- stop-server!
+  "Stop an in-memory server using lazy-loaded function"
+  [server]
+  (require 'mcp-clj.in-memory-transport.server)
+  ((ns-resolve 'mcp-clj.in-memory-transport.server 'stop!) server))
+
+(defn- create-test-client-with-handler
+  "Create a test client with in-memory transport and custom handler"
+  [handler]
+  ;; Ensure transport is registered before creating client/server
+  (ensure-in-memory-transport-registered!)
+  (let [shared-transport (shared/create-shared-transport)
+        session          (atom {})
+        ;; Create server using lazy-loaded function
+        create-server-fn (do (require 'mcp-clj.in-memory-transport.server)
+                             (ns-resolve 'mcp-clj.in-memory-transport.server 'create-in-memory-server))
+        server           (create-server-fn
+                          {:shared shared-transport}
+                          {"tools/list" handler
+                           "tools/call" handler})
+        ;; Create transport using lazy-loaded function
+        create-transport-fn (do (require 'mcp-clj.in-memory-transport.client)
+                                (ns-resolve 'mcp-clj.in-memory-transport.client 'create-transport))
+        transport           (create-transport-fn {:shared shared-transport})]
+    {:session          session
+     :transport        transport
+     :server           server
+     :shared-transport shared-transport}))
 
 (deftest call-tool-success-test
-  ;; Tests successful tool execution returns content directly
-  (testing "successful tool execution returns content directly"
-    (let [client (create-mock-client)]
-      (reset! (:response-atom client)
-              (CompletableFuture/completedFuture
-               {:content "success result" :isError false}))
-      (is (= "success result"
-             (tools/call-tool-impl client "test-tool" {})))))
+  ;; Tests successful tool execution returns CompletableFuture with content
+  (testing "successful tool execution returns CompletableFuture with content"
+    (let [handler (fn [method params]
+                    {:content "success result" :isError false})
+          client  (create-test-client-with-handler handler)]
+      (try
+        (let [future (tools/call-tool-impl client "test-tool" {})]
+          (is (instance? CompletableFuture future))
+          (is (= {:content "success result"} (.get future 1 TimeUnit/SECONDS))))
+        (finally
+          (stop-server! (:server client))))))
 
   (testing "tool execution with JSON content parsing"
-    (let [client (create-mock-client)]
-      (reset! (:response-atom client)
-              (CompletableFuture/completedFuture
-               {:content [{:type "text" :text "{\"key\": \"value\"}"}]
-                :isError false}))
-      ;; Should return the parsed content - access the data field from first item
-      (let [result (tools/call-tool-impl client "test-tool" {})]
-        (is (vector? result))
-        (is (= 1 (count result)))
-        (let [first-item (first result)]
-          (is (= "text" (:type first-item)))
-          (is (nil? (:text first-item))) ; text should be nil after parsing
-          (is (= {:key "value"} (:data first-item))))))))
+    (let [handler (fn [method params]
+                    {:content [{:type "text" :text "{\"key\": \"value\"}"}]
+                     :isError false})
+          client  (create-test-client-with-handler handler)]
+      (try
+        ;; Should return the parsed content - access the data field from first item
+        (let [future (tools/call-tool-impl client "test-tool" {})
+              result (:content (.get future 1 TimeUnit/SECONDS))]
+          (is (vector? result))
+          (is (= 1 (count result)))
+          (let [first-item (first result)]
+            (is (= "text" (:type first-item)))
+            (is (nil? (:text first-item))) ; text should be nil after parsing
+            (is (= {:key "value"} (:data first-item)))))
+        (finally
+          (stop-server! (:server client)))))))
 
 (deftest call-tool-error-test
-  ;; Tests tool execution throws on error
-  (testing "tool execution throws on error"
-    (let [client (create-mock-client)]
-      (reset! (:response-atom client)
-              (CompletableFuture/completedFuture
-               {:content "error message" :isError true}))
-      (is (thrown-with-msg? clojure.lang.ExceptionInfo
-                            #"Tool execution failed: test-tool"
-                            (tools/call-tool-impl client "test-tool" {}))))))
+  ;; Tests tool execution returns future that throws on error when dereferenced
+  (testing "tool execution returns future that throws on error when dereferenced"
+    (let [handler (fn [method params]
+                    {:content "error message" :isError true})
+          client  (create-test-client-with-handler handler)]
+      (try
+        (let [future (tools/call-tool-impl client "test-tool" {})]
+          (is (instance? CompletableFuture future))
+          (is (thrown-with-msg? java.util.concurrent.ExecutionException
+                                #"Tool execution failed: test-tool"
+                                (.get future 1 TimeUnit/SECONDS))))
+        (finally
+          (stop-server! (:server client)))))))
 
 (deftest tools-cache-test
   ;; Tests tools cache creation and access
   (testing "tools cache creation and access"
-    (let [client (create-mock-client)]
+    (let [client {:session (atom {})}]
       ;; Cache should be created on first access
       (is (nil? @(#'tools/get-tools-cache client)))
 
@@ -89,85 +115,101 @@
         (is (= test-tools (#'tools/get-cached-tools client)))))))
 
 (deftest list-tools-impl-test
-  ;; Tests successful tools list request
-  (testing "successful tools list request"
+  ;; Tests successful tools list request returns CompletableFuture
+  (testing "successful tools list request returns CompletableFuture"
     (let [mock-tools [{:name "echo" :description "Echo tool"}
                       {:name "calc" :description "Calculator tool"}]
-          client (create-mock-client)]
+          handler    (fn [method params]
+                       {:tools mock-tools})
+          client     (create-test-client-with-handler handler)]
+      (try
+        (let [future (tools/list-tools-impl client)]
+          (is (instance? CompletableFuture future))
+          (let [result (.get future 1 TimeUnit/SECONDS)]
+            (is (= mock-tools (:tools result)))
+            ;; Tools should be cached
+            (is (= mock-tools (#'tools/get-cached-tools client)))))
+        (finally
+          (stop-server! (:server client))))))
 
-      (reset! (:response-atom client)
-              (CompletableFuture/completedFuture
-               {:tools mock-tools}))
-      (let [result (tools/list-tools-impl client)]
-        (is (= mock-tools (:tools result)))
-        ;; Tools should be cached
-        (is (= mock-tools (#'tools/get-cached-tools client))))))
-
-  (testing "error handling in tools list"
-    (let [client (create-mock-client)
-          error-future (CompletableFuture.)]
-      (.completeExceptionally error-future
-                              (ex-info "Connection failed" {}))
-      (reset! (:response-atom client) error-future)
-      (is (thrown-with-msg?
-           Exception #"Connection failed"
-           (tools/list-tools-impl client))))))
+  (testing "error handling in tools list returns failed future"
+    (let [handler (fn [method params]
+                    (throw (ex-info "Connection failed" {})))
+          client  (create-test-client-with-handler handler)]
+      (try
+        (let [future (tools/list-tools-impl client)]
+          (is (instance? CompletableFuture future))
+          ;; The in-memory transport will wrap this in an error response
+          (is (thrown? Exception (.get future 1 TimeUnit/SECONDS))))
+        (finally
+          (stop-server! (:server client)))))))
 
 (deftest call-tool-impl-test
-  ;; Tests successful tool call
-  (testing "successful tool call"
-    (let [client (create-mock-client)]
-      (reset! (:response-atom client)
-              (CompletableFuture/completedFuture
-               {:content "tool result"
-                :isError false}))
-      (let [result (tools/call-tool-impl client "test-tool" {:input "test"})]
-        (is (= "tool result" result)))))
+  ;; Tests successful tool call returns CompletableFuture
+  (testing "successful tool call returns CompletableFuture"
+    (let [handler (fn [method params]
+                    {:content "tool result"
+                     :isError false})
+          client  (create-test-client-with-handler handler)]
+      (try
+        (let [future (tools/call-tool-impl client "test-tool" {:input "test"})]
+          (is (instance? CompletableFuture future))
+          (is (= {:content "tool result"} (.get future 1 TimeUnit/SECONDS))))
+        (finally
+          (stop-server! (:server client))))))
 
-  (testing "tool call with error response"
-    (let [client (create-mock-client)]
-      (reset! (:response-atom client)
-              (CompletableFuture/completedFuture
-               {:content "Tool execution failed"
-                :isError true}))
-      (is (thrown-with-msg?
-           clojure.lang.ExceptionInfo #"Tool execution failed"
-           (tools/call-tool-impl client "failing-tool" {})))))
+  (testing "tool call with error response returns future that throws"
+    (let [handler (fn [method params]
+                    {:content "Tool execution failed"
+                     :isError true})
+          client  (create-test-client-with-handler handler)]
+      (try
+        (let [future (tools/call-tool-impl client "failing-tool" {})]
+          (is (instance? CompletableFuture future))
+          (is (thrown-with-msg?
+               java.util.concurrent.ExecutionException #"Tool execution failed"
+               (.get future 1 TimeUnit/SECONDS))))
+        (finally
+          (stop-server! (:server client))))))
 
-  (testing "tool call with transport error"
-    (let [client (create-mock-client)
-          error-future (CompletableFuture.)]
-      (.completeExceptionally error-future
-                              (ex-info "Transport error" {}))
-      (reset! (:response-atom client) error-future)
-      (is (thrown-with-msg?
-           clojure.lang.ExceptionInfo #"Tool call failed"
-           (tools/call-tool-impl client "test-tool" {}))))))
+  (testing "tool call with handler exception"
+    (let [handler (fn [method params]
+                    (throw (ex-info "Handler error" {})))
+          client  (create-test-client-with-handler handler)]
+      (try
+        (let [future (tools/call-tool-impl client "test-tool" {})]
+          (is (instance? CompletableFuture future))
+          ;; The server wraps exceptions in an error response
+          (is (thrown? Exception (.get future 1 TimeUnit/SECONDS))))
+        (finally
+          (stop-server! (:server client)))))))
 
 (deftest available-tools?-impl-test
   ;; Tests available tools checking logic
   (testing "returns true when cached tools exist"
-    (let [client (create-mock-client)]
+    (let [client {:session (atom {})}]
       (#'tools/cache-tools! client [{:name "test-tool"}])
       (is (true? (tools/available-tools?-impl client)))))
 
   (testing "returns false when no cached tools and no server tools"
-    (let [client (create-mock-client)]
+    (let [client {:session (atom {})}]
       (with-redefs [tools/list-tools-impl
                     (fn [_client]
-                      {:tools []})]
+                      (CompletableFuture/completedFuture {:tools []}))]
         (is (false? (tools/available-tools?-impl client))))))
 
   (testing "queries server when no cached tools"
-    (let [client (create-mock-client)]
+    (let [client {:session (atom {})}]
       (with-redefs [tools/list-tools-impl
                     (fn [_client]
-                      {:tools [{:name "server-tool"}]})]
+                      (CompletableFuture/completedFuture {:tools [{:name "server-tool"}]}))]
         (is (true? (tools/available-tools?-impl client))))))
 
   (testing "returns false on server error"
-    (let [client (create-mock-client)]
+    (let [client {:session (atom {})}]
       (with-redefs [tools/list-tools-impl
                     (fn [_client]
-                      (throw (ex-info "Server error" {})))]
+                      (let [future (CompletableFuture.)]
+                        (.completeExceptionally future (ex-info "Server error" {}))
+                        future))]
         (is (false? (tools/available-tools?-impl client)))))))

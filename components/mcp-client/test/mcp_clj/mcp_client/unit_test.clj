@@ -2,31 +2,53 @@
   "Unit tests for MCP client using in-memory transport for speed"
   (:require
    [clojure.test :refer [deftest is testing]]
+   [mcp-clj.client-transport.factory :as client-transport-factory]
    [mcp-clj.in-memory-transport.shared :as shared]
    [mcp-clj.mcp-client.core :as client]
-   [mcp-clj.mcp-server.core :as server])
-  (:import
-   [java.util.concurrent TimeUnit]))
+   [mcp-clj.mcp-server.core :as server]
+   [mcp-clj.server-transport.factory :as server-transport-factory]))
+
+;;; Transport registration function for robust test isolation
+(defn ensure-in-memory-transport-registered!
+  "Ensure in-memory transport is registered in both client and server factories.
+  Can be called multiple times safely - registration is idempotent."
+  []
+  (client-transport-factory/register-transport! :in-memory
+    (fn [options]
+      (require 'mcp-clj.in-memory-transport.client)
+      (let [create-fn (ns-resolve 'mcp-clj.in-memory-transport.client 'create-transport)]
+        (create-fn options))))
+  (server-transport-factory/register-transport! :in-memory
+    (fn [options handlers]
+      (require 'mcp-clj.in-memory-transport.server)
+      (let [create-server (ns-resolve 'mcp-clj.in-memory-transport.server 'create-in-memory-server)]
+        (create-server options handlers)))))
+
+;;; Ensure transport is registered at namespace load time
+(ensure-in-memory-transport-registered!)
 
 ;;; Test Tools
 
 (def test-tools
-  {"echo" {:name "echo"
-           :description "Echo back the input"
-           :inputSchema {:type "object"
-                         :properties {:message {:type "string"}}}
-           :implementation (fn [args] {:result (str "Echo: " (:message args))})}
+  {"echo" {:name           "echo"
+           :description    "Echo back the input"
+           :inputSchema    {:type       "object"
+                            :properties {:message {:type "string"}}}
+           :implementation (fn [args]
+                             (binding [*out* *err*]
+                               (prn "echo" args))
+                             {:result (str "Echo: " (:message args))})}
 
-   "add" {:name "add"
-          :description "Add two numbers"
-          :inputSchema {:type "object"
-                        :properties {:a {:type "number"}
-                                     :b {:type "number"}}}
+   "add" {:name           "add"
+          :description    "Add two numbers"
+          :inputSchema    {:type       "object"
+                           :properties {:a {:type "number"}
+                                        :b {:type "number"}}}
           :implementation (fn [{:keys [a b]}] {:result (+ a b)})}
 
-   "error-tool" {:name "error-tool"
-                 :description "Tool that throws an error"
-                 :inputSchema {:type "object"}
+   "error-tool" {:name           "error-tool"
+                 :description    "Tool that throws an error"
+                 :inputSchema    {:type "object"}
                  :implementation (fn [_] (throw (ex-info "Test error" {})))}})
 
 ;;; Helper Functions
@@ -37,6 +59,8 @@
       :or {tools test-tools
            client-info {:name "test-client" :version "1.0.0"}
            capabilities {}}}]
+  ;; Ensure transport is registered before creating client/server
+  (ensure-in-memory-transport-registered!)
   (let [shared-transport (shared/create-shared-transport)
         test-server (server/create-server
                      {:transport {:type :in-memory :shared shared-transport}
@@ -114,7 +138,7 @@
           ;; Test calling add tool
           (let [add-result @(client/call-tool client "add" {:a 5 :b 3})]
             (is (some? add-result))
-            (is (= 8 (-> add-result :content first :text))))
+            (is (= "8" (-> add-result :content first :text))))
 
           ;; Test calling non-existent tool
           (is (thrown? Exception
@@ -137,14 +161,19 @@
           (client/wait-for-ready client 5000)
 
           ;; Launch multiple operations concurrently
-          (let [echo-futures (mapv #(client/call-tool client "echo" {:message (str "message-" %)})
-                                   (range 5))
-                add-futures (mapv #(client/call-tool client "add" {:a % :b (inc %)})
-                                  (range 3))]
+          (let [echo-futures (mapv
+                              #(client/call-tool
+                                client
+                                "echo"
+                                {:message (str "message-" %)})
+                              (range 5))
+                add-futures  (mapv
+                              #(client/call-tool client "add" {:a % :b (inc %)})
+                              (range 3))]
 
             ;; Wait for all to complete
             (let [echo-results (mapv #(deref % 2000 :timeout) echo-futures)
-                  add-results (mapv #(deref % 2000 :timeout) add-futures)]
+                  add-results  (mapv #(deref % 2000 :timeout) add-futures)]
 
               ;; All should complete successfully
               (is (every? #(not= :timeout %) echo-results))
@@ -152,11 +181,12 @@
 
               ;; Check echo results
               (doseq [[i result] (map-indexed vector echo-results)]
-                (is (= (str "Echo: message-" i) (-> result :content first :text))))
+                (is (= (str "Echo: message-" i)
+                       (-> result :content first :text))))
 
               ;; Check add results
               (doseq [[i result] (map-indexed vector add-results)]
-                (is (= (+ i (inc i)) (-> result :content first :text)))))))
+                (is (= (str (+ i (inc i))) (-> result :content first :text)))))))
 
         (finally
           (cleanup-test-env test-env))))))
@@ -193,6 +223,8 @@
 (deftest multiple-clients-test
   ;; Test multiple clients connecting to same server
   (testing "Multiple clients can connect to same server via in-memory transport"
+    ;; Ensure transport is registered before creating clients
+    (ensure-in-memory-transport-registered!)
     (let [shared-transport (shared/create-shared-transport)
           test-server (server/create-server
                        {:transport {:type :in-memory :shared shared-transport}

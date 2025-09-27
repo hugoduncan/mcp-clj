@@ -72,6 +72,29 @@
 (defn- text-map [msg]
   {:type "text" :text msg})
 
+(defn- transform-tool-result
+  "Transform tool implementation result into MCP format"
+  [result]
+  (cond
+    ;; Already in MCP format (has :content and :isError)
+    (and (contains? result :content) (contains? result :isError))
+    result
+
+    ;; Tool implementation returned {:result "..."} format
+    (contains? result :result)
+    {:content [(text-map (str (:result result)))]
+     :isError false}
+
+    ;; Tool implementation returned string directly
+    (string? result)
+    {:content [(text-map result)]
+     :isError false}
+
+    ;; Other formats - convert to string
+    :else
+    {:content [(text-map (str result))]
+     :isError false}))
+
 (defn- negotiate-initialization
   "Negotiate initialization request according to MCP specification"
   [{:keys [protocolVersion capabilities clientInfo] :as params}]
@@ -164,7 +187,7 @@
                           (set (mapv keyword (:required inputSchema)))
                           (set (keys arguments)))]
         (if (empty? missing-args)
-          (implementation arguments)
+          (transform-tool-result (implementation arguments))
           {:content [(text-map
                       (str "Missing args: " (vec missing-args) ", found "
                            (set (keys arguments))))]

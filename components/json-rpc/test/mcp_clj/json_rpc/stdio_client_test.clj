@@ -41,7 +41,7 @@
       (let [input-stream (BufferedReader. (StringReader. ""))
             output-stream (BufferedWriter. (StringWriter.))
             client (stdio-client/create-json-rpc-client input-stream output-stream)]
-        (is (instance? mcp_clj.json_rpc.stdio_client.JSONRPClient client))
+        (is (= (.getName (type client)) "mcp_clj.json_rpc.stdio_client.JSONRPClient"))
         (is (instance? ConcurrentHashMap (:pending-requests client)))
         (is (instance? clojure.lang.Atom (:request-id-counter client)))
         (is (some? (:executor client)))
@@ -54,7 +54,7 @@
       (let [input-stream (BufferedReader. (StringReader. ""))
             output-stream (BufferedWriter. (StringWriter.))
             client (stdio-client/create-json-rpc-client input-stream output-stream {:num-threads 4})]
-        (is (instance? mcp_clj.json_rpc.stdio_client.JSONRPClient client))
+        (is (= (.getName (type client)) "mcp_clj.json_rpc.stdio_client.JSONRPClient"))
         (is (= 0 @(:request-id-counter client)))
         (stdio-client/close-json-rpc-client! client)))))
 

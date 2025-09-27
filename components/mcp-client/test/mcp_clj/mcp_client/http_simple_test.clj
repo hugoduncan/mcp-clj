@@ -7,12 +7,11 @@
    [mcp-clj.mcp-server.core :as server]
    [mcp-clj.log :as log]))
 
-(deftest simple-http-test
+(deftest ^:integ simple-http-test
   ;; Simple test to verify HTTP transport basics
   (testing "Basic HTTP transport test"
     (let [server (server/create-server
-                  {:transport :http
-                   :port 0
+                  {:transport {:type :http :port 0}
                    :tools
                    {"echo"
                     {:name "echo"
