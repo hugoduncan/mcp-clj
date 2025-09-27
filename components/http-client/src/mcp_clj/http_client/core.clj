@@ -1,18 +1,18 @@
 (ns mcp-clj.http-client.core
   "HTTP client implementation using JDK HttpClient"
   (:require
-   [clojure.data.json :as json]
-   [clojure.string :as str])
+    [clojure.data.json :as json]
+    [clojure.string :as str])
   (:import
-   (java.net
-    URI)
-   (java.net.http
-    HttpClient
-    HttpRequest
-    HttpRequest$BodyPublishers
-    HttpResponse$BodyHandlers)
-   (java.time
-    Duration)))
+    (java.net
+      URI)
+    (java.net.http
+      HttpClient
+      HttpRequest
+      HttpRequest$BodyPublishers
+      HttpResponse$BodyHandlers)
+    (java.time
+      Duration)))
 
 ;; HTTP Client Creation
 
@@ -28,14 +28,14 @@
        (.connectTimeout builder (Duration/ofMillis connect-timeout)))
      (case follow-redirects
        :never  (.followRedirects
-                builder
-                java.net.http.HttpClient$Redirect/NEVER)
+                 builder
+                 java.net.http.HttpClient$Redirect/NEVER)
        :always (.followRedirects
-                builder
-                java.net.http.HttpClient$Redirect/ALWAYS)
+                 builder
+                 java.net.http.HttpClient$Redirect/ALWAYS)
        :normal (.followRedirects
-                builder
-                java.net.http.HttpClient$Redirect/NORMAL))
+                 builder
+                 java.net.http.HttpClient$Redirect/NORMAL))
      (.build builder))))
 
 ;; Request Building
