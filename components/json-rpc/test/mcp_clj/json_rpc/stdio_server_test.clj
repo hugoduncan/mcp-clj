@@ -260,8 +260,11 @@
       (stdio-server/set-handlers! server handlers)
 
       (let [output (capture-output
-                    #(#'stdio-server/handle-request (:executor server) @(:handlers server) request))]
-                                        ; Should not produce any output for notifications
+                    #(#'stdio-server/handle-request
+                      (:executor server)
+                      @(:handlers server)
+                      request))]
+        ;; Should not produce any output for notifications
         (is (empty? (str/trim output))))
 
       (stdio-server/stop! server))))
