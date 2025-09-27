@@ -1,0 +1,2 @@
+{:deps
+ {poly/interop {:local/root "../../components/interop"}}}

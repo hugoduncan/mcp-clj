@@ -99,7 +99,7 @@ Include REFINE to refine the spec
 - [x] add projects/client to build a client jar
         - include the mcp-client component
 
-- [ ] add projects/java-sdk-wrapper to build a jar with the SDK interop
+- [x] add projects/java-sdk-wrapper to build a jar with the SDK interop
       component
 
 - [ ] add a github action to run the tests
