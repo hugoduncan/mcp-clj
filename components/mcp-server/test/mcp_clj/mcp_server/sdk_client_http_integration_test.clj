@@ -8,13 +8,15 @@
    Tests server behavior from the client perspective - ensuring our HTTP server
    responds correctly to standard MCP operations from a real SDK client."
   (:require
-   [clojure.test :refer [deftest is testing use-fixtures]]
-   [mcp-clj.java-sdk.interop :as java-sdk]
-   [mcp-clj.log :as log]
-   [mcp-clj.mcp-server.core :as mcp-core])
-  (:import    [java.lang AutoCloseable]))
+    [clojure.test :refer [deftest is testing use-fixtures]]
+    [mcp-clj.java-sdk.interop :as java-sdk]
+    [mcp-clj.log :as log]
+    [mcp-clj.mcp-server.core :as mcp-core])
+  (:import
+    (java.lang
+      AutoCloseable)))
 
-;;; Test Fixtures and Helpers
+;; Test Fixtures and Helpers
 
 (def ^:private ^:dynamic *server* nil)
 (def ^:private ^:dynamic *server-port* nil)
@@ -39,16 +41,16 @@
   "Create SDK client connected to our Clojure MCP server via HTTP"
   ^AutoCloseable [async?]
   (let [transport (java-sdk/create-http-client-transport
-                   {:url                        (str "http://localhost:" *server-port* "/")
-                    :use-sse                    false
-                    :open-connection-on-startup false
-                    :resumable-streams          false})
+                    {:url                        (str "http://localhost:" *server-port* "/")
+                     :use-sse                    false
+                     :open-connection-on-startup false
+                     :resumable-streams          false})
         client    (java-sdk/create-java-client
-                   {:transport transport
-                    :async?    async?})]
+                    {:transport transport
+                     :async?    async?})]
     client))
 
-;;; Server Behavior Tests via HTTP
+;; Server Behavior Tests via HTTP
 
 (deftest ^:integ test-http-server-initialization
   ;; Test MCP server initialization over HTTP transport
@@ -107,9 +109,9 @@
 
       (testing "clj-eval tool call over HTTP"
         (let [result @(java-sdk/call-tool
-                       client
-                       "clj-eval"
-                       {:code "(+ 1 2 3)"})]
+                        client
+                        "clj-eval"
+                        {:code "(+ 1 2 3)"})]
           (is (map? result))
           (is (contains? result :content))
 
@@ -126,9 +128,9 @@
 
       (testing "non-existent tool call over HTTP"
         (let [result @(java-sdk/call-tool
-                       client
-                       "non-existent-tool"
-                       {:param "value"})]
+                        client
+                        "non-existent-tool"
+                        {:param "value"})]
           (is (contains? result :content))
           (when (contains? result :isError)
             (is (:isError result)))))
@@ -150,10 +152,10 @@
 
       (testing "multiple concurrent tool calls over HTTP"
         (let [futures (doall
-                       (for [i (range 3)]
-                         (java-sdk/call-tool
-                          client "clj-eval"
-                          {:code (str "(+ " i " 10)")})))
+                        (for [i (range 3)]
+                          (java-sdk/call-tool
+                            client "clj-eval"
+                            {:code (str "(+ " i " 10)")})))
               results (mapv deref futures)]
 
           ;; Wait for all to complete
@@ -166,7 +168,7 @@
             (is (sequential? (:content result))))
 
           (log/info :http-integration-test/concurrent-results
-            {:count (count results)})))
+                    {:count (count results)})))
 
       (testing "mixed operation types concurrently over HTTP"
         (let [list-future (java-sdk/list-tools client)
@@ -204,9 +206,9 @@
 
         ;; Server should still work for valid operations
         (let [result @(java-sdk/call-tool
-                       client
-                       "clj-eval"
-                       {:code "(str \"after-error\")"})]
+                        client
+                        "clj-eval"
+                        {:code "(str \"after-error\")"})]
           (is (= "after-error" (-> result :content first :text))))
 
         ;; Tool listing should still work
@@ -227,12 +229,12 @@
   ;; Test HTTP server without SSE streaming transport
   (testing "HTTP server with SSE disabled via Java SDK client"
     (let [transport (java-sdk/create-http-client-transport
-                     {:url                        (str "http://localhost:" *server-port* "/")
-                      :use-sse                    false ; Explicitly disable SSE
-                      :open-connection-on-startup false})
+                      {:url                        (str "http://localhost:" *server-port* "/")
+                       :use-sse                    false ; Explicitly disable SSE
+                       :open-connection-on-startup false})
           client    (java-sdk/create-java-client
-                     {:transport transport
-                      :async?    false})]
+                      {:transport transport
+                       :async?    false})]
       (try
         ;; Initialize connection
         (let [init-result (java-sdk/initialize-client client)]
@@ -251,19 +253,19 @@
   (testing "HTTP server with origin validation"
     (let [;; Create a server with restricted origins
           server-with-origins (mcp-core/create-server
-                               {:transport {:type :http
-                                           :port 0
-                                           :allowed-origins ["https://trusted.example.com"]}})
+                                {:transport {:type :http
+                                             :port 0
+                                             :allowed-origins ["https://trusted.example.com"]}})
           port (-> server-with-origins :json-rpc-server deref :port)]
       (try
         ;; Try to connect - Java SDK client doesn't set Origin headers by default
         ;; so this should succeed (no Origin header = allowed by default)
         (let [transport (java-sdk/create-http-client-transport
-                         {:url (str "http://localhost:" port "/")
-                          :use-sse false})
+                          {:url (str "http://localhost:" port "/")
+                           :use-sse false})
               client (java-sdk/create-java-client
-                      {:transport transport
-                       :async? false})]
+                       {:transport transport
+                        :async? false})]
           (try
             ;; This should succeed since no Origin header = allowed
             (let [result (java-sdk/initialize-client client)]

@@ -1,24 +1,24 @@
 (ns mcp-clj.mcp-client.session
   "MCP client session state management"
   (:require
-   [mcp-clj.log :as log]))
+    [mcp-clj.log :as log]))
 
-;;; Session States
+;; Session States
 
 (def session-states #{:disconnected :initializing :ready :error})
 
-;;; Session Record
+;; Session Record
 
 (defrecord Session
-           [state ; Current session state
-            client-info ; Client information sent in initialize
-            capabilities ; Client capabilities
-            server-info ; Server info from initialize response
-            server-capabilities ; Server capabilities from initialize response
-            protocol-version ; Negotiated protocol version
-            error-info]) ; Error information if state is :error
+  [state ; Current session state
+   client-info ; Client information sent in initialize
+   capabilities ; Client capabilities
+   server-info ; Server info from initialize response
+   server-capabilities ; Server capabilities from initialize response
+   protocol-version ; Negotiated protocol version
+   error-info]) ; Error information if state is :error
 
-;;; Session State Transitions
+;; Session State Transitions
 
 (def ^:private valid-transitions
   {:disconnected #{:initializing :error}
@@ -31,7 +31,7 @@
   [from-state to-state]
   (contains? (get valid-transitions from-state #{}) to-state))
 
-;;; Session Management
+;; Session Management
 
 (defn create-session
   "Create new session in disconnected state"
@@ -42,13 +42,13 @@
          capabilities {}
          protocol-version "2025-06-18"}}]
   (->Session
-   :disconnected
-   client-info
-   capabilities
-   nil ; server-info
-   nil ; server-capabilities
-   protocol-version
-   nil)) ; error-info
+    :disconnected
+    client-info
+    capabilities
+    nil ; server-info
+    nil ; server-capabilities
+    protocol-version
+    nil)) ; error-info
 
 (defn transition-state!
   "Transition session to new state with optional data"

@@ -1,16 +1,22 @@
 (ns mcp-clj.mcp-server.transport-test
   "Tests for MCP server transport selection and functionality"
   (:require
-   [clojure.data.json :as json]
-   [clojure.java.io :as io]
-   [clojure.string :as str]
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.json-rpc.protocols :as json-rpc-protocols]
-   [mcp-clj.mcp-server.core :as mcp]
-   [mcp-clj.tools.core :as tools])
+    [clojure.data.json :as json]
+    [clojure.java.io :as io]
+    [clojure.string :as str]
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.json-rpc.protocols :as json-rpc-protocols]
+    [mcp-clj.mcp-server.core :as mcp]
+    [mcp-clj.tools.core :as tools])
   (:import
-   [java.io ByteArrayInputStream ByteArrayOutputStream PipedInputStream PipedOutputStream StringReader]
-   [java.util.concurrent TimeUnit]))
+    (java.io
+      ByteArrayInputStream
+      ByteArrayOutputStream
+      PipedInputStream
+      PipedOutputStream
+      StringReader)
+    (java.util.concurrent
+      TimeUnit)))
 
 (def test-tool
   {:name "test-add"
@@ -23,7 +29,7 @@
                      {:content [{:type "text"
                                  :text (str "Result: " (+ (:a params) (:b params)))}]})})
 
-;;; Transport Selection Tests
+;; Transport Selection Tests
 
 (deftest transport-configuration-test
   (testing "Transport configuration validation"
@@ -41,24 +47,24 @@
 
     (testing "invalid transport configurations"
       (is (thrown-with-msg?
-           clojure.lang.ExceptionInfo
-           #"Missing :transport configuration"
-           (mcp/create-server {}))
+            clojure.lang.ExceptionInfo
+            #"Missing :transport configuration"
+            (mcp/create-server {}))
           "missing transport should throw")
 
       (is (thrown-with-msg?
-           clojure.lang.ExceptionInfo
-           #"Missing :type in transport configuration"
-           (mcp/create-server {:transport {:port 3001}}))
+            clojure.lang.ExceptionInfo
+            #"Missing :type in transport configuration"
+            (mcp/create-server {:transport {:port 3001}}))
           "missing :type should throw")
 
       (is (thrown-with-msg?
-           clojure.lang.ExceptionInfo
-           #"Unregistered transport type"
-           (mcp/create-server {:transport {:type :invalid}}))
+            clojure.lang.ExceptionInfo
+            #"Unregistered transport type"
+            (mcp/create-server {:transport {:type :invalid}}))
           "invalid transport type should throw"))))
 
-;;; stdio Transport Tests
+;; stdio Transport Tests
 
 (deftest stdio-server-creation-test
   (testing "stdio server creation"
@@ -70,8 +76,8 @@
       ;; Test that we can call protocol methods
       (testing "protocol operations work"
         (is (nil? (json-rpc-protocols/notify-all!
-                   @(:json-rpc-server server)
-                   "test" {})) "notify-all should work (no-op for stdio)"))
+                    @(:json-rpc-server server)
+                    "test" {})) "notify-all should work (no-op for stdio)"))
 
       ;; Clean up
       ((:stop server)))))
@@ -90,7 +96,7 @@
       ;; Clean up
       ((:stop server)))))
 
-;;; SSE Transport Tests
+;; SSE Transport Tests
 
 (deftest sse-server-creation-test
   (testing "SSE server creation"
@@ -102,8 +108,8 @@
       ;; Test that we can call protocol methods
       (testing "protocol operations work"
         (is (nil? (json-rpc-protocols/notify-all!
-                   @(:json-rpc-server server)
-                   "test" {})) "notify-all should work"))
+                    @(:json-rpc-server server)
+                    "test" {})) "notify-all should work"))
 
       ;; The json-rpc-server should be an SSE server (has :session-id->session)
       (let [rpc-server @(:json-rpc-server server)]
@@ -124,8 +130,8 @@
       ;; Test that we can call protocol methods
       (testing "protocol operations work"
         (is (nil? (json-rpc-protocols/notify-all!
-                   @(:json-rpc-server server)
-                   "test" {})) "notify-all should work"))
+                    @(:json-rpc-server server)
+                    "test" {})) "notify-all should work"))
 
       ;; The json-rpc-server should be an HTTP server
       (let [rpc-server @(:json-rpc-server server)]
@@ -134,7 +140,7 @@
       ;; Clean up
       ((:stop server)))))
 
-;;; Protocol Polymorphism Tests
+;; Protocol Polymorphism Tests
 
 (deftest protocol-polymorphism-test
   (testing "All server types implement JsonRpcServer protocol"
@@ -148,34 +154,34 @@
       (try
         (testing "All servers support set-handlers!"
           (is (some? (json-rpc-protocols/set-handlers!
-                      @(:json-rpc-server stdio-server)
-                      {"new" (fn [m p] {:test "result"})}))
+                       @(:json-rpc-server stdio-server)
+                       {"new" (fn [m p] {:test "result"})}))
               "stdio server should support set-handlers!")
 
           (is (some? (json-rpc-protocols/set-handlers!
-                      @(:json-rpc-server sse-server)
-                      {"new" (fn [r p] {:test "result"})}))
+                       @(:json-rpc-server sse-server)
+                       {"new" (fn [r p] {:test "result"})}))
               "sse server should support set-handlers!")
 
           (is (some? (json-rpc-protocols/set-handlers!
-                      @(:json-rpc-server http-server)
-                      {"new" (fn [r p] {:test "result"})}))
+                       @(:json-rpc-server http-server)
+                       {"new" (fn [r p] {:test "result"})}))
               "http server should support set-handlers!"))
 
         (testing "All servers support notify-all!"
           (is (nil? (json-rpc-protocols/notify-all!
-                     @(:json-rpc-server stdio-server)
-                     "notification" {:data "test"}))
+                      @(:json-rpc-server stdio-server)
+                      "notification" {:data "test"}))
               "stdio server should support notify-all!")
 
           (is (nil? (json-rpc-protocols/notify-all!
-                     @(:json-rpc-server sse-server)
-                     "notification" {:data "test"}))
+                      @(:json-rpc-server sse-server)
+                      "notification" {:data "test"}))
               "sse server should support notify-all!")
 
           (is (nil? (json-rpc-protocols/notify-all!
-                     @(:json-rpc-server http-server)
-                     "notification" {:data "test"}))
+                      @(:json-rpc-server http-server)
+                      "notification" {:data "test"}))
               "http server should support notify-all!"))
 
         (testing "All servers support stop!"
@@ -194,7 +200,7 @@
           (try ((:stop sse-server)) (catch Exception _))
           (try ((:stop http-server)) (catch Exception _)))))))
 
-;;; Integration Tests
+;; Integration Tests
 
 (deftest server-functionality-test
   (testing "All transports support basic MCP operations"
@@ -205,8 +211,8 @@
                             :sse {:transport {:type :sse :port 0}}
                             :http {:transport {:type :http :port 0}})
               server (mcp/create-server
-                      (merge server-opts
-                             {:tools {"test-add" test-tool}}))]
+                       (merge server-opts
+                              {:tools {"test-add" test-tool}}))]
 
           (try
             (testing "Server creation"
@@ -233,13 +239,13 @@
               ;; Clean up
               ((:stop server)))))))))
 
-;;; Error Handling Tests
+;; Error Handling Tests
 
 (deftest transport-error-handling-test
   (testing "Invalid tool definitions"
     (is (thrown-with-msg?
-         clojure.lang.ExceptionInfo
-         #"Invalid tool in constructor"
-         (mcp/create-server {:transport {:type :stdio}
-                             :tools {"invalid" {:bad "tool"}}}))
+          clojure.lang.ExceptionInfo
+          #"Invalid tool in constructor"
+          (mcp/create-server {:transport {:type :stdio}
+                              :tools {"invalid" {:bad "tool"}}}))
         "should reject invalid tools")))

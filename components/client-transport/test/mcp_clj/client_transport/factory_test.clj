@@ -1,19 +1,32 @@
 (ns mcp-clj.client-transport.factory-test
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.client-transport.factory :as factory]
-   [mcp-clj.client-transport.protocol :as transport-protocol]))
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.client-transport.factory :as factory]
+    [mcp-clj.client-transport.protocol :as transport-protocol]))
 
-;;; Test Helper - Mock Transport
+;; Test Helper - Mock Transport
 
-(defrecord MockTransport [config]
+(defrecord MockTransport
+  [config]
+
   transport-protocol/Transport
-  (send-request! [_ method params timeout-ms]
+
+  (send-request!
+    [_ method params timeout-ms]
     {:mock-response true :method method :params params :timeout timeout-ms})
-  (send-notification! [_ method params]
+
+
+  (send-notification!
+    [_ method params]
     {:mock-notification true :method method :params params})
+
+
   (close! [_] nil)
+
+
   (alive? [_] true)
+
+
   (get-json-rpc-client [_] nil))
 
 (defn mock-transport-factory
@@ -21,7 +34,7 @@
   [options]
   (->MockTransport options))
 
-;;; Test Setup and Cleanup
+;; Test Setup and Cleanup
 
 (defn clean-registry!
   "Clean registry state for testing"
@@ -39,7 +52,7 @@
     (factory/register-transport! :stdio
                                  (requiring-resolve 'mcp-clj.client-transport.stdio/create-transport))))
 
-;;; Registry Tests
+;; Registry Tests
 
 (deftest transport-registration-test
   ;; Test transport registration and management
@@ -59,12 +72,12 @@
     (testing "validates transport type is keyword"
       (is (thrown-with-msg? clojure.lang.ExceptionInfo
                             #"Transport type must be a keyword"
-                            (factory/register-transport! "not-keyword" mock-transport-factory))))
+            (factory/register-transport! "not-keyword" mock-transport-factory))))
 
     (testing "validates factory is function"
       (is (thrown-with-msg? clojure.lang.ExceptionInfo
                             #"Factory must be a function"
-                            (factory/register-transport! :invalid "not-function"))))
+            (factory/register-transport! :invalid "not-function"))))
 
     (clean-registry!)))
 
@@ -79,7 +92,7 @@
       (is (factory/transport-registered? :stdio))
       (is (contains? (set (factory/list-transports)) :stdio)))))
 
-;;; Factory Function Tests
+;; Factory Function Tests
 
 (deftest create-transport-success-test
   ;; Test successful transport creation
@@ -108,30 +121,30 @@
     (testing "missing transport configuration"
       (is (thrown-with-msg? clojure.lang.ExceptionInfo
                             #"Missing transport configuration"
-                            (factory/create-transport {}))))
+            (factory/create-transport {}))))
 
     (testing "unregistered transport type"
       (is (thrown-with-msg? clojure.lang.ExceptionInfo
                             #"Unregistered transport type"
-                            (factory/create-transport {:transport {:type :nonexistent}}))))
+            (factory/create-transport {:transport {:type :nonexistent}}))))
 
     (testing "factory function failure"
       (let [failing-factory (fn [_] (throw (RuntimeException. "Factory failed")))]
         (factory/register-transport! :failing failing-factory)
         (is (thrown-with-msg? clojure.lang.ExceptionInfo
                               #"Transport factory failed"
-                              (factory/create-transport {:transport {:type :failing}})))))
+              (factory/create-transport {:transport {:type :failing}})))))
 
     (testing "factory returns invalid transport"
       (let [invalid-factory (fn [_] "not-a-transport")]
         (factory/register-transport! :invalid invalid-factory)
         (is (thrown-with-msg? clojure.lang.ExceptionInfo
                               #"Transport factory failed"
-                              (factory/create-transport {:transport {:type :invalid}})))))
+              (factory/create-transport {:transport {:type :invalid}})))))
 
     (clean-registry!)))
 
-;;; Integration Tests
+;; Integration Tests
 
 (deftest pluggable-transport-integration-test
   ;; Test complete workflow of registering and using custom transport
@@ -158,13 +171,13 @@
 
         ;; Test transport functionality
         (let [request-result (transport-protocol/send-request!
-                              transport "test-method" {:arg1 "value1"} 5000)]
+                               transport "test-method" {:arg1 "value1"} 5000)]
           (is (:mock-response request-result))
           (is (= "test-method" (:method request-result)))
           (is (= {:arg1 "value1"} (:params request-result))))
 
         (let [notification-result (transport-protocol/send-notification!
-                                   transport "test-notification" {:arg2 "value2"})]
+                                    transport "test-notification" {:arg2 "value2"})]
           (is (:mock-notification notification-result))
           (is (= "test-notification" (:method notification-result)))
           (is (= {:arg2 "value2"} (:params notification-result))))

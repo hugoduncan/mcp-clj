@@ -43,7 +43,7 @@
      :client-was-supported? client-supported?
      :supported-versions    supported-versions}))
 
-;;; Version comparison utilities
+;; Version comparison utilities
 
 (defn version-gte?
   "Check if version1 is greater than or equal to version2"
@@ -70,7 +70,7 @@
   [protocol-version]
   (version-gte? protocol-version "2025-06-18"))
 
-;;; Version-specific behavior dispatch
+;; Version-specific behavior dispatch
 
 (defmulti handle-version-specific-behavior
   "Handle version-specific protocol behavior
@@ -90,12 +90,12 @@
 (defmethod handle-version-specific-behavior :default
   [protocol-version feature-type context]
   (throw
-   (ex-info (str "Unsupported feature for protocol version: " protocol-version)
-            {:protocol-version protocol-version
-             :feature-type     feature-type
-             :context          context})))
+    (ex-info (str "Unsupported feature for protocol version: " protocol-version)
+             {:protocol-version protocol-version
+              :feature-type     feature-type
+              :context          context})))
 
-;;; Capabilities handling
+;; Capabilities handling
 
 (defmethod handle-version-specific-behavior ["2025-06-18" :capabilities]
   [_ _ {:keys [capabilities]}]
@@ -118,7 +118,7 @@
                                 {}  ; Convert nested capabilities to empty map
                                 cap-map))))
 
-;;; Server info handling
+;; Server info handling
 
 (defmethod handle-version-specific-behavior ["2025-06-18" :server-info]
   [_ _ {:keys [server-info]}]
@@ -135,7 +135,7 @@
   ;; 2024-11-05 does not support title field
   (dissoc server-info :title))
 
-;;; Content type validation
+;; Content type validation
 
 (defmethod handle-version-specific-behavior ["2025-06-18" :content-types]
   [_ _ {:keys [content-types]}]
@@ -152,7 +152,7 @@
   ;; 2024-11-05 supports only text, image, and resource
   (filter #(contains? #{"text" "image" "resource"} (:type %)) content-types))
 
-;;; Tool response formatting
+;; Tool response formatting
 
 (defmethod handle-version-specific-behavior ["2025-06-18" :tool-response]
   [_ _ {:keys [content isError structured-content]}]
@@ -170,7 +170,7 @@
   ;; 2024-11-05 does not support structured content
   {:content content :isError isError})
 
-;;; Header validation
+;; Header validation
 
 (defmethod handle-version-specific-behavior ["2025-06-18" :headers]
   [protocol-version _ {:keys [headers]}]
@@ -193,21 +193,21 @@
   (let [mcp-version-header (get headers "mcp-protocol-version")]
     {:valid? true :protocol-version mcp-version-header}))
 
-;;; Utility functions that depend on multimethod
+;; Utility functions that depend on multimethod
 
 (defn validate-content-types
   "Validate content types are supported for the given protocol version"
   [protocol-version content-items]
   (when (seq content-items)
     (handle-version-specific-behavior
-     protocol-version
-     :content-types
-     {:content-types content-items})))
+      protocol-version
+      :content-types
+      {:content-types content-items})))
 
 (defn validate-headers
   "Validate headers are correct for the given protocol version"
   [protocol-version headers]
   (handle-version-specific-behavior
-   protocol-version
-   :headers
-   {:headers headers}))
+    protocol-version
+    :headers
+    {:headers headers}))

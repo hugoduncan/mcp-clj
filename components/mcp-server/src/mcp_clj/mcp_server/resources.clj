@@ -1,32 +1,40 @@
 (ns mcp-clj.mcp-server.resources
   "MCP resource endpoints"
-  (:require [mcp-clj.log :as log]))
+  (:require
+    [mcp-clj.log :as log]))
 
-(defrecord ResourceDefinition [name uri mime-type description annotations implementation])
+(defrecord ResourceDefinition
+  [name uri mime-type description annotations implementation])
 
-(defn- valid-string? [x]
+(defn- valid-string?
+  [x]
   (and (string? x)
        (pos? (count x))))
 
-(defn- valid-uri? [x]
+(defn- valid-uri?
+  [x]
   (try
     (java.net.URI. x)
     true
     (catch Exception _
       false)))
 
-(defn- valid-audience-value? [x]
+(defn- valid-audience-value?
+  [x]
   (#{"user" "assistant"} x))
 
-(defn- valid-audience? [x]
+(defn- valid-audience?
+  [x]
   (and (vector? x)
        (every? valid-audience-value? x)))
 
-(defn- valid-priority? [x]
+(defn- valid-priority?
+  [x]
   (and (number? x)
        (<= 0 x 1)))
 
-(defn- valid-annotations? [annotations]
+(defn- valid-annotations?
+  [annotations]
   (and (map? annotations)
        (or (nil? (:priority annotations))
            (valid-priority? (:priority annotations)))

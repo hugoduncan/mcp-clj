@@ -1,8 +1,8 @@
 (ns mcp-clj.tools.core-test
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.tools.core :as tools]
-   [mcp-clj.tools.clj-eval :as clj-eval]))
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.tools.clj-eval :as clj-eval]
+    [mcp-clj.tools.core :as tools]))
 
 (deftest valid-tool-test
   (testing "tool validation"

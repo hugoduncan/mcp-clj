@@ -1,28 +1,28 @@
 (ns mcp-clj.mcp-client.http-simple-test
   "Simple HTTP transport test for debugging"
   (:require
-   [clojure.java.shell :as shell]
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.mcp-client.core :as client]
-   [mcp-clj.mcp-server.core :as server]
-   [mcp-clj.log :as log]))
+    [clojure.java.shell :as shell]
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.log :as log]
+    [mcp-clj.mcp-client.core :as client]
+    [mcp-clj.mcp-server.core :as server]))
 
 (deftest ^:integ simple-http-test
   ;; Simple test to verify HTTP transport basics
   (testing "Basic HTTP transport test"
     (let [server     (server/create-server
-                      {:transport {:type :http :port 0}
-                       :tools
-                       {"echo"
-                        {:name           "echo"
-                         :description    "Simple echo"
-                         :inputSchema    {:type       "object"
-                                          :properties {:msg {:type "string"}}
-                                          :required   ["msg"]}
-                         :implementation (fn [{:keys [msg]}]
-                                           {:content
-                                            [{:type "text" :text msg}]
-                                            :isError false})}}})
+                       {:transport {:type :http :port 0}
+                        :tools
+                        {"echo"
+                         {:name           "echo"
+                          :description    "Simple echo"
+                          :inputSchema    {:type       "object"
+                                           :properties {:msg {:type "string"}}
+                                           :required   ["msg"]}
+                          :implementation (fn [{:keys [msg]}]
+                                            {:content
+                                             [{:type "text" :text msg}]
+                                             :isError false})}}})
           ;; Wait for server to be fully initialized with proper timeout
           rpc-server (deref (:json-rpc-server server) 5000 nil)
           port       (when rpc-server
@@ -48,12 +48,12 @@
           ;; Only proceed with client test if server is responding
           (when (= 0 (:exit response))
             (let [client (client/create-client
-                          {:transport        {:type        :http
-                                              :url         (str "http://localhost:" port)
-                                              :num-threads 2}
-                           :client-info      {:name "test" :version "1.0.0"}
-                           :capabilities     {:tools {}}
-                           :protocol-version "2024-11-05"})]
+                           {:transport        {:type        :http
+                                               :url         (str "http://localhost:" port)
+                                               :num-threads 2}
+                            :client-info      {:name "test" :version "1.0.0"}
+                            :capabilities     {:tools {}}
+                            :protocol-version "2024-11-05"})]
 
               (try
                 ;; Wait for ready

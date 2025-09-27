@@ -1,11 +1,11 @@
 (ns mcp-clj.mcp-server.http-transport-test
   (:require
-   [clojure.data.json :as json]
-   [clojure.test :refer [deftest is testing]]
-   [hato.client :as hato]
-   [mcp-clj.mcp-server.core :as mcp-core]))
+    [clojure.data.json :as json]
+    [clojure.test :refer [deftest is testing]]
+    [hato.client :as hato]
+    [mcp-clj.mcp-server.core :as mcp-core]))
 
-;;; Test Helpers
+;; Test Helpers
 
 (defn- http-get
   "Send HTTP GET request"
@@ -47,7 +47,7 @@
        (finally
          ((:stop ~server-binding))))))
 
-;;; Tests
+;; Tests
 
 (deftest ^:integ http-transport-creation-test
   ;; Test creating MCP server with HTTP transport

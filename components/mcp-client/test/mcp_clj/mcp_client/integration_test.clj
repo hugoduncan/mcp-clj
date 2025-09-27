@@ -1,21 +1,21 @@
 (ns mcp-clj.mcp-client.integration-test
   "Integration tests for MCP client connecting to real MCP server"
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.mcp-client.core :as client]))
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.mcp-client.core :as client]))
 
-;;; Integration Tests
+;; Integration Tests
 
 (deftest ^:integ client-server-initialization-test
   (testing "MCP client automatically initializes with real MCP server"
     (with-open [client (client/create-client
-                        {:transport {:type :stdio
-                                     :command "clojure"
-                                     :args ["-M:stdio-server"]}
-                         :client-info {:name "integration-test-client"
-                                       :title "Integration Test Client"
-                                       :version "1.0.0"}
-                         :capabilities {}})]
+                         {:transport {:type :stdio
+                                      :command "clojure"
+                                      :args ["-M:stdio-server"]}
+                          :client-info {:name "integration-test-client"
+                                        :title "Integration Test Client"
+                                        :version "1.0.0"}
+                          :capabilities {}})]
 
       ;; Client should start initializing automatically
       (let [initial-state (:state @(:session client))]
@@ -52,10 +52,10 @@
   (testing "MCP client handles server connection errors gracefully"
     ;; Try to connect to non-existent server
     (with-open [client (client/create-client
-                        {:transport {:type :stdio
-                                     :command "cat"}
-                         :client-info {:name "error-test-client"}
-                         :capabilities {}})]
+                         {:transport {:type :stdio
+                                      :command "cat"}
+                          :client-info {:name "error-test-client"}
+                          :capabilities {}})]
 
       ;; Wait briefly to let initialization attempt complete
       (try

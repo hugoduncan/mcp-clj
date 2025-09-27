@@ -4,10 +4,10 @@
   This allows the SDK server to be started as a subprocess for testing.
 
   Usage: clj -M:dev:test -m mcp-clj.java-sdk.sdk-server-main"
+  (:gen-class)
   (:require
-   [mcp-clj.java-sdk.interop :as java-sdk]
-   [mcp-clj.log :as log])
-  (:gen-class))
+    [mcp-clj.java-sdk.interop :as java-sdk]
+    [mcp-clj.log :as log]))
 
 (defn create-test-tools
   "Create a set of test tools for the SDK server"
@@ -53,10 +53,10 @@
   (try
     ;; Create SDK server with stdio transport
     (with-open [server (java-sdk/create-java-server
-                        {:name    "java-sdk-test-server"
-                         :version "1.0.0"
-                         ;; Use sync for simpler subprocess handling
-                         :async?  false})]
+                         {:name    "java-sdk-test-server"
+                          :version "1.0.0"
+                          ;; Use sync for simpler subprocess handling
+                          :async?  false})]
       (let [tools (create-test-tools)]
 
         (log/info :sdk-server-main/server-created {:name (:name server)})
@@ -76,13 +76,13 @@
 
         ;; Add shutdown hook for cleanup
         (.addShutdownHook
-         (Runtime/getRuntime)
-         (Thread. (fn []
-                    (log/info :sdk-server-main/shutting-down)
-                    (try
-                      (java-sdk/stop-server server)
-                      (catch Exception e
-                        (log/error :sdk-server-main/shutdown-error {:error e}))))))
+          (Runtime/getRuntime)
+          (Thread. (fn []
+                     (log/info :sdk-server-main/shutting-down)
+                     (try
+                       (java-sdk/stop-server server)
+                       (catch Exception e
+                         (log/error :sdk-server-main/shutdown-error {:error e}))))))
 
         ;; Keep the process alive
         ;; The server's start method should block, but if not, we wait

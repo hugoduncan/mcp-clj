@@ -1,8 +1,8 @@
 (ns mcp-clj.mcp-client.session-test
   "Tests for MCP client session management"
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.mcp-client.session :as session]))
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.mcp-client.session :as session]))
 
 (deftest create-session-test
   (testing "Create session with defaults"
@@ -19,9 +19,9 @@
     (let [client-info {:name "test" :version "1.0.0"}
           capabilities {:test true}
           session (session/create-session
-                   {:client-info client-info
-                    :capabilities capabilities
-                    :protocol-version "2024-11-05"})]
+                    {:client-info client-info
+                     :capabilities capabilities
+                     :protocol-version "2024-11-05"})]
       (is (= :disconnected (:state session)))
       (is (= "2024-11-05" (:protocol-version session)))
       (is (= capabilities (:capabilities session)))
@@ -36,14 +36,14 @@
 
           ;; initializing -> ready
           session3 (session/transition-state!
-                    session2 :ready
-                    :server-info {:name "test-server"}
-                    :server-capabilities {:tools true})
+                     session2 :ready
+                     :server-info {:name "test-server"}
+                     :server-capabilities {:tools true})
 
           ;; ready -> error
           session4 (session/transition-state!
-                    session3 :error
-                    :error-info {:type :connection-lost})
+                     session3 :error
+                     :error-info {:type :connection-lost})
 
           ;; error -> disconnected (clears server info)
           session5 (session/transition-state! session4 :disconnected)]
@@ -64,7 +64,7 @@
 
       ;; disconnected -> ready is invalid
       (is (thrown? Exception
-                   (session/transition-state! session :ready)))
+            (session/transition-state! session :ready)))
 
       ;; Create ready session
       (let [ready-session (-> session
@@ -72,7 +72,7 @@
                               (session/transition-state! :ready))]
         ;; ready -> initializing is invalid
         (is (thrown? Exception
-                     (session/transition-state! ready-session :initializing)))))))
+              (session/transition-state! ready-session :initializing)))))))
 
 (deftest session-predicates-test
   (testing "Session state predicates"
@@ -97,15 +97,15 @@
 (deftest get-session-info-test
   (testing "Get comprehensive session information"
     (let [session       (session/create-session
-                         {:client-info      {:name "test-client"}
-                          :capabilities     {:test true}
-                          :protocol-version "2024-11-05"})
+                          {:client-info      {:name "test-client"}
+                           :capabilities     {:test true}
+                           :protocol-version "2024-11-05"})
           ready-session (-> session
                             (session/transition-state! :initializing)
                             (session/transition-state!
-                             :ready
-                             :server-info {:name "test-server"}
-                             :server-capabilities {:tools true}))
+                              :ready
+                              :server-info {:name "test-server"}
+                              :server-capabilities {:tools true}))
           info          (session/get-session-info ready-session)]
 
       (is (= :ready (:state info)))

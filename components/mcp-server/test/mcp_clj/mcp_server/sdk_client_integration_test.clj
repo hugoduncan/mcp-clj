@@ -7,24 +7,25 @@
    Tests server behavior from the client perspective - ensuring our server
    responds correctly to standard MCP operations from a real SDK client."
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.java-sdk.interop :as java-sdk]
-   [mcp-clj.log :as log])
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.java-sdk.interop :as java-sdk]
+    [mcp-clj.log :as log])
   (:import
-   [java.lang AutoCloseable]))
+    (java.lang
+      AutoCloseable)))
 
 (defn- create-server-client
   "Create SDK client connected to our Clojure MCP server subprocess"
   ^AutoCloseable [async?]
   (let [transport (java-sdk/create-stdio-client-transport
-                   {:command "clj"
-                    :args    ["-M:stdio-server:dev:test"]})
+                    {:command "clj"
+                     :args    ["-M:stdio-server:dev:test"]})
         client    (java-sdk/create-java-client
-                   {:transport transport
-                    :async?    async?})] ; Use sync for simpler testing
+                    {:transport transport
+                     :async?    async?})] ; Use sync for simpler testing
     client))
 
-;;; Server Behavior Tests
+;; Server Behavior Tests
 
 (deftest ^:integ test-server-initialization
   (testing "Clojure MCP server initialization with Java SDK client"
@@ -33,7 +34,7 @@
       (let [result (java-sdk/initialize-client client)]
         (is (some? result))
         (log/info :server-integration-test/server-initialized
-          {:result result})))))
+                  {:result result})))))
 
 (deftest ^:integ test-server-tool-discovery
   (testing "server tool discovery via Java SDK client"
@@ -60,7 +61,7 @@
               (is (some? (:description tool)))))
 
           (log/info :server-integration-test/tools-discovered
-            {:count (count (:tools tools-response))}))))))
+                    {:count (count (:tools tools-response))}))))))
 
 (deftest ^:integ test-server-tool-execution
   (testing "server tool execution via Java SDK client"
@@ -81,9 +82,9 @@
 
       (testing "clj-eval tool call"
         (let [result @(java-sdk/call-tool
-                       client
-                       "clj-eval"
-                       {:code "(+ 1 2 3)"})]
+                        client
+                        "clj-eval"
+                        {:code "(+ 1 2 3)"})]
           (is (map? result))
           (is (contains? result :content))
 
@@ -98,18 +99,18 @@
 
       (testing "with non-existent tool call"
         (let [result @(java-sdk/call-tool
-                       client
-                       "non-existent-tool"
-                       {:param "value"})]
+                        client
+                        "non-existent-tool"
+                        {:param "value"})]
           (testing "should return an error response"
             (when (contains? result :isError)
               (is (:isError result))))))
 
       (testing "with invalid tool arguments"
         (let [result @(java-sdk/call-tool
-                       client
-                       "clj-eval"
-                       {:invalid "args"})]
+                        client
+                        "clj-eval"
+                        {:invalid "args"})]
           (testing "should return an error response"
             (when (contains? result :isError)
               (is (:isError result)))))))))
@@ -122,11 +123,11 @@
 
       (testing "multiple concurrent tool calls"
         (let [futures (doall
-                       (for [i (range 3)]
-                         (java-sdk/call-tool
-                          client
-                          "clj-eval"
-                          {:code (str "(+ " i " 10)")})))]
+                        (for [i (range 3)]
+                          (java-sdk/call-tool
+                            client
+                            "clj-eval"
+                            {:code (str "(+ " i " 10)")})))]
 
           ;; Wait for all to complete
           (let [results (doall (map deref futures))]
@@ -172,9 +173,9 @@
 
         ;; Server should still work for valid operations
         (let [result @(java-sdk/call-tool
-                       client
-                       "clj-eval"
-                       {:code "(str \"after-error\")"})]
+                        client
+                        "clj-eval"
+                        {:code "(str \"after-error\")"})]
           (is (= "after-error" (-> result :content first :text))))
 
         ;; Tool listing should still work

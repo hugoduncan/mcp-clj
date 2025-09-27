@@ -1,13 +1,13 @@
 (ns mcp-clj.mcp-client.http-integration-test
   "Integration tests for MCP client and server using HTTP transport"
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.mcp-client.core :as client]
-   [mcp-clj.mcp-server.core :as server]
-   [mcp-clj.log :as log]
-   [clojure.string :as str]))
+    [clojure.string :as str]
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.log :as log]
+    [mcp-clj.mcp-client.core :as client]
+    [mcp-clj.mcp-server.core :as server]))
 
-;;; Test Tools Definition
+;; Test Tools Definition
 
 (def test-tools
   "Test tools for integration testing"
@@ -64,7 +64,7 @@
                                                        (clojure.string/join ", "))}]
                                  :isError false})}})
 
-;;; Test Helper Functions
+;; Test Helper Functions
 
 (defn- get-server-port
   "Get the port of the running server, waiting for it to be ready"
@@ -93,13 +93,13 @@
   [server]
   (let [port (get-server-port server)
         client (client/create-client
-                {:transport {:type :http
-                             :url (str "http://localhost:" port)
-                             :num-threads 2}
-                 :client-info {:name "integration-test-client"
-                               :version "1.0.0"}
-                 :capabilities {:tools {}}
-                 :protocol-version "2024-11-05"})]
+                 {:transport {:type :http
+                              :url (str "http://localhost:" port)
+                              :num-threads 2}
+                  :client-info {:name "integration-test-client"
+                                :version "1.0.0"}
+                  :capabilities {:tools {}}
+                  :protocol-version "2024-11-05"})]
     ;; Wait for client to be ready
     (client/wait-for-ready client 5000)
     (log/info :test/client-connected {:ready (client/client-ready? client)})
@@ -120,7 +120,7 @@
          ((:stop ~server-binding))
          (log/info :test/server-stopped)))))
 
-;;; Integration Tests
+;; Integration Tests
 
 (deftest ^:integ http-server-client-initialization-test
   ;; Test that both server and client initialize correctly over HTTP
@@ -251,8 +251,8 @@
     (testing "HTTP concurrent requests integration"
       (testing "concurrent tool calls work correctly"
         (let [futures (doall
-                       (for [i (range 5)]
-                         (client/call-tool client "add" {:a i :b (+ i 10)})))
+                        (for [i (range 5)]
+                          (client/call-tool client "add" {:a i :b (+ i 10)})))
               results (mapv (comp :text first :content deref) futures)]
 
           ;; Verify all futures completed successfully
@@ -264,8 +264,8 @@
 
       (testing "concurrent tool discovery works"
         (let [futures (doall
-                       (for [_ (range 3)]
-                         (future @(client/list-tools client))))
+                        (for [_ (range 3)]
+                          (future @(client/list-tools client))))
               results (mapv deref futures)]
 
           ;; All should return the same tool count

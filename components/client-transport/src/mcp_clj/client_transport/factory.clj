@@ -1,11 +1,11 @@
 (ns mcp-clj.client-transport.factory
   "Factory for creating MCP client transports with pluggable registry"
   (:require
-   [mcp-clj.client-transport.http :as http]
-   [mcp-clj.client-transport.protocol :as transport-protocol]
-   [mcp-clj.client-transport.stdio :as stdio]))
+    [mcp-clj.client-transport.http :as http]
+    [mcp-clj.client-transport.protocol :as transport-protocol]
+    [mcp-clj.client-transport.stdio :as stdio]))
 
-;;; Transport Registry
+;; Transport Registry
 
 (defonce ^:private transport-registry
   (atom {}))
@@ -57,7 +57,7 @@
   [transport-type]
   (contains? @transport-registry transport-type))
 
-;;; Factory Function
+;; Factory Function
 
 (defn create-transport
   "Create transport based on configuration using the pluggable registry.
@@ -70,10 +70,10 @@
   [{:keys [transport] :as config}]
   (if-not transport
     (throw
-     (ex-info
-      "Missing transport configuration"
-      {:config config
-       :supported (str ":transport map with :type from " (list-transports))}))
+      (ex-info
+        "Missing transport configuration"
+        {:config config
+         :supported (str ":transport map with :type from " (list-transports))}))
 
     (let [{:keys [type] :as transport-config} transport
           transport-options (dissoc transport-config :type)
@@ -97,13 +97,13 @@
 
         ;; Transport type not registered
         (throw
-         (ex-info
-          "Unregistered transport type"
-          {:config config
-           :transport-type type
-           :registered-types (list-transports)}))))))
+          (ex-info
+            "Unregistered transport type"
+            {:config config
+             :transport-type type
+             :registered-types (list-transports)}))))))
 
-;;; Auto-registration of Built-in Transports
+;; Auto-registration of Built-in Transports
 
 (register-transport! :http http/create-transport)
 

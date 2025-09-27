@@ -1,9 +1,9 @@
 (ns mcp-clj.sse-server.main
   "SSE-based MCP server main entry point"
+  (:gen-class)
   (:require
-   [mcp-clj.mcp-server.core :as mcp-server]
-   [mcp-clj.log :as log])
-  (:gen-class))
+    [mcp-clj.log :as log]
+    [mcp-clj.mcp-server.core :as mcp-server]))
 
 (defn parse-args
   "Parse command line arguments for SSE server"

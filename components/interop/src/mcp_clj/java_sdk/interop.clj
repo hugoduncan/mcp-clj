@@ -4,68 +4,76 @@
   Provides a minimal Clojure API to create and interact with MCP
   clients and servers from the official Java SDK."
   (:require
-   [mcp-clj.log :as log])
+    [mcp-clj.log :as log])
   (:import
-   [com.fasterxml.jackson.databind
-    ObjectMapper] ;; Types
-   [io.modelcontextprotocol.client
-    McpClient
-    McpAsyncClient
-    McpSyncClient]
-   [io.modelcontextprotocol.client.transport
-    StdioClientTransport
-    ServerParameters
-    WebFluxSseClientTransport
-    WebClientStreamableHttpTransport]
-   [io.modelcontextprotocol.server
-    McpServer
-    McpAsyncServer
-    McpSyncServer
-    McpServerFeatures$SyncToolSpecification
-    McpServerFeatures$SyncToolSpecification$Builder
-    McpServerFeatures$AsyncToolSpecification$Builder]
-   [io.modelcontextprotocol.server.transport
-    StdioServerTransportProvider
-    WebFluxSseServerTransportProvider
-    WebFluxStatelessServerTransport
-    WebFluxStreamableServerTransportProvider]
-   [io.modelcontextprotocol.spec
-    McpSchema
-    McpSchema$AudioContent
-    McpSchema$BlobResourceContents
-    McpSchema$CallToolRequest
-    McpSchema$CallToolResult
-    McpSchema$Content
-    McpSchema$EmbeddedResource
-    McpSchema$ImageContent
-    McpSchema$InitializeResult
-    McpSchema$ListToolsResult
-    McpSchema$ResourceLink
-    McpSchema$ServerCapabilities$PromptCapabilities
-    McpSchema$ServerCapabilities$ResourceCapabilities
-    McpSchema$ServerCapabilities$ToolCapabilities
-    McpSchema$ServerCapabilities
-    McpSchema$ServerCapabilities$Builder
-    McpSchema$TextContent
-    McpSchema$TextResourceContents
-    McpSchema$Tool
-    McpServerTransportProvider]
-   [org.springframework.web.reactive.function.client
-    WebClient
-    WebClient$Builder]
-   [java.lang AutoCloseable]
-   [java.util List
-    Map]
-   [java.util.concurrent CompletableFuture
-    TimeUnit]))
+    (com.fasterxml.jackson.databind
+      ObjectMapper)
+    ; Types
+    (io.modelcontextprotocol.client
+      McpAsyncClient
+      McpClient
+      McpSyncClient)
+    (io.modelcontextprotocol.client.transport
+      ServerParameters
+      StdioClientTransport
+      WebClientStreamableHttpTransport
+      WebFluxSseClientTransport)
+    (io.modelcontextprotocol.server
+      McpAsyncServer
+      McpServer
+      McpServerFeatures$AsyncToolSpecification$Builder
+      McpServerFeatures$SyncToolSpecification
+      McpServerFeatures$SyncToolSpecification$Builder
+      McpSyncServer)
+    (io.modelcontextprotocol.server.transport
+      StdioServerTransportProvider
+      WebFluxSseServerTransportProvider
+      WebFluxStatelessServerTransport
+      WebFluxStreamableServerTransportProvider)
+    (io.modelcontextprotocol.spec
+      McpSchema
+      McpSchema$AudioContent
+      McpSchema$BlobResourceContents
+      McpSchema$CallToolRequest
+      McpSchema$CallToolResult
+      McpSchema$Content
+      McpSchema$EmbeddedResource
+      McpSchema$ImageContent
+      McpSchema$InitializeResult
+      McpSchema$ListToolsResult
+      McpSchema$ResourceLink
+      McpSchema$ServerCapabilities
+      McpSchema$ServerCapabilities$Builder
+      McpSchema$ServerCapabilities$PromptCapabilities
+      McpSchema$ServerCapabilities$ResourceCapabilities
+      McpSchema$ServerCapabilities$ToolCapabilities
+      McpSchema$TextContent
+      McpSchema$TextResourceContents
+      McpSchema$Tool
+      McpServerTransportProvider)
+    (java.lang
+      AutoCloseable)
+    (java.util
+      List
+      Map)
+    (java.util.concurrent
+      CompletableFuture
+      TimeUnit)
+    (org.springframework.web.reactive.function.client
+      WebClient
+      WebClient$Builder)))
 
-;;; Utility functions
+;; Utility functions
 
-;;; Records for Java SDK client and server wrappers
+;; Records for Java SDK client and server wrappers
 
-(defrecord JavaSdkClient [^McpClient client transport async?]
+(defrecord JavaSdkClient
+  [^McpClient client transport async?]
+
   AutoCloseable
-  (close [_this]
+
+  (close
+    [_this]
     (log/info :java-sdk/closing-client)
     (try
       (if async?
@@ -75,9 +83,13 @@
       (catch Exception e
         (log/warn :java-sdk/close-error {:error e})))))
 
-(defrecord JavaSdkServer [^McpServer server name version async?]
+(defrecord JavaSdkServer
+  [^McpServer server name version async?]
+
   AutoCloseable
-  (close [_this]
+
+  (close
+    [_this]
     (log/info :java-sdk/closing-server)
     (try
       (if async?
@@ -92,10 +104,10 @@
   (cond
     (map? m)
     (java.util.HashMap.
-     ^Map (into {} (map (fn [[k v]]
-                          [(if (keyword? k) (name k) k)
-                           (clj->java-map v)])
-                        m)))
+      ^Map (into {} (map (fn [[k v]]
+                           [(if (keyword? k) (name k) k)
+                            (clj->java-map v)])
+                         m)))
 
     (sequential? m)
     (java.util.ArrayList. ^java.util.Collection (map clj->java-map m))
@@ -140,47 +152,47 @@
   [^McpSchema$Content content]
   (let [m (.meta content)]
     (cond->
-        (condp = (.type content)
-          "text"
-          (let [^McpSchema$TextContent text-content content]
-            {:type "text"
-             :text (.text text-content)})
-
-          "image"
-          (let [^McpSchema$ImageContent image-content content]
-            {:data (.data image-content)
-             :mime-type (.mimeType image-content)})
-
-          "audio"
-          (let [^McpSchema$AudioContent audio-content content]
-            {:data (.data audio-content)
-             :mime-type (.mimeType audio-content)})
-
-          "resource"
-          (let [^McpSchema$EmbeddedResource embedded-resource content
-                resource (.resource embedded-resource)
-                base {:uri (.uri resource)
-                      :mime-type (.mimeType resource)
-                      :meta (into {} (.meta resource))}]
-            (cond
-              (instance? McpSchema$TextResourceContents resource)
-              (assoc base
-                     :text (.text ^McpSchema$TextResourceContents resource))
-              (instance? McpSchema$BlobResourceContents resource)
-              (assoc base
-                     :blob (.blob ^McpSchema$BlobResourceContents resource))))
-
-          "resource_link"
-          (let [^McpSchema$ResourceLink link content]
-            {:name (.name link)
-             :title (.title link)
-             :uri (.uri link)
-             :descritpion (.description link)
-             :mime-type (.mimeType link)
-             :size (.size link)})
-
+      (condp = (.type content)
+        "text"
+        (let [^McpSchema$TextContent text-content content]
           {:type "text"
-           :text (str content)})
+           :text (.text text-content)})
+
+        "image"
+        (let [^McpSchema$ImageContent image-content content]
+          {:data (.data image-content)
+           :mime-type (.mimeType image-content)})
+
+        "audio"
+        (let [^McpSchema$AudioContent audio-content content]
+          {:data (.data audio-content)
+           :mime-type (.mimeType audio-content)})
+
+        "resource"
+        (let [^McpSchema$EmbeddedResource embedded-resource content
+              resource (.resource embedded-resource)
+              base {:uri (.uri resource)
+                    :mime-type (.mimeType resource)
+                    :meta (into {} (.meta resource))}]
+          (cond
+            (instance? McpSchema$TextResourceContents resource)
+            (assoc base
+                   :text (.text ^McpSchema$TextResourceContents resource))
+            (instance? McpSchema$BlobResourceContents resource)
+            (assoc base
+                   :blob (.blob ^McpSchema$BlobResourceContents resource))))
+
+        "resource_link"
+        (let [^McpSchema$ResourceLink link content]
+          {:name (.name link)
+           :title (.title link)
+           :uri (.uri link)
+           :descritpion (.description link)
+           :mime-type (.mimeType link)
+           :size (.size link)})
+
+        {:type "text"
+         :text (str content)})
       (and m (seq m))
       (assoc :meta m))))
 
@@ -236,26 +248,26 @@
        :protocolVersion (.protocolVersion init-result)
        :capabilities {:tools
                       (when-let
-                       [^McpSchema$ServerCapabilities$ToolCapabilities
-                        tools-cap
-                        (and capabilities (.tools capabilities))]
+                        [^McpSchema$ServerCapabilities$ToolCapabilities
+                         tools-cap
+                         (and capabilities (.tools capabilities))]
                         {:listChanged (.listChanged tools-cap)})
                       :resources
                       (when-let
-                       [^McpSchema$ServerCapabilities$ResourceCapabilities
-                        resources-cap
-                        (and capabilities (.resources capabilities))]
+                        [^McpSchema$ServerCapabilities$ResourceCapabilities
+                         resources-cap
+                         (and capabilities (.resources capabilities))]
                         {:listChanged (.listChanged resources-cap)
                          :subscribe (.subscribe resources-cap)})
                       :prompts
                       (when-let
-                       [^McpSchema$ServerCapabilities$PromptCapabilities
-                        prompts-cap
-                        (and capabilities (.prompts capabilities))]
+                        [^McpSchema$ServerCapabilities$PromptCapabilities
+                         prompts-cap
+                         (and capabilities (.prompts capabilities))]
                         {:listChanged (.listChanged prompts-cap)})}
        :instructions (.instructions init-result)})))
 
-;;; Client API
+;; Client API
 
 (defn create-java-client
   "Create a Java SDK MCP client.
@@ -297,7 +309,7 @@
         server-params (if args
                         (-> builder
                             (.args
-                             ^"[Ljava.lang.String;" (into-array String args))
+                              ^"[Ljava.lang.String;" (into-array String args))
                             (.build))
                         (.build builder))]
 
@@ -390,14 +402,16 @@
       ;; Convert Mono to CompletableFuture if needed and transform result
       (->  future
            (.thenApply (reify java.util.function.Function
-                         (apply [_ result]
+                         (apply
+                           [_ result]
                            (java-tools-result->clj result))))))
     ;; For sync client, wrap the synchronous call in a CompletableFuture
     (CompletableFuture/supplyAsync
-     (reify java.util.function.Supplier
-       (get [_]
-         (let [result (.listTools ^McpSyncClient (:client client-record))]
-           (java-tools-result->clj result)))))))
+      (reify java.util.function.Supplier
+        (get
+          [_]
+          (let [result (.listTools ^McpSyncClient (:client client-record))]
+            (java-tools-result->clj result)))))))
 
 (defn call-tool
   "Call a tool through the Java SDK client.
@@ -423,22 +437,24 @@
             future                 (.toFuture future-or-mono)]
         (-> future
             (.thenApply (reify java.util.function.Function
-                          (apply [_ result]
+                          (apply
+                            [_ result]
                             (java-tool-result->clj result))))))
       ;; For sync client, wrap the synchronous call in a CompletableFuture
       (CompletableFuture/supplyAsync
-       (reify java.util.function.Supplier
-         (get [_]
-           (let [^McpSyncClient client (:client client-record)
-                 result                (.callTool client request)]
-             (java-tool-result->clj result))))))))
+        (reify java.util.function.Supplier
+          (get
+            [_]
+            (let [^McpSyncClient client (:client client-record)
+                  result                (.callTool client request)]
+              (java-tool-result->clj result))))))))
 
 (defn close-client
   "Close the Java SDK client."
   [^JavaSdkClient client-record]
   (.close client-record))
 
-;;; Server API (placeholder - not fully implemented yet)
+;; Server API (placeholder - not fully implemented yet)
 
 (defn create-java-server
   "Create a Java SDK MCP server with configurable transport.
@@ -459,20 +475,20 @@
                  (-> (McpServer/async transport)
                      (.serverInfo name version)
                      (.capabilities
-                      (-> (McpSchema$ServerCapabilities$Builder.)
-                          (.tools true)
-                          (.build)))
+                       (-> (McpSchema$ServerCapabilities$Builder.)
+                           (.tools true)
+                           (.build)))
                      (.build))
                  (-> (McpServer/sync transport)
                      (.serverInfo name version)
                      (.capabilities
-                      (-> (McpSchema$ServerCapabilities$Builder.)
-                          (.tools true)
-                          (.build)))
+                       (-> (McpSchema$ServerCapabilities$Builder.)
+                           (.tools true)
+                           (.build)))
                      (.build)))]
     (->JavaSdkServer server name version async?)))
 
-;;; Process management for stdio transport
+;; Process management for stdio transport
 
 (defn start-process
   "Start a process for stdio transport.
@@ -513,8 +529,8 @@
   (let [^String schema-json (if (string? input-schema)
                               input-schema
                               (.writeValueAsString
-                               (ObjectMapper.)
-                               input-schema))
+                                (ObjectMapper.)
+                                input-schema))
         tool (-> (McpSchema$Tool/builder)
                  (.name name)
                  (.description description)
@@ -589,14 +605,14 @@
     :stdio-client (let [command (:command options)]
                     (when-not command
                       (throw
-                       (ex-info
-                        "Command required for stdio client transport"
-                        {:options options})))
+                        (ex-info
+                          "Command required for stdio client transport"
+                          {:options options})))
                     (create-stdio-client-transport command))
     :stdio-server (create-stdio-server-transport)
     :http-client (create-http-client-transport options)
     :http-server (create-http-server-transport options)
     (throw
-     (ex-info
-      "Unknown transport type"
-      {:transport-type transport-type}))))
+      (ex-info
+        "Unknown transport type"
+        {:transport-type transport-type}))))

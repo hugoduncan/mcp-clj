@@ -1,10 +1,10 @@
 (ns mcp-clj.mcp-client.http-transport-test
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.mcp-client.core :as client]
-   [mcp-clj.mcp-server.core :as server]))
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.mcp-client.core :as client]
+    [mcp-clj.mcp-server.core :as server]))
 
-;;; Test Helpers
+;; Test Helpers
 
 (defn- create-test-server
   "Create and start a test HTTP server with optional tools"
@@ -12,20 +12,20 @@
    (create-test-server nil))
   ([tools]
    (server/create-server
-    {:transport {:type :http :port 0} ; Random port
-     :tools     (or tools
-                    {"test-echo"
-                     {:name        "test-echo"
-                      :description "Echo test tool"
-                      :inputSchema {:type       "object"
-                                    :properties {:message {:type "string"}}
-                                    :required   ["message"]}
-                      :implementation
-                      (fn [args]
-                        {:content
-                         [{:type "text"
-                           :text (str "Echo: " (:message args))}]
-                         :isError false})}})})))
+     {:transport {:type :http :port 0} ; Random port
+      :tools     (or tools
+                     {"test-echo"
+                      {:name        "test-echo"
+                       :description "Echo test tool"
+                       :inputSchema {:type       "object"
+                                     :properties {:message {:type "string"}}
+                                     :required   ["message"]}
+                       :implementation
+                       (fn [args]
+                         {:content
+                          [{:type "text"
+                            :text (str "Echo: " (:message args))}]
+                          :isError false})}})})))
 
 (defn- get-server-port
   "Get the port of the running server, waiting for it to be ready"
@@ -47,15 +47,15 @@
      (when-not port
        (throw (ex-info "Server did not start - no port available" {})))
      (let [client (client/create-client
-                   (merge
-                    {:transport {:type :http
-                                 :url (str "http://localhost:" port)
-                                 :num-threads 2}
-                     :client-info {:name "test-client"
-                                   :version "1.0.0"}
-                     :capabilities {:tools {}}
-                     :protocol-version "2024-11-05"}
-                    opts))]
+                    (merge
+                      {:transport {:type :http
+                                   :url (str "http://localhost:" port)
+                                   :num-threads 2}
+                       :client-info {:name "test-client"
+                                     :version "1.0.0"}
+                       :capabilities {:tools {}}
+                       :protocol-version "2024-11-05"}
+                      opts))]
        ;; Wait for client to be ready
        (client/wait-for-ready client 5000)
        client))))
@@ -73,7 +73,7 @@
        (finally
          ((:stop ~server-sym))))))
 
-;;; Tests
+;; Tests
 
 (deftest ^:integ http-client-initialization-test
   ;; Test that HTTP client initializes correctly
@@ -107,9 +107,9 @@
     (with-http-test-env [server client]
       (testing "executes tools successfully"
         (let [result @(client/call-tool
-                       client
-                       "test-echo"
-                       {:message "Hello, HTTP!"})]
+                        client
+                        "test-echo"
+                        {:message "Hello, HTTP!"})]
           (is (map? result))
           (is (not (:isError result)))
           (is (= 1 (count (:content result))))
@@ -129,9 +129,9 @@
 
       (testing "handles invalid arguments"
         (let [resp @(client/call-tool
-                     client
-                     "test-echo"
-                     {:wrong-param "value"})]
+                      client
+                      "test-echo"
+                      {:wrong-param "value"})]
           (is (:isError resp))
           (is (= "Missing args: [:message], found #{:wrong-param}"
                  (-> resp :content first :text))))))))

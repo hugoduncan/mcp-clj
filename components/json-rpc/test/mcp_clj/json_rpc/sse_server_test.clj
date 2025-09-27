@@ -1,20 +1,20 @@
 (ns mcp-clj.json-rpc.sse-server-test
   (:require
-   [clojure.data.json :as json]
-   [clojure.string :as str]
-   [clojure.test :refer [deftest is testing use-fixtures]]
-   [hato.client :as hato]
-   [hato.middleware :as mw]
-   [mcp-clj.http :as http]
-   [mcp-clj.json-rpc.sse-server :as server]
-   [mcp-clj.json-rpc.protocols :as protocols])
+    [clojure.data.json :as json]
+    [clojure.string :as str]
+    [clojure.test :refer [deftest is testing use-fixtures]]
+    [hato.client :as hato]
+    [hato.middleware :as mw]
+    [mcp-clj.http :as http]
+    [mcp-clj.json-rpc.protocols :as protocols]
+    [mcp-clj.json-rpc.sse-server :as server])
   (:import
-   [java.util.concurrent
-    CountDownLatch
-    Executors
-    TimeUnit]))
+    (java.util.concurrent
+      CountDownLatch
+      Executors
+      TimeUnit)))
 
-;;; Test Fixtures and Helpers
+;; Test Fixtures and Helpers
 
 (def ^:private ^:dynamic *server* nil)
 (def ^:private ^:dynamic *client-session* nil)
@@ -33,10 +33,10 @@
         (when-let [[k v] (str/split line #":" 2)]
           (let [v (str/trim v)]
             (recur
-             (assoc resp (keyword k)
-                    (if (= "message" (:event resp))
-                      (json/read-str v :key-fn keyword)
-                      v)))))))))
+              (assoc resp (keyword k)
+                     (if (= "message" (:event resp))
+                       (json/read-str v :key-fn keyword)
+                       v)))))))))
 
 (defn- parse-sse-message
   "Parse an SSE message from a line of text"
@@ -59,8 +59,8 @@
                            {:headers {"Accept" "text/event-stream"}
                             :as      :stream})
         reader   (java.io.BufferedReader.
-                  (java.io.InputStreamReader.
-                   (:body response)))]
+                   (java.io.InputStreamReader.
+                     (:body response)))]
     (when (= http/Ok (:status response))
       (when-let [endpoint (wait-for-endpoint reader)]
         {:reader   reader
@@ -123,10 +123,10 @@
   [f]
   (let [executor (Executors/newScheduledThreadPool 2)
         server (server/create-server
-                {:port 0
-                 :num-threads 2
-                 :on-sse-connect (fn [_] nil)
-                 :on-sse-close (fn [_] nil)})]
+                 {:port 0
+                  :num-threads 2
+                  :on-sse-connect (fn [_] nil)
+                  :on-sse-close (fn [_] nil)})]
     (try
       (binding [*server* server]
         (let [session (establish-sse-connection (:port server))]
@@ -142,7 +142,7 @@
 
 (use-fixtures :each with-test-server)
 
-;;; Tests
+;; Tests
 
 (deftest ^:integ connection-establishment-test
   (testing "SSE connection establishment"
@@ -240,9 +240,9 @@
       (testing "Multiple simultaneous requests"
         (let [requests (repeat request-count (make-request "slow" {} 1))
               futures (doall
-                       (for [req requests]
-                         (future
-                           (send-request req))))]
+                        (for [req requests]
+                          (future
+                            (send-request req))))]
 
           (is (.await latch 2 TimeUnit/SECONDS)
               "All requests should start within 2 seconds")

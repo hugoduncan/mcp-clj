@@ -1,18 +1,18 @@
 (ns mcp-clj.json-rpc.http-server-test
   (:require
-   [clojure.data.json :as json]
-   [clojure.test :refer [deftest is testing use-fixtures]]
-   [hato.client :as hato]
-   [mcp-clj.http :as http]
-   [mcp-clj.json-rpc.http-server :as http-server]
-   [mcp-clj.json-rpc.json-protocol :as json-protocol]
-   [mcp-clj.json-rpc.protocols :as protocols])
+    [clojure.data.json :as json]
+    [clojure.test :refer [deftest is testing use-fixtures]]
+    [hato.client :as hato]
+    [mcp-clj.http :as http]
+    [mcp-clj.json-rpc.http-server :as http-server]
+    [mcp-clj.json-rpc.json-protocol :as json-protocol]
+    [mcp-clj.json-rpc.protocols :as protocols])
   (:import
-   [java.util.concurrent
-    CountDownLatch
-    TimeUnit]))
+    (java.util.concurrent
+      CountDownLatch
+      TimeUnit)))
 
-;;; Test Fixtures and Helpers
+;; Test Fixtures and Helpers
 
 (def ^:private ^:dynamic *server* nil)
 
@@ -49,7 +49,7 @@
 
 (use-fixtures :each with-test-server)
 
-;;; Tests
+;; Tests
 
 (deftest ^:integ http-server-creation-test
   ;; Test creating an HTTP server with streamable transport
@@ -75,7 +75,7 @@
 
     (testing "throws on invalid handlers"
       (is (thrown? Exception
-                   (http-server/set-handlers! *server* "invalid"))))))
+            (http-server/set-handlers! *server* "invalid"))))))
 
 (deftest ^:integ mcp-endpoint-discovery-test
   ;; Test GET /mcp endpoint returns transport capabilities

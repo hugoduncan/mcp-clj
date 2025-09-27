@@ -1,7 +1,8 @@
 (ns mcp-clj.tools.core
   "Tool definitions and validation for MCP servers"
-  (:require [mcp-clj.tools.clj-eval :as clj-eval]
-            [mcp-clj.tools.ls :as ls]))
+  (:require
+    [mcp-clj.tools.clj-eval :as clj-eval]
+    [mcp-clj.tools.ls :as ls]))
 
 (defn valid-tool?
   "Validate a tool definition"

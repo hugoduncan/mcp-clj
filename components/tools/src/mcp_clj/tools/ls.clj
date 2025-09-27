@@ -1,12 +1,13 @@
 (ns mcp-clj.tools.ls
   "File listing tool for MCP servers"
   (:require
-   [clojure.data.json :as json]
-   [clojure.java.io :as io]
-   [clojure.string :as str]
-   [mcp-clj.log :as log])
+    [clojure.data.json :as json]
+    [clojure.java.io :as io]
+    [clojure.string :as str]
+    [mcp-clj.log :as log])
   (:import
-   [java.io File]))
+    (java.io
+      File)))
 
 (def ^:private allowed-roots
   "Allowed directory roots for security"
@@ -71,7 +72,8 @@
                       :total-files       0
                       :max-depth-reached false
                       :max-files-reached false})]
-    (letfn [(walk-dir [dir current-depth gitignore-patterns]
+    (letfn [(walk-dir
+              [dir current-depth gitignore-patterns]
               (when (and (< current-depth max-depth)
                          (< (count (:files @result)) max-files))
                 (try
@@ -93,7 +95,7 @@
                                        (< (inc current-depth) max-depth))
                               (walk-dir (.getPath file) (inc current-depth) dir-gitignore))))))
 
-                                        ; Check if we can't traverse deeper due to max-depth limit
+                    ;; Check if we can't traverse deeper due to max-depth limit
                     (let [remaining-files (.listFiles (io/file dir))]
                       (when (and remaining-files
                                  (some (fn [^File file]
@@ -103,7 +105,7 @@
                                        remaining-files))
                         (swap! result assoc :max-depth-reached true))))
                   (catch Exception e
-                                        ; Skip directories we can't read
+                    ;; Skip directories we can't read
                     nil))))]
 
       (walk-dir root-dir 0 #{}))

@@ -1,11 +1,12 @@
 (ns mcp-clj.mcp-client.ls-tool-integration-test
   "Integration test for the ls tool using mcp-client with mcp-server"
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.mcp-client.core :as client]
-   [mcp-clj.mcp-client.tools :as tools])
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.mcp-client.core :as client]
+    [mcp-clj.mcp-client.tools :as tools])
   (:import
-   [java.nio.file Paths]))
+    (java.nio.file
+      Paths)))
 
 (defn relativize
   "Returns the path of `to` relative to `from`.
@@ -18,12 +19,12 @@
 (deftest ^:integ ls-tool-integration-test
   (testing "ls tool works through mcp-client connecting to mcp-server"
     (with-open [client (client/create-client
-                        {:transport    {:type    :stdio
-                                        :command "clojure"
-                                        :args    ["-M:stdio-server"]}
-                         :client-info  {:name    "ls-integration-test-client"
-                                        :version "1.0.0"}
-                         :capabilities {}})]
+                         {:transport    {:type    :stdio
+                                         :command "clojure"
+                                         :args    ["-M:stdio-server"]}
+                          :client-info  {:name    "ls-integration-test-client"
+                                         :version "1.0.0"}
+                          :capabilities {}})]
 
       ;; Wait for client to initialize
       (client/wait-for-ready client 20000)
@@ -62,14 +63,14 @@
             (is (map? data))
             (let [file-paths (:files data)]
               (is (some
-                   #(re-find #"mcp-client|mcp-server|tools" %)
-                   file-paths))))))
+                    #(re-find #"mcp-client|mcp-server|tools" %)
+                    file-paths))))))
 
       (testing "respects max-files parameter"
         (let [future (tools/call-tool-impl
-                      client
-                      "ls"
-                      {"path" "." "max-files" 5})
+                       client
+                       "ls"
+                       {"path" "." "max-files" 5})
               result (:content @future)] ; Deref the future and get :content
           (is (vector? result))
 
@@ -78,9 +79,9 @@
 
       (testing "respects max-depth parameter"
         (let [future (tools/call-tool-impl
-                      client
-                      "ls"
-                      {"path" "." "max-depth" 1})
+                       client
+                       "ls"
+                       {"path" "." "max-depth" 1})
               result (:content @future) ; Deref the future and get :content
               dir    (System/getProperty "user.dir")]
           (is (vector? result))
@@ -89,10 +90,10 @@
           (let [data  (:data (first result))
                 paths (:files data)]
             (is (every?
-                 (comp
-                  #(< (count (filter #{\/} %)) 3)
-                  #(relativize dir %))
-                 paths)))))
+                  (comp
+                    #(< (count (filter #{\/} %)) 3)
+                    #(relativize dir %))
+                  paths)))))
 
       (testing "handles non-existent path gracefully by throwing exception"
         (let [resp @(tools/call-tool-impl ; Deref the future
@@ -105,9 +106,9 @@
 
         ;; Verify the exception contains the expected error content
         (let [data    @(tools/call-tool-impl
-                        client
-                        "ls"
-                        {"path" "non-existent-path-12345"})
+                         client
+                         "ls"
+                         {"path" "non-existent-path-12345"})
               content (:content data)]
           (is (vector? content))
           (let [error-item (first content)]
@@ -115,5 +116,5 @@
             (is (= "text" (:type error-item)))
             (is (string? (:text error-item)))
             (is (re-find
-                 #"not found|does not exist"
-                 (:text error-item)))))))))
+                  #"not found|does not exist"
+                  (:text error-item)))))))))

@@ -1,9 +1,11 @@
 (ns mcp-clj.in-memory-transport.atomic
   "Type-hinted wrapper functions for Java atomic operations to eliminate reflection warnings"
   (:import
-   [java.util.concurrent.atomic AtomicBoolean AtomicLong]))
+    (java.util.concurrent.atomic
+      AtomicBoolean
+      AtomicLong)))
 
-;;; AtomicBoolean operations
+;; AtomicBoolean operations
 
 (defn create-atomic-boolean
   "Create a new AtomicBoolean with initial value"
@@ -25,7 +27,7 @@
   [^AtomicBoolean atomic expected updated]
   (.compareAndSet atomic expected updated))
 
-;;; AtomicLong operations
+;; AtomicLong operations
 
 (defn create-atomic-long
   "Create a new AtomicLong with initial value"

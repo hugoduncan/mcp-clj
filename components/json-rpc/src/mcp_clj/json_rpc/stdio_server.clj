@@ -1,24 +1,26 @@
 (ns mcp-clj.json-rpc.stdio-server
   "JSON-RPC 2.0 server over stdio"
   (:require
-   [clojure.data.json :as json]
-   [mcp-clj.json-rpc.executor :as executor]
-   [mcp-clj.json-rpc.json-protocol :as json-protocol]
-   [mcp-clj.json-rpc.protocols :as protocols]
-   [mcp-clj.json-rpc.stdio :as stdio]
-   [mcp-clj.log :as log])
+    [clojure.data.json :as json]
+    [mcp-clj.json-rpc.executor :as executor]
+    [mcp-clj.json-rpc.json-protocol :as json-protocol]
+    [mcp-clj.json-rpc.protocols :as protocols]
+    [mcp-clj.json-rpc.stdio :as stdio]
+    [mcp-clj.log :as log])
   (:import
-   [java.io BufferedReader
-    BufferedWriter
-    InputStreamReader
-    OutputStreamWriter]
-   [java.util.concurrent RejectedExecutionException]))
+    (java.io
+      BufferedReader
+      BufferedWriter
+      InputStreamReader
+      OutputStreamWriter)
+    (java.util.concurrent
+      RejectedExecutionException)))
 
-;;; Configuration
+;; Configuration
 
 (def ^:private request-timeout-ms 30000)
 
-;;; JSON I/O
+;; JSON I/O
 
 (defn- read-json
   "Read JSON from reader using unified stdio implementation"
@@ -40,7 +42,7 @@
         (log/error :rpc/write {:msg "JSON write error:"
                                :exception (.getMessage e)})))))
 
-;;; JSON-RPC Request Handling
+;; JSON-RPC Request Handling
 
 (defn- handle-json-rpc
   "Process a JSON-RPC request with simplified handler interface"
@@ -56,19 +58,19 @@
   [executor handler rpc-call]
   (let [out *out*]
     (executor/submit-with-timeout!
-     executor
-     #(try
-        (binding [*out* out]
-          (handle-json-rpc handler rpc-call))
-        (catch Throwable e
-          (log/error :rpc/handler-error {:error e})
-          (write-json!
-           out
-           (json-protocol/json-rpc-error
-            :internal-error
-            (.getMessage e)
-            (:id rpc-call)))))
-     request-timeout-ms)))
+      executor
+      #(try
+         (binding [*out* out]
+           (handle-json-rpc handler rpc-call))
+         (catch Throwable e
+           (log/error :rpc/handler-error {:error e})
+           (write-json!
+             out
+             (json-protocol/json-rpc-error
+               :internal-error
+               (.getMessage e)
+               (:id rpc-call)))))
+      request-timeout-ms)))
 
 (defn- handle-request
   "Handle a JSON-RPC request"
@@ -77,50 +79,50 @@
     (log/info :rpc/json-request {:json-request rpc-call})
     (if-let [validation-error (json-protocol/validate-request rpc-call)]
       (write-json!
-       *out*
-       (json-protocol/json-rpc-error
-        (:code (:error validation-error))
-        (:message (:error validation-error))
-        (:id rpc-call)))
+        *out*
+        (json-protocol/json-rpc-error
+          (:code (:error validation-error))
+          (:message (:error validation-error))
+          (:id rpc-call)))
       (if-let [handler (get handlers (:method rpc-call))]
         (dispatch-rpc-call executor handler rpc-call)
         (do
           (log/warn :rpc/no-such-method
-            {:method             (:method rpc-call)
-             :available-handlers (keys handlers)})
+                    {:method             (:method rpc-call)
+                     :available-handlers (keys handlers)})
           (write-json!
-           *out*
-           (json-protocol/json-rpc-error
-            :method-not-found
-            (str "Method not found: " (:method rpc-call))
-            (:id rpc-call))))))
+            *out*
+            (json-protocol/json-rpc-error
+              :method-not-found
+              (str "Method not found: " (:method rpc-call))
+              (:id rpc-call))))))
     (catch RejectedExecutionException _
       (log/warn :rpc/overload-rejection)
       (write-json!
-       *out*
-       (json-protocol/json-rpc-error :overloaded "Server overloaded")))
+        *out*
+        (json-protocol/json-rpc-error :overloaded "Server overloaded")))
     (catch Exception e
       (log/error :rpc/error {:error e})
       (write-json!
-       *out*
-       (json-protocol/json-rpc-error
-        :internal-error
-        (.getMessage e)
-        (:id rpc-call))))))
+        *out*
+        (json-protocol/json-rpc-error
+          :internal-error
+          (.getMessage e)
+          (:id rpc-call))))))
 
-;;; Server
+;; Server
 
 (defrecord StdioServer
-           [executor
-            handlers
-            out
-            server-future
-            stop-fn])
+  [executor
+   handlers
+   out
+   server-future
+   stop-fn])
 
 (defn- input-reader
   []
   (BufferedReader.
-   (InputStreamReader. System/in) 1024))
+    (InputStreamReader. System/in) 1024))
 
 (defn create-server
   "Create JSON-RPC server over stdio."
@@ -184,10 +186,11 @@
   [server]
   ((:stop-fn server)))
 
-(defn stdio-server? [x]
+(defn stdio-server?
+  [x]
   (instance? StdioServer x))
 
-;;; Protocol Implementation
+;; Protocol Implementation
 
 (extend-type StdioServer
   protocols/JsonRpcServer
@@ -200,8 +203,8 @@
   (notify-all! [server method params]
     (log/debug :server/notify-all! {:method method :params params})
     (write-json!
-     (:out server)
-     (json-protocol/json-rpc-notification method params)))
+      (:out server)
+      (json-protocol/json-rpc-notification method params)))
 
   (stop! [server]
     ((:stop-fn server))))

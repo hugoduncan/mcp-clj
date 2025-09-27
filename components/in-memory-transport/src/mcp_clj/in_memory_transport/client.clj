@@ -1,23 +1,28 @@
 (ns mcp-clj.in-memory-transport.client
   "In-memory client transport for unit testing MCP communication"
   (:require
-   [mcp-clj.client-transport.protocol :as transport-protocol]
-   [mcp-clj.in-memory-transport.shared :as shared]
-   [mcp-clj.in-memory-transport.atomic :as atomic]
-   [mcp-clj.log :as log])
+    [mcp-clj.client-transport.protocol :as transport-protocol]
+    [mcp-clj.in-memory-transport.atomic :as atomic]
+    [mcp-clj.in-memory-transport.shared :as shared]
+    [mcp-clj.log :as log])
   (:import
-   [java.util.concurrent TimeUnit CompletableFuture Executors]))
+    (java.util.concurrent
+      CompletableFuture
+      Executors
+      TimeUnit)))
 
 (defrecord InMemoryTransport
-           [shared-transport ; SharedTransport instance
-            client-alive? ; AtomicBoolean for client status
-            notification-handler] ; Function to handle notifications
+  [shared-transport ; SharedTransport instance
+   client-alive? ; AtomicBoolean for client status
+   notification-handler] ; Function to handle notifications
 
   transport-protocol/Transport
-  (send-request! [_ method params timeout-ms]
+
+  (send-request!
+    [_ method params timeout-ms]
     (if-not (shared/transport-alive? shared-transport)
       (CompletableFuture/failedFuture
-       (ex-info "Transport is closed" {:transport :in-memory}))
+        (ex-info "Transport is closed" {:transport :in-memory}))
       (let [request-id (shared/next-request-id! shared-transport)
             future (CompletableFuture.)
             request {:jsonrpc "2.0"
@@ -49,10 +54,12 @@
             (shared/remove-pending-request! shared-transport request-id)
             (CompletableFuture/failedFuture e))))))
 
-  (send-notification! [_ method params]
+
+  (send-notification!
+    [_ method params]
     (if-not (shared/transport-alive? shared-transport)
       (CompletableFuture/failedFuture
-       (ex-info "Transport is closed" {:transport :in-memory}))
+        (ex-info "Transport is closed" {:transport :in-memory}))
       (let [notification {:jsonrpc "2.0"
                           :method method
                           :params params}]
@@ -63,15 +70,21 @@
           (catch Exception e
             (CompletableFuture/failedFuture e))))))
 
-  (close! [_]
+
+  (close!
+    [_]
     (atomic/set-boolean! client-alive? false)
     (log/info :in-memory/client-closed {}))
 
-  (alive? [_]
+
+  (alive?
+    [_]
     (and (atomic/get-boolean client-alive?)
          (shared/transport-alive? shared-transport)))
 
-  (get-json-rpc-client [_]
+
+  (get-json-rpc-client
+    [_]
     ;; Return a minimal client-like object for compatibility
     (reify
       Object
@@ -109,8 +122,8 @@
                                         {:method (:method message)
                                          :error (.getMessage e)})))))
                      (catch InterruptedException _
-                       ;; Thread interrupted, exit
-                       )
+                            ;; Thread interrupted, exit
+                            )
                      (catch Exception e
                        (log/error :in-memory/client-processor-error {:error (.getMessage e)})))
                    (recur)))))))
@@ -126,9 +139,9 @@
     (throw (ex-info "Missing :shared transport in configuration"
                     {:config {:shared shared}})))
   (let [transport (->InMemoryTransport
-                   shared
-                   (atomic/create-atomic-boolean true)
-                   notification-handler)]
+                    shared
+                    (atomic/create-atomic-boolean true)
+                    notification-handler)]
     ;; Start message processing
     (start-client-message-processor! transport)
     (log/info :in-memory/client-created {})

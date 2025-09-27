@@ -1,7 +1,7 @@
 (ns mcp-clj.json-rpc.json-protocol-test
   (:require
-   [clojure.test :refer :all]
-   [mcp-clj.json-rpc.json-protocol :as protocol]))
+    [clojure.test :refer :all]
+    [mcp-clj.json-rpc.json-protocol :as protocol]))
 
 (deftest json-conversion
   (testing "EDN to JSON conversion"
@@ -17,13 +17,13 @@
 (deftest request-validation
   (testing "Valid request"
     (is (nil? (protocol/validate-request
-               {:jsonrpc "2.0"
-                :method  "test"
-                :params  {:a 1}}))))
+                {:jsonrpc "2.0"
+                 :method  "test"
+                 :params  {:a 1}}))))
 
   (testing "Invalid version"
     (let [response (protocol/validate-request
-                    {:jsonrpc "1.0"
-                     :method  "test"})]
+                     {:jsonrpc "1.0"
+                      :method  "test"})]
       (is (= "Invalid JSON-RPC version"
              (get-in response [:error :message]))))))

@@ -1,16 +1,18 @@
 (ns mcp-clj.mcp-server-test
   (:require
-   [clojure.data.json :as json]
-   [clojure.java.io :as io]
-   [clojure.string :as str]
-   [clojure.test :refer [deftest is testing use-fixtures]]
-   [hato.client :as hato]
-   [mcp-clj.mcp-server.core :as mcp])
+    [clojure.data.json :as json]
+    [clojure.java.io :as io]
+    [clojure.string :as str]
+    [clojure.test :refer [deftest is testing use-fixtures]]
+    [hato.client :as hato]
+    [mcp-clj.mcp-server.core :as mcp])
   (:import
-   [java.io BufferedReader]
-   [java.util.concurrent BlockingQueue
-    LinkedBlockingQueue
-    TimeUnit]))
+    (java.io
+      BufferedReader)
+    (java.util.concurrent
+      BlockingQueue
+      LinkedBlockingQueue
+      TimeUnit)))
 
 (def test-tool
   "Test tool for server testing"
@@ -56,10 +58,10 @@
   "Test fixture for server lifecycle"
   [f]
   (let [server (mcp/create-server
-                {:transport {:type :sse :port 0}
-                 :tools {"test-tool" test-tool
-                         "error-test-tool" error-test-tool}
-                 :prompts {"test-prompt" test-prompt}})]
+                 {:transport {:type :sse :port 0}
+                  :tools {"test-tool" test-tool
+                          "error-test-tool" error-test-tool}
+                  :prompts {"test-prompt" test-prompt}})]
     (try
       (binding [*server* server]
         (f))
@@ -86,10 +88,12 @@
    :params params
    :id id})
 
-(defn- poll [^BlockingQueue queue]
+(defn- poll
+  [^BlockingQueue queue]
   (.poll queue 2 TimeUnit/SECONDS))
 
-(defn- offer [^BlockingQueue queue value]
+(defn- offer
+  [^BlockingQueue queue value]
   (.offer queue value))
 
 (defn wait-for-sse-events
@@ -111,10 +115,10 @@
           (when-let [[k v] (str/split line #":" 2)]
             (let [v (str/trim v)]
               (recur
-               (assoc resp (keyword k)
-                      (if (= "message" (:event resp))
-                        (json/read-str v :key-fn keyword)
-                        v))))))))))
+                (assoc resp (keyword k)
+                       (if (= "message" (:event resp))
+                         (json/read-str v :key-fn keyword)
+                         v))))))))))
 
 (defn step-plan
   [state]
@@ -156,7 +160,8 @@
 
       (assoc state :failed {:unknown-action action}))))
 
-(defn run-plan [state]
+(defn run-plan
+  [state]
   (loop [state (assoc state :id 0)]
     (let [state' (step-plan state)]
       (prn :run-plan :state' state')
@@ -170,14 +175,16 @@
 
 (defn- update-state-apply-key
   [state-key data-key]
-  (fn apply-key [state data]
+  (fn apply-key
+    [state data]
     (prn :apply-key :data data)
     (prn state-key (get data data-key))
     (assoc state state-key (get data data-key))))
 
 (defn- update-state-apply-data
   [state-key]
-  (fn apply-data [state data]
+  (fn apply-data
+    [state data]
     (prn :apply-data :state state :data data)
     (prn state-key data)
     (assoc state state-key data)))
@@ -185,9 +192,9 @@
 (defn- json-request
   [method params & [id]]
   (cond->
-   {:jsonrpc "2.0"
-    :method method
-    :params params}
+    {:jsonrpc "2.0"
+     :method method
+     :params params}
     id (assoc :id id)))
 
 (defn- json-result
@@ -197,28 +204,30 @@
                  options)
     id (assoc :id id)))
 
-(defn- initialisation-plan []
+(defn- initialisation-plan
+  []
   [{:action :receive
     :data {:event "endpoint"}
     :apply-fn (update-state-apply-key :uri :data)}
    {:action :send
     :msg (json-request
-          "initialize"
-          {:protocolVersion "2024-11-05"
-           :capabilities {:roots
-                          {:listChanged true}
-                          :tools
-                          {:listChanged true}}
-           :clientInfo {:name "mcp"
-                        :version "0.1.0"}})}
+           "initialize"
+           {:protocolVersion "2024-11-05"
+            :capabilities {:roots
+                           {:listChanged true}
+                           :tools
+                           {:listChanged true}}
+            :clientInfo {:name "mcp"
+                         :version "0.1.0"}})}
    {:action :receive
     :data {:event "message"}}
    {:action :notify
     :msg (json-request
-          "notifications/initialized"
-          {})}])
+           "notifications/initialized"
+           {})}])
 
-(defn port []
+(defn port
+  []
   (:port @(:json-rpc-server *server*)))
 
 (deftest ^:integ lifecycle-test
@@ -272,110 +281,110 @@
               (testing "tool interactions"
                 (let [state
                       (assoc
-                       state'
-                       :plan
-                       [{:action :send
-                         :msg    (json-request
-                                  "tools/list"
-                                  {}
-                                  0)}
-                        {:action :receive
-                         :data
-                         {:event "message"
+                        state'
+                        :plan
+                        [{:action :send
+                          :msg    (json-request
+                                    "tools/list"
+                                    {}
+                                    0)}
+                         {:action :receive
                           :data
-                          (json-result
-                           {:tools
-                            [{:name        "test-tool",
-                              :description "A test tool for server testing",
-                              :inputSchema
-                              {:type       "object",
-                               :properties {:value {:type "string"}},
-                               :required   ["value"]}}
-                             {:name        "error-test-tool",
-                              :description "A test tool that always returns an error",
-                              :inputSchema
-                              {:type       "object",
-                               :properties {:value {:type "string"}},
-                               :required   ["value"]}}]}
-                           {}
-                           0)}}])
+                          {:event "message"
+                           :data
+                           (json-result
+                             {:tools
+                              [{:name        "test-tool",
+                                :description "A test tool for server testing",
+                                :inputSchema
+                                {:type       "object",
+                                 :properties {:value {:type "string"}},
+                                 :required   ["value"]}}
+                               {:name        "error-test-tool",
+                                :description "A test tool that always returns an error",
+                                :inputSchema
+                                {:type       "object",
+                                 :properties {:value {:type "string"}},
+                                 :required   ["value"]}}]}
+                             {}
+                             0)}}])
                       [state' result] (run-plan state)
                       _               (testing "tools/list"
                                         (is (= :passed result) (pr-str state))
                                         (is (not (:failed state'))))
                       state           (assoc
-                                       state'
-                                       :plan
-                                       [{:action :send
-                                         :msg    (json-request
-                                                  "tools/call"
-                                                  {:name "test-tool"
-                                                   :arguments
-                                                   {:value "me"}}
-                                                  0)}
-                                        {:action :receive
-                                         :data
-                                         {:event "message"
+                                        state'
+                                        :plan
+                                        [{:action :send
+                                          :msg    (json-request
+                                                    "tools/call"
+                                                    {:name "test-tool"
+                                                     :arguments
+                                                     {:value "me"}}
+                                                    0)}
+                                         {:action :receive
                                           :data
-                                          (json-result
-                                           {:content
-                                            [{:type "text"
-                                              :text "test-response:me"}]
-                                            :isError false}
-                                           nil
-                                           0)}}])
+                                          {:event "message"
+                                           :data
+                                           (json-result
+                                             {:content
+                                              [{:type "text"
+                                                :text "test-response:me"}]
+                                              :isError false}
+                                             nil
+                                             0)}}])
                       [state' result] (testing "makes a successful tools/call"
                                         (run-plan state))
                       _               (testing "makes a successful tools/call"
                                         (is (= :passed result))
                                         (is (not (:failed state'))))
                       state           (assoc
-                                       state'
-                                       :plan
-                                       [{:action :send
-                                         :msg    (json-request
-                                                  "tools/call"
-                                                  {:name "error-test-tool"
-                                                   :arguments
-                                                   {:value "me"}}
-                                                  0)}
-                                        {:action :receive
-                                         :data
-                                         {:event "message"
+                                        state'
+                                        :plan
+                                        [{:action :send
+                                          :msg    (json-request
+                                                    "tools/call"
+                                                    {:name "error-test-tool"
+                                                     :arguments
+                                                     {:value "me"}}
+                                                    0)}
+                                         {:action :receive
                                           :data
-                                          (json-result
-                                           {:content
-                                            [{:type "text"
-                                              :text "test-error"}]
-                                            :isError true}
-                                           nil
-                                           0)}}])
+                                          {:event "message"
+                                           :data
+                                           (json-result
+                                             {:content
+                                              [{:type "text"
+                                                :text "test-error"}]
+                                              :isError true}
+                                             nil
+                                             0)}}])
                       [state' result] (testing "tools/call with an error"
                                         (run-plan state))
                       _               (testing "tools/call with an error"
                                         (is (= :passed result))
                                         (is (not (:failed state'))))
                       state           (assoc
-                                       state'
-                                       :plan
-                                       [{:action :send
-                                         :msg    (json-request
-                                                  "tools/call"
-                                                  {:name "unkown"
-                                                   :arguments
-                                                   {:code "(/ 1 0)"}}
-                                                  0)}
-                                        {:action :receive
-                                         :data
-                                         {:event "message"
+                                        state'
+                                        :plan
+                                        [{:action :send
+                                          :msg    (json-request
+                                                    "tools/call"
+                                                    {:name "unkown"
+                                                     :arguments
+                                                     {:code "(/ 1 0)"}}
+                                                    0)}
+                                         {:action :receive
                                           :data
-                                          (json-result
-                                           {:content
-                                            [{:type "text"
-                                              :text "Tool not found: unkown"}]
-                                            :isError true}
-                                           nil
-                                           0)}}])
+                                          {:event "message"
+                                           :data
+                                           (json-result
+                                             {:content
+                                              [{:type "text"
+                                                :text "Tool not found: unkown"}]
+                                              :isError true}
+                                             nil
+                                             0)}}])
                       [state' result] (run-plan state)
                       _               (testing "tools/call with unknown tool"
                                         (is (= :passed result))
@@ -451,7 +460,7 @@
 
         ;; Test adding invalid tool
         (is (thrown? clojure.lang.ExceptionInfo
-                     (mcp/add-tool! server (dissoc test-tool :implementation))))
+              (mcp/add-tool! server (dissoc test-tool :implementation))))
 
         (finally
           ((:stop server)))))))
@@ -493,24 +502,24 @@
                 (is (= :passed result))
                 (testing "tool interactions"
                   (let [state           (assoc
-                                         state'
-                                         :plan
-                                         [{:action :send
-                                           :msg    (json-request
-                                                    "tools/call"
-                                                    {:name      "echo"
-                                                     :arguments {:text "hello"}}
-                                                    0)}
-                                          {:action :receive
-                                           :data
-                                           {:event "message"
-                                            :data  (json-result
-                                                    {:content
-                                                     [{:type "text"
-                                                       :text "hello"}]
-                                                     :isError false}
-                                                    nil
-                                                    0)}}])
+                                          state'
+                                          :plan
+                                          [{:action :send
+                                            :msg    (json-request
+                                                      "tools/call"
+                                                      {:name      "echo"
+                                                       :arguments {:text "hello"}}
+                                                      0)}
+                                           {:action :receive
+                                            :data
+                                            {:event "message"
+                                             :data  (json-result
+                                                      {:content
+                                                       [{:type "text"
+                                                         :text "hello"}]
+                                                       :isError false}
+                                                      nil
+                                                      0)}}])
                         [state' result] (run-plan state)]
                     (is (= :passed result))))))
             (future-cancel f)))))))
@@ -541,21 +550,21 @@
               (testing "resource interactions"
                 (let [state
                       (assoc
-                       state'
-                       :plan
-                       [{:action :send
-                         :msg (json-request
-                               "resources/list"
-                               {}
-                               0)}
-                        {:action :receive
-                         :data
-                         {:event "message"
+                        state'
+                        :plan
+                        [{:action :send
+                          :msg (json-request
+                                 "resources/list"
+                                 {}
+                                 0)}
+                         {:action :receive
                           :data
-                          (json-result
-                           {:resources []}
-                           {}
-                           0)}}])
+                          {:event "message"
+                           :data
+                           (json-result
+                             {:resources []}
+                             {}
+                             0)}}])
                       [state' result] (run-plan state)
                       _ (testing "resources/list"
                           (is (= :passed result)))]))))
@@ -587,27 +596,27 @@
               (testing "prompt interactions"
                 (let [state
                       (assoc
-                       state'
-                       :plan
-                       [{:action :send
-                         :msg (json-request
-                               "prompts/list"
-                               {}
-                               0)}
-                        {:action :receive
-                         :data
-                         {:event "message"
+                        state'
+                        :plan
+                        [{:action :send
+                          :msg (json-request
+                                 "prompts/list"
+                                 {}
+                                 0)}
+                         {:action :receive
                           :data
-                          (json-result
-                           {:prompts
-                            [{:name "test-prompt",
-                              :description "A test prompt for server testing",
-                              :arguments
-                              [{:name "reply"
-                                :description "something"
-                                :required true}]}]}
-                           nil
-                           0)}}])
+                          {:event "message"
+                           :data
+                           (json-result
+                             {:prompts
+                              [{:name "test-prompt",
+                                :description "A test prompt for server testing",
+                                :arguments
+                                [{:name "reply"
+                                  :description "something"
+                                  :required true}]}]}
+                             nil
+                             0)}}])
                       [state' result] (run-plan state)
                       _ (testing "prompts/list"
                           (is (= :passed result)))]))))

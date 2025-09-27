@@ -1,12 +1,12 @@
 (ns mcp-clj.json-rpc.json-protocol
   "JSON-RPC 2.0 protocol constants and utilities"
   (:require
-   [clojure.data.json :as json]))
+    [clojure.data.json :as json]))
 
-;;; Protocol version
+;; Protocol version
 (def ^:const version "2.0")
 
-;;; Standard error codes
+;; Standard error codes
 (def error-codes
   {:parse-error -32700
    :invalid-request -32600
@@ -17,7 +17,7 @@
    :server-error-start -32000
    :server-error-end -32099})
 
-;;; Response construction
+;; Response construction
 
 (defn error-response
   "Create a JSON-RPC error response"
@@ -59,7 +59,7 @@
                    :message message}}
     id (assoc :id id)))
 
-;;; Request validation
+;; Request validation
 
 (defn validate-request
   "Validate a JSON-RPC request.
@@ -68,17 +68,17 @@
   (cond
     (not= jsonrpc version)
     (error-response
-     (:invalid-request error-codes)
-     "Invalid JSON-RPC version")
+      (:invalid-request error-codes)
+      "Invalid JSON-RPC version")
 
     (not (string? method))
     (error-response
-     (:invalid-request error-codes)
-     "Method must be a string")
+      (:invalid-request error-codes)
+      "Method must be a string")
 
     :else nil))
 
-;;; JSON conversion
+;; JSON conversion
 
 (def write-json-options
   "Options for writing JSON"

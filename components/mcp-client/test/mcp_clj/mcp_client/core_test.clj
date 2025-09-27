@@ -1,16 +1,16 @@
 (ns mcp-clj.mcp-client.core-test
   "Tests for MCP client core functionality"
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.mcp-client.core :as core]
-   [mcp-clj.mcp-client.session :as session]))
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.mcp-client.core :as core]
+    [mcp-clj.mcp-client.session :as session]))
 
 (deftest create-client-test
   (testing "should create client with stdio and automatic initialization"
     (let [config {:transport {:type :stdio
-                               :command "echo"
-                               :args ["test"]
-                               :env {"TEST_VAR" "test_value"}}
+                              :command "echo"
+                              :args ["test"]
+                              :env {"TEST_VAR" "test_value"}}
                   :client-info {:name "test-client"
                                 :version "1.0.0"}
                   :capabilities {}}]
@@ -28,8 +28,8 @@
 
   (testing "should create client with minimal server configuration"
     (let [config {:transport {:type :stdio
-                               :command "echo"
-                               :args ["test"]}
+                              :command "echo"
+                              :args ["test"]}
                   :client-info {:name "minimal-test-client"}
                   :capabilities {}}]
       (with-open [client (core/create-client config)]
@@ -40,17 +40,17 @@
 
   (testing "should throw exception for invalid server configuration"
     (is (thrown? Exception
-                 (core/create-client {:transport {:type :invalid}})))
+          (core/create-client {:transport {:type :invalid}})))
     (is (thrown? Exception
-                 (core/create-client {:transport {:type :stdio
-                                                  :command ["echo", "test"]}})))))
+          (core/create-client {:transport {:type :stdio
+                                           :command ["echo", "test"]}})))))
 
 (deftest client-state-test
   (testing "should provide correct client state predicates"
     (let [client (core/create-client
-                  {:transport {:type :stdio
-                               :command "echo"
-                               :args ["test"]}})]
+                   {:transport {:type :stdio
+                                :command "echo"
+                                :args ["test"]}})]
 
       ;; Initially might be initializing due to automatic initialization
       (is (not (core/client-ready? client)))
@@ -73,11 +73,11 @@
 (deftest get-client-info-test
   (testing "should return correct client information"
     (let [client (core/create-client
-                  {:transport {:type :stdio
-                               :command "echo"
-                               :args ["test"]}
-                   :client-info {:name "test-client" :version "1.0.0"}
-                   :capabilities {:test true}})
+                   {:transport {:type :stdio
+                                :command "echo"
+                                :args ["test"]}
+                    :client-info {:name "test-client" :version "1.0.0"}
+                    :capabilities {:test true}})
           info (core/get-client-info client)]
 
       ;; Client starts initializing automatically, so state might be :initializing or :error
@@ -93,8 +93,8 @@
 (deftest wait-for-ready-test
   (testing "should timeout when waiting for ready with short timeout"
     (let [client (core/create-client {:transport {:type :stdio
-                                                       :command "echo"
-                                                       :args ["test"]}})]
+                                                  :command "echo"
+                                                  :args ["test"]}})]
 
       ;; Should timeout quickly since echo won't respond with proper MCP protocol
       (is (thrown? Exception (core/wait-for-ready client 50)))
@@ -104,8 +104,8 @@
 
   (testing "should timeout when waiting for ready with default timeout"
     (let [client (core/create-client {:transport {:type :stdio
-                                                       :command "echo"
-                                                       :args ["test"]}})]
+                                                  :command "echo"
+                                                  :args ["test"]}})]
 
       ;; Should timeout with default timeout (use shorter timeout for testing)
       (is (thrown? Exception (core/wait-for-ready client 50)))

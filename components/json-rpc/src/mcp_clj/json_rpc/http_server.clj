@@ -1,29 +1,30 @@
 (ns mcp-clj.json-rpc.http-server
   "JSON-RPC 2.0 server with MCP Streamable HTTP transport (2025-03-26 spec)"
   (:require
-   [clojure.data.json :as json]
-   [clojure.string :as str]
-   [mcp-clj.http :as http]
-   [mcp-clj.http-server.adapter :as http-server]
-   [mcp-clj.json-rpc.executor :as executor]
-   [mcp-clj.json-rpc.json-protocol :as json-protocol]
-   [mcp-clj.json-rpc.protocols :as protocols]
-   [mcp-clj.log :as log]
-   [mcp-clj.sse :as sse])
+    [clojure.data.json :as json]
+    [clojure.string :as str]
+    [mcp-clj.http :as http]
+    [mcp-clj.http-server.adapter :as http-server]
+    [mcp-clj.json-rpc.executor :as executor]
+    [mcp-clj.json-rpc.json-protocol :as json-protocol]
+    [mcp-clj.json-rpc.protocols :as protocols]
+    [mcp-clj.log :as log]
+    [mcp-clj.sse :as sse])
   (:import
-   [java.util.concurrent RejectedExecutionException]))
+    (java.util.concurrent
+      RejectedExecutionException)))
 
-;;; Configuration
+;; Configuration
 
 (def ^:private request-timeout-ms 30000)
 
-;;; Session Management
+;; Session Management
 
 (defrecord StreamableHttpSession
-           [^String session-id
-            sse-reply!-fn
-            sse-close!-fn
-            ^java.util.concurrent.atomic.AtomicLong event-counter])
+  [^String session-id
+   sse-reply!-fn
+   sse-close!-fn
+   ^java.util.concurrent.atomic.AtomicLong event-counter])
 
 (defn- generate-session-id
   []
@@ -48,18 +49,19 @@
   [request]
   (get (:headers request) "last-event-id"))
 
-;;; Message Handling
+;; Message Handling
 
 (defn- handle-json-rpc
   "Process a JSON-RPC request or batch"
   [handlers rpc-data request session]
-  (letfn [(process-single [rpc-call]
+  (letfn [(process-single
+            [rpc-call]
             (log/info :rpc/invoke {:method (:method rpc-call) :params (:params rpc-call)})
             (if-let [validation-error (json-protocol/validate-request rpc-call)]
               (json-protocol/json-rpc-error
-               (:code (:error validation-error))
-               (:message (:error validation-error))
-               (:id rpc-call))
+                (:code (:error validation-error))
+                (:message (:error validation-error))
+                (:id rpc-call))
               (if-let [handler (get handlers (:method rpc-call))]
                 (try
                   (when-let [response (handler request (:params rpc-call))]
@@ -68,13 +70,13 @@
                   (catch Exception e
                     (log/error :rpc/handler-error {:method (:method rpc-call) :error (.getMessage e)})
                     (json-protocol/json-rpc-error
-                     :internal-error
-                     (.getMessage e)
-                     (:id rpc-call))))
+                      :internal-error
+                      (.getMessage e)
+                      (:id rpc-call))))
                 (json-protocol/json-rpc-error
-                 :method-not-found
-                 (str "Method not found: " (:method rpc-call))
-                 (:id rpc-call)))))]
+                  :method-not-found
+                  (str "Method not found: " (:method rpc-call))
+                  (:id rpc-call)))))]
     (if (vector? rpc-data)
       ;; Batch request
       (if (empty? rpc-data)
@@ -91,8 +93,8 @@
       (do
         (log/warn :http/origin-validation-failed {:origin (get (:headers request) "origin")})
         (http/json-response
-         (json-protocol/json-rpc-error :security-error "Invalid origin")
-         http/BadRequest))
+          (json-protocol/json-rpc-error :security-error "Invalid origin")
+          http/BadRequest))
       (let [session-id (extract-session-id request)
             session (get @session-id->session session-id)
             body-str (slurp (:body request))
@@ -103,26 +105,26 @@
                    :rpc-data rpc-data})
         (if (nil? @handlers)
           (http/json-response
-           (json-protocol/json-rpc-error
-            :internal-error
-            "Server not ready - handlers not initialized")
-           http/Unavailable)
+            (json-protocol/json-rpc-error
+              :internal-error
+              "Server not ready - handlers not initialized")
+            http/Unavailable)
           (let [result (try
                          ;; Execute synchronously for HTTP transport
                          (handle-json-rpc @handlers rpc-data request session)
                          (catch Exception e
                            (log/error :rpc/handler-error {:error (.getMessage e)})
                            (json-protocol/json-rpc-error
-                            :internal-error
-                            (.getMessage e))))]
+                             :internal-error
+                             (.getMessage e))))]
             (http/json-response result http/Ok)))))
     (catch Exception e
       (log/error :rpc/post-error {:error (.getMessage e)})
       (http/json-response
-       (json-protocol/json-rpc-error
-        :parse-error
-        "Invalid JSON")
-       http/BadRequest))))
+        (json-protocol/json-rpc-error
+          :parse-error
+          "Invalid JSON")
+        http/BadRequest))))
 
 (defn- handle-sse-get
   "Handle SSE stream setup via GET"
@@ -137,16 +139,16 @@
             {:keys [reply! close! response]} (sse/handler request)
             event-counter (java.util.concurrent.atomic.AtomicLong. 0)
             session (->StreamableHttpSession
-                     session-id
-                     (fn [message]
-                       (let [event-id (.incrementAndGet event-counter)]
-                         (reply! (assoc (sse/message (json/write-str message))
-                                        :id (str event-id)))))
-                     (fn []
-                       (log/info :http/sse-close {:session-id session-id})
-                       (close!)
-                       (swap! session-id->session dissoc session-id))
-                     event-counter)]
+                      session-id
+                      (fn [message]
+                        (let [event-id (.incrementAndGet event-counter)]
+                          (reply! (assoc (sse/message (json/write-str message))
+                                         :id (str event-id)))))
+                      (fn []
+                        (log/info :http/sse-close {:session-id session-id})
+                        (close!)
+                        (swap! session-id->session dissoc session-id))
+                      event-counter)]
         (swap! session-id->session assoc session-id session)
         (log/info :http/sse-connect {:session-id session-id :last-event-id last-event-id})
 
@@ -181,23 +183,23 @@
     (if (str/includes? (get (:headers request) "accept" "") "text/event-stream")
       (handle-sse-get session-id->session allowed-origins request)
       (http/json-response
-       {"transport"    "streamable-http"
-        "version"      "2025-03-26"
-        "capabilities" {"sse"       true
-                        "batch"     true
-                        "resumable" true}}
-       http/Ok))
+        {"transport"    "streamable-http"
+         "version"      "2025-03-26"
+         "capabilities" {"sse"       true
+                         "batch"     true
+                         "resumable" true}}
+        http/Ok))
 
     ;; 404 for unknown endpoints
     (do
       (log/warn :http/not-found
-        {:method   request-method
-         :uri      uri
-         :request  request
-         :handlers handlers})
+                {:method   request-method
+                 :uri      uri
+                 :request  request
+                 :handlers handlers})
       (http/text-response "Not Found" http/NotFound))))
 
-;;; Server Creation
+;; Server Creation
 
 (defn create-server
   "Create JSON-RPC server with MCP Streamable HTTP transport"
@@ -221,11 +223,11 @@
                                             handlers
                                             allowed-origins)
         {:keys [server port stop]} (http-server/run-server
-                                    handler
-                                    {:executor executor :port port})]
+                                     handler
+                                     {:executor executor :port port})]
 
     (log/info :http/server-created
-      {:port port :allowed-origins allowed-origins})
+              {:port port :allowed-origins allowed-origins})
 
     {:server              server
      :port                port
@@ -236,7 +238,7 @@
                             (stop)
                             (executor/shutdown-executor executor))}))
 
-;;; Server Operations
+;; Server Operations
 
 (defn set-handlers!
   "Set the JSON-RPC method handlers"
@@ -278,7 +280,7 @@
   [server]
   (keys @(:session-id->session server)))
 
-;;; Protocol Implementation
+;; Protocol Implementation
 
 (extend-type clojure.lang.PersistentArrayMap
   protocols/JsonRpcServer

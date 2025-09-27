@@ -1,10 +1,11 @@
 (ns mcp-clj.json-rpc.stdio
   "Unified JSON I/O functions for stdio communication"
   (:require
-   [clojure.data.json :as json])
+    [clojure.data.json :as json])
   (:import
-   [java.io BufferedReader
-    BufferedWriter]))
+    (java.io
+      BufferedReader
+      BufferedWriter)))
 
 (defn read-json
   "Read JSON message from a reader.

@@ -1,16 +1,16 @@
 (ns mcp-clj.json-rpc.executor
   "Executor service utilities for JSON-RPC servers"
   (:require
-   [mcp-clj.log :as log])
+    [mcp-clj.log :as log])
   (:import
-   [java.util.concurrent
-    Callable
-    ExecutorService
-    Executors
-    RejectedExecutionException
-    ScheduledExecutorService
-    ThreadPoolExecutor
-    TimeUnit]))
+    (java.util.concurrent
+      Callable
+      ExecutorService
+      Executors
+      RejectedExecutionException
+      ScheduledExecutorService
+      ThreadPoolExecutor
+      TimeUnit)))
 
 (def ^:private default-request-timeout-ms 30000)
 
@@ -45,10 +45,10 @@
    (.submit ^ExecutorService executor ^Callable (wrap-log-throwables f)))
   ([executor f delay-millis]
    (.schedule
-    ^ScheduledExecutorService executor
-    ^Callable (wrap-log-throwables f)
-    (long delay-millis)
-    TimeUnit/MILLISECONDS)))
+     ^ScheduledExecutorService executor
+     ^Callable (wrap-log-throwables f)
+     (long delay-millis)
+     TimeUnit/MILLISECONDS)))
 
 (defn submit-with-timeout!
   "Execute a function on the executor with a timeout.
@@ -57,14 +57,14 @@
   ;; futures will cancel each other
   (let [cf           (promise)
         task         (submit!
-                      executor
-                      #(do (let [result (f)]
-                             (when (realized? cf)
-                               (future-cancel @cf))
-                             result)))
+                       executor
+                       #(do (let [result (f)]
+                              (when (realized? cf)
+                                (future-cancel @cf))
+                              result)))
         timeout-task (submit!
-                      executor
-                      #(future-cancel task)
-                      timeout-ms)]
+                       executor
+                       #(future-cancel task)
+                       timeout-ms)]
     (deliver cf timeout-task)
     task))

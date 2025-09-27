@@ -1,10 +1,10 @@
 (ns mcp-clj.json-rpc.protocols-test
   "Integration tests for polymorphic JSON-RPC server operations"
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.json-rpc.protocols :as protocols]
-   [mcp-clj.json-rpc.sse-server :as sse-server]
-   [mcp-clj.json-rpc.stdio-server :as stdio-server]))
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.json-rpc.protocols :as protocols]
+    [mcp-clj.json-rpc.sse-server :as sse-server]
+    [mcp-clj.json-rpc.stdio-server :as stdio-server]))
 
 (defn- test-server-polymorphism
   "Test polymorphic behavior across different server types"
@@ -30,13 +30,13 @@
 (deftest polymorphic-server-operations-test
   (testing "SSE Server polymorphic operations"
     (test-server-polymorphism
-     #(sse-server/create-server {:port 0 :num-threads 2})
-     "SSE Server"))
+      #(sse-server/create-server {:port 0 :num-threads 2})
+      "SSE Server"))
 
   (testing "Stdio Server polymorphic operations"
     (test-server-polymorphism
-     #(stdio-server/create-server {:num-threads 2})
-     "Stdio Server")))
+      #(stdio-server/create-server {:num-threads 2})
+      "Stdio Server")))
 
 (deftest protocol-interface-consistency-test
   (testing "Both servers expose the same protocol interface"
@@ -71,14 +71,14 @@
 
       (testing "Invalid handlers throw consistent errors"
         (is (thrown-with-msg?
-             clojure.lang.ExceptionInfo
-             #"Handlers must be a map"
-             (protocols/set-handlers! sse-server "not-a-map")))
+              clojure.lang.ExceptionInfo
+              #"Handlers must be a map"
+              (protocols/set-handlers! sse-server "not-a-map")))
 
         (is (thrown-with-msg?
-             clojure.lang.ExceptionInfo
-             #"Handlers must be a map"
-             (protocols/set-handlers! stdio-server "not-a-map"))))
+              clojure.lang.ExceptionInfo
+              #"Handlers must be a map"
+              (protocols/set-handlers! stdio-server "not-a-map"))))
 
       ;; Clean up
       (protocols/stop! sse-server)

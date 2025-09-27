@@ -1,29 +1,35 @@
 (ns mcp-clj.mcp-client.core
   "MCP client implementation with initialization support"
   (:require
-   [mcp-clj.client-transport.factory :as transport-factory]
-   [mcp-clj.client-transport.protocol :as transport-protocol]
-   [mcp-clj.log :as log]
-   [mcp-clj.mcp-client.session :as session]
-   [mcp-clj.mcp-client.tools :as tools]
-   [mcp-clj.mcp-client.transport :as transport]
-   [mcp-clj.mcp-server.version :as version])
+    [mcp-clj.client-transport.factory :as transport-factory]
+    [mcp-clj.client-transport.protocol :as transport-protocol]
+    [mcp-clj.log :as log]
+    [mcp-clj.mcp-client.session :as session]
+    [mcp-clj.mcp-client.tools :as tools]
+    [mcp-clj.mcp-client.transport :as transport]
+    [mcp-clj.mcp-server.version :as version])
   (:import
-   [java.lang AutoCloseable]
-   [java.util.concurrent CompletableFuture ExecutionException TimeUnit TimeoutException]))
+    (java.lang
+      AutoCloseable)
+    (java.util.concurrent
+      CompletableFuture
+      ExecutionException
+      TimeUnit
+      TimeoutException)))
 
-;;; Client Record
+;; Client Record
 
 (declare close!)
 
 (defrecord MCPClient
-           [transport ; Transport implementation (stdio)
-            session ; Session state (atom)
-            initialization-future] ; CompletableFuture for initialization process
+  [transport ; Transport implementation (stdio)
+   session ; Session state (atom)
+   initialization-future] ; CompletableFuture for initialization process
   AutoCloseable
+
   (close [this] (close! this))) ; Session state (atom)
 
-;;; Initialization Protocol
+;; Initialization Protocol
 
 (defn- handle-initialize-response
   "Handle server response to initialize request"
@@ -37,18 +43,18 @@
             expected-version (:protocol-version current-session)]
         (when (not= protocolVersion expected-version)
           (throw (ex-info
-                  "Protocol version mismatch"
-                  {:expected expected-version
-                   :received protocolVersion
-                   :response response}))))
+                   "Protocol version mismatch"
+                   {:expected expected-version
+                    :received protocolVersion
+                    :response response}))))
 
       ;; Transition to ready state with server info
       (swap! session-atom
              #(session/transition-state!
-               %
-               :ready
-               :server-info serverInfo
-               :server-capabilities capabilities))
+                %
+                :ready
+                :server-info serverInfo
+                :server-capabilities capabilities))
 
       (log/info :client/session-ready
                 {:server-info serverInfo
@@ -58,10 +64,10 @@
       (log/error :client/initialize-error {:error e})
       (swap! session-atom
              #(session/transition-state!
-               %
-               :error
-               :error-info {:type :initialization-failed
-                            :error e})))))
+                %
+                :error
+                :error-info {:type :initialization-failed
+                             :error e})))))
 
 (defn- send-initialized-notification
   "Send initialized notification after successful initialization"
@@ -97,10 +103,10 @@
                            :capabilities (:capabilities session)
                            :clientInfo (:client-info session)}
               response-future (transport/send-request!
-                               transport
-                               "initialize"
-                               init-params
-                               30000)]
+                                transport
+                                "initialize"
+                                init-params
+                                30000)]
 
           (log/debug :mcp/initialize-sent {:params init-params})
 
@@ -124,7 +130,7 @@
                                 (.completeExceptionally ready-future e)))
                             ready-future))))))))
 
-;;; Client Management
+;; Client Management
 
 (defn create-client
   "Create MCP client with specified transport and automatically initialize.
@@ -141,11 +147,11 @@
                    :as config}]
   (let [transport (transport-factory/create-transport config)
         session (session/create-session
-                 (cond->
-                  {:client-info client-info
-                   :capabilities capabilities}
-                   protocol-version
-                   (assoc :protocol-version protocol-version)))
+                  (cond->
+                    {:client-info client-info
+                     :capabilities capabilities}
+                    protocol-version
+                    (assoc :protocol-version protocol-version)))
         client (->MCPClient transport (atom session) nil)
         init-future (start-initialization! client)]
     (assoc client :initialization-future init-future)))
@@ -206,7 +212,7 @@
      (catch ExecutionException e
        (throw (.getCause e))))))
 
-;;; Tool Calling API
+;; Tool Calling API
 
 (defn list-tools
   "Discover available tools from the server.

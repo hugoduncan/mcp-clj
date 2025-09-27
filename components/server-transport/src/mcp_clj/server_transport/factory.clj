@@ -1,7 +1,7 @@
 (ns mcp-clj.server-transport.factory
   "Factory for creating MCP server transports with pluggable registry")
 
-;;; Transport Registry
+;; Transport Registry
 
 (defonce ^:private transport-registry
   (atom {}))
@@ -53,7 +53,7 @@
   [transport-type]
   (contains? @transport-registry transport-type))
 
-;;; Factory Function
+;; Factory Function
 
 (defn create-transport
   "Create server transport based on configuration using the pluggable registry.
@@ -81,13 +81,13 @@
 
       ;; Transport type not registered
       (throw
-       (ex-info
-        "Unregistered transport type"
-        {:transport-type type
-         :transport-config transport-config
-         :registered-types (list-transports)})))))
+        (ex-info
+          "Unregistered transport type"
+          {:transport-type type
+           :transport-config transport-config
+           :registered-types (list-transports)})))))
 
-;;; Built-in Transport Factories
+;; Built-in Transport Factories
 
 (defn- create-stdio-server
   [options handlers]
@@ -132,7 +132,7 @@
       (set-handlers! server handlers))
     server))
 
-;;; Auto-registration of Built-in Transports
+;; Auto-registration of Built-in Transports
 
 (register-transport! :stdio create-stdio-server)
 (register-transport! :sse create-sse-server)

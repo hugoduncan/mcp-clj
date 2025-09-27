@@ -4,26 +4,26 @@
    This tests cross-implementation compatibility by using our Clojure MCP client
    to communicate with the Java SDK MCP server subprocess."
   (:require
-   [clojure.string :as str]
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.log :as log]
-   [mcp-clj.mcp-client.core :as client])
+    [clojure.string :as str]
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.log :as log]
+    [mcp-clj.mcp-client.core :as client])
   (:import
-   [java.lang
-    AutoCloseable]))
+    (java.lang
+      AutoCloseable)))
 
 (defn- create-client
   ^AutoCloseable []
   (client/create-client
-   {:transport {:type :stdio
-                :command "clj"
-                :args ["-M:dev:test" "-m" "mcp-clj.java-sdk.sdk-server-main"]}
-    :client-info {:name "java-sdk-integration-test"
-                  :version "0.1.0"}
-    :capabilities {}
-    :protocol-version "2024-11-05"}))
+    {:transport {:type :stdio
+                 :command "clj"
+                 :args ["-M:dev:test" "-m" "mcp-clj.java-sdk.sdk-server-main"]}
+     :client-info {:name "java-sdk-integration-test"
+                   :version "0.1.0"}
+     :capabilities {}
+     :protocol-version "2024-11-05"}))
 
-;;; MCP Protocol Tests
+;; MCP Protocol Tests
 
 (deftest ^:integ test-client-initialization
   (testing "MCP client initialization with Java SDK server"
@@ -70,7 +70,7 @@
               (is (some? (:description tool)))))
 
           (log/info :integration-test/tools-discovered
-            {:tools (:tools tools-response)})
+                    {:tools (:tools tools-response)})
 
           ;; Verify client knows tools are available
           (is (client/available-tools? client)))))))
@@ -83,9 +83,9 @@
 
       (testing "echo tool call"
         (let [future (client/call-tool
-                      client
-                      "echo"
-                      {:message "Hello from Clojure MCP client!"})
+                       client
+                       "echo"
+                       {:message "Hello from Clojure MCP client!"})
               result (:content @future)]
           (is (sequential? result))
 
@@ -151,11 +151,11 @@
 
       (testing "multiple concurrent tool calls"
         (let [futures (doall
-                       (for [i (range 5)]
-                         (future
-                           (:content @(client/call-tool ; Deref the CompletableFuture and get :content
-                                       client "echo"
-                                       {:message (str "Concurrent message " i)})))))]
+                        (for [i (range 5)]
+                          (future
+                            (:content @(client/call-tool ; Deref the CompletableFuture and get :content
+                                        client "echo"
+                                        {:message (str "Concurrent message " i)})))))]
 
           ;; Wait for all to complete
           (let [results (mapv deref futures)]
@@ -278,9 +278,9 @@
 
         ;; Perform an operation to ensure everything works
         (let [result @(client/call-tool
-                       client
-                       "echo"
-                       {:message "cleanup test"})]
+                        client
+                        "echo"
+                        {:message "cleanup test"})]
           (is (= "Echo: cleanup test" (-> result :content first :text))))))))
 
 (deftest ^:integ test-multiple-clients
@@ -299,13 +299,13 @@
 
         ;; Both should be able to make calls independently
         (let [result1 (client/call-tool
-                       client1
-                       "echo"
-                       {:message "from client 1"})
+                        client1
+                        "echo"
+                        {:message "from client 1"})
               result2 (client/call-tool
-                       client2
-                       "echo"
-                       {:message "from client 2"})]
+                        client2
+                        "echo"
+                        {:message "from client 2"})]
 
           (is (= "Echo: from client 1" (-> @result1 :content first :text)))
           (is (= "Echo: from client 2" (-> @result2 :content first :text))))))))

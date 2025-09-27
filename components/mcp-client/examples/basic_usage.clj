@@ -1,7 +1,7 @@
 (ns mcp-clj.mcp-client.examples.basic-usage
   "Basic usage example of MCP client"
   (:require
-   [mcp-clj.mcp-client.core :as client]))
+    [mcp-clj.mcp-client.core :as client]))
 
 (comment
   ;; Example usage of MCP client

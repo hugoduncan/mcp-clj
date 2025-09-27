@@ -1,14 +1,16 @@
 (ns mcp-clj.in-memory-transport.core-test
   "Tests for in-memory transport implementation"
   (:require
-   [clojure.test :refer [deftest testing is]]
-   [mcp-clj.client-transport.protocol :as transport-protocol]
-   [mcp-clj.in-memory-transport.client :as client]
-   [mcp-clj.in-memory-transport.shared :as shared])
+    [clojure.test :refer [deftest testing is]]
+    [mcp-clj.client-transport.protocol :as transport-protocol]
+    [mcp-clj.in-memory-transport.client :as client]
+    [mcp-clj.in-memory-transport.shared :as shared])
   (:import
-   [java.util.concurrent CompletableFuture TimeUnit]))
+    (java.util.concurrent
+      CompletableFuture
+      TimeUnit)))
 
-;;; Unit Tests for SharedTransport
+;; Unit Tests for SharedTransport
 
 (deftest test-create-shared-transport
   ;; Test creating shared transport state for connecting client and server
@@ -21,7 +23,7 @@
         (is (= 0 (shared/get-request-id shared)))
         (is (empty? @(:pending-requests shared)))))))
 
-;;; Unit Tests for Client Transport
+;; Unit Tests for Client Transport
 
 (deftest test-client-transport-creation
   ;; Test creating client transport with shared state
@@ -34,9 +36,9 @@
 
       (testing "throws error when shared transport missing"
         (is (thrown-with-msg?
-             clojure.lang.ExceptionInfo
-             #"Missing :shared transport"
-             (client/create-transport {})))))))
+              clojure.lang.ExceptionInfo
+              #"Missing :shared transport"
+              (client/create-transport {})))))))
 
 (deftest test-client-transport-lifecycle
   ;; Test client transport lifecycle operations
@@ -61,11 +63,11 @@
   (testing "transport sends messages to queues"
     (let [shared-transport (shared/create-shared-transport)
           transport (client/create-transport
-                     {:shared shared-transport})]
+                      {:shared shared-transport})]
 
       (testing "send-notification puts message in queue"
         (let [future (transport-protocol/send-notification!
-                      transport "test" {:data "hello"})]
+                       transport "test" {:data "hello"})]
           ;; Should complete successfully
           (is (nil? (.get future 1 TimeUnit/SECONDS)))
           ;; Should have message in queue
@@ -76,10 +78,10 @@
 
       (testing "send-request puts message in queue"
         (let [future (transport-protocol/send-request!
-                      transport
-                      "test-req"
-                      {:input "world"}
-                      1000)]
+                       transport
+                       "test-req"
+                       {:input "world"}
+                       1000)]
           ;; Should create a pending future
           (is (instance? CompletableFuture future))
           ;; Should have message in queue
@@ -144,10 +146,10 @@
       (testing "full request-response cycle"
         ;; 1. Client sends request
         (transport-protocol/send-request!
-         transport
-         "test-method"
-         {:input "test-data"}
-         5000)
+          transport
+          "test-method"
+          {:input "test-data"}
+          5000)
 
         ;; 2. Verify request is in client-to-server queue
         (let [request-message (shared/poll-from-client! shared-transport 100)]
@@ -189,7 +191,7 @@
         (try
           ;; Send a test request
           (let [request-future (transport-protocol/send-request!
-                                client-transport "test-method" {:test "data"} 5000)]
+                                 client-transport "test-method" {:test "data"} 5000)]
 
             ;; Wait for completion
             (.get request-future 5 TimeUnit/SECONDS)

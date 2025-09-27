@@ -1,16 +1,17 @@
 (ns mcp-clj.json-rpc.stdio-server-test
   (:require
-   [clojure.data.json :as json]
-   [clojure.java.io :as io]
-   [clojure.string :as str]
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.json-rpc.protocols :as protocols]
-   [mcp-clj.json-rpc.stdio-server :as stdio-server])
+    [clojure.data.json :as json]
+    [clojure.java.io :as io]
+    [clojure.string :as str]
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.json-rpc.protocols :as protocols]
+    [mcp-clj.json-rpc.stdio-server :as stdio-server])
   (:import
-   [java.io BufferedReader
-    ByteArrayInputStream
-    ByteArrayOutputStream
-    StringReader]))
+    (java.io
+      BufferedReader
+      ByteArrayInputStream
+      ByteArrayOutputStream
+      StringReader)))
 
 (defn- create-test-input
   "Create input stream from JSON-RPC requests"
@@ -35,9 +36,9 @@
 (deftest test-read-json
   (testing "reads valid JSON"
     (let [reader (BufferedReader.
-                  (StringReader.
-                   "{\"jsonrpc\":\"2.0\",\"method\":\"test\",\"id\":1}")
-                  1024)]
+                   (StringReader.
+                     "{\"jsonrpc\":\"2.0\",\"method\":\"test\",\"id\":1}")
+                   1024)]
       (is (= [{:jsonrpc "2.0" :method "test" :id 1} nil]
              (#'stdio-server/read-json reader)))))
 
@@ -65,8 +66,8 @@
                    (write [bytes] (throw (RuntimeException. "Write error"))))
           response {:jsonrpc "2.0" :result "success" :id 1}
           stderr-output (capture-output
-                         #(binding [*err* *out*]
-                            (#'stdio-server/write-json! output response)))]
+                          #(binding [*err* *out*]
+                             (#'stdio-server/write-json! output response)))]
       (is (str/includes? stderr-output "JSON write error")))))
 
 (deftest test-handle-json-rpc
@@ -204,9 +205,9 @@
   (testing "rejects invalid handlers"
     (let [server (stdio-server/create-server {})]
       (is (thrown-with-msg?
-           clojure.lang.ExceptionInfo
-           #"Handlers must be a map"
-           (stdio-server/set-handlers! server "not-a-map")))
+            clojure.lang.ExceptionInfo
+            #"Handlers must be a map"
+            (stdio-server/set-handlers! server "not-a-map")))
       (stdio-server/stop! server))))
 
 (deftest ^:integ test-integration
@@ -221,20 +222,20 @@
                        :id      2}]
           ;; Convert to JSON strings, one per line
           json-input (str/join
-                      (mapv (comp #(str % "\n") json/write-str) requests))
+                       (mapv (comp #(str % "\n") json/write-str) requests))
           response
           (with-out-str
             (with-redefs [mcp-clj.json-rpc.stdio-server/input-reader
                           (constantly
-                           (BufferedReader.
-                            (StringReader. json-input)))]
+                            (BufferedReader.
+                              (StringReader. json-input)))]
               (let [handlers {"add"  (fn [_method params]
                                        {:sum
                                         (+ (first params) (second params))})
                               "echo" (fn [_method params]
                                        params)}
                     server   (stdio-server/create-server
-                              {:handlers handlers})]
+                               {:handlers handlers})]
                 ;; server will EOF on input
                 @(:server-future server))))]
       (is (str/includes? response "\"sum\":3"))
@@ -260,10 +261,10 @@
       (stdio-server/set-handlers! server handlers)
 
       (let [output (capture-output
-                    #(#'stdio-server/handle-request
-                      (:executor server)
-                      @(:handlers server)
-                      request))]
+                     #(#'stdio-server/handle-request
+                       (:executor server)
+                       @(:handlers server)
+                       request))]
         ;; Should not produce any output for notifications
         (is (empty? (str/trim output))))
 
