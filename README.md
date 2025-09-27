@@ -12,6 +12,8 @@ functionality. The project aims to maintain compatibility with
 Anthropic's MCP specification while providing a simple and reliable
 implementation.
 
+NOTE: this is still ALPHA.  Breaking changes can be expected.
+
 ## Usage
 
 Add mcp-clj as a dependency to your project.
@@ -61,6 +63,8 @@ approach to REPL integration:
   and no nREPL configuration, but you lose the ability to connect to
   existing running Clojure applications or remote development
   environments.
+
+  - Much fewer tools
 
 ## Configuration
 
