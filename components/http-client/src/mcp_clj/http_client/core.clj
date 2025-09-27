@@ -1,49 +1,53 @@
 (ns mcp-clj.http-client.core
   "HTTP client implementation using JDK HttpClient"
   (:require
-    [clojure.data.json :as json]
-    [clojure.string :as str])
+   [clojure.data.json :as json]
+   [clojure.string :as str])
   (:import
-    (java.net
-      URI)
-    (java.net.http
-      HttpClient
-      HttpRequest
-      HttpRequest$BodyPublishers
-      HttpResponse$BodyHandlers)
-    (java.time
-      Duration)))
+   (java.net
+    URI)
+   (java.net.http
+    HttpClient
+    HttpHeaders
+    HttpRequest
+    HttpRequest$BodyPublishers
+    HttpRequest$Builder
+    HttpResponse
+    HttpResponse$BodyHandler
+    HttpResponse$BodyHandlers)
+   (java.time
+    Duration)))
 
 ;; HTTP Client Creation
 
 (defn create-client
   "Create an HTTP client with optional configuration"
-  ([]
+  (^HttpClient []
    (create-client {}))
-  ([{:keys [connect-timeout follow-redirects]
-     :or   {connect-timeout  30000
-            follow-redirects :normal}}]
+  (^HttpClient [{:keys [connect-timeout follow-redirects]
+                 :or   {connect-timeout  30000
+                        follow-redirects :normal}}]
    (let [builder (HttpClient/newBuilder)]
      (when connect-timeout
        (.connectTimeout builder (Duration/ofMillis connect-timeout)))
      (case follow-redirects
        :never  (.followRedirects
-                 builder
-                 java.net.http.HttpClient$Redirect/NEVER)
+                builder
+                java.net.http.HttpClient$Redirect/NEVER)
        :always (.followRedirects
-                 builder
-                 java.net.http.HttpClient$Redirect/ALWAYS)
+                builder
+                java.net.http.HttpClient$Redirect/ALWAYS)
        :normal (.followRedirects
-                 builder
-                 java.net.http.HttpClient$Redirect/NORMAL))
+                builder
+                java.net.http.HttpClient$Redirect/NORMAL))
      (.build builder))))
 
 ;; Request Building
 
 (defn- build-headers
   "Build headers for HTTP request"
-  [headers]
-  (reduce (fn [builder [k v]]
+  [^HttpHeaders headers]
+  (reduce (fn [^HttpRequest$Builder builder [k v]]
             (.header builder (name k) (str v)))
           (HttpRequest/newBuilder)
           headers))
@@ -63,7 +67,7 @@
 
 (defn- build-request
   "Build HTTP request"
-  [{:keys [method url headers body timeout]}]
+  ^HttpRequest [{:keys [method url headers body timeout]}]
   (let [builder (-> (HttpRequest/newBuilder)
                     (.uri (build-uri url)))]
 
@@ -89,14 +93,14 @@
 
 (defn- parse-headers
   "Parse HTTP response headers into a map"
-  [http-response]
+  [^HttpResponse http-response]
   (into {}
         (map (fn [[k v]] [k (first v)]))
         (.map (.headers http-response))))
 
 (defn- process-response
   "Process HTTP response based on options"
-  [http-response {:keys [as] :or {as :string}}]
+  [^HttpResponse http-response {:keys [as] :or {as :string}}]
   (let [status  (.statusCode http-response)
         headers (parse-headers http-response)
         body    (.body http-response)]
@@ -115,12 +119,13 @@
   "Send HTTP request and return response"
   ([client request-opts]
    (request client request-opts {}))
-  ([client request-opts response-opts]
+  ([^HttpClient client request-opts response-opts]
    (let [http-request  (build-request request-opts)
-         body-handler  (case (:as response-opts :string)
-                         :stream (HttpResponse$BodyHandlers/ofInputStream)
-                         :string (HttpResponse$BodyHandlers/ofString)
-                         (HttpResponse$BodyHandlers/ofString))
+         ^HttpResponse$BodyHandler body-handler
+         (case (:as response-opts :string)
+           :stream (HttpResponse$BodyHandlers/ofInputStream)
+           :string (HttpResponse$BodyHandlers/ofString)
+           (HttpResponse$BodyHandlers/ofString))
          http-response (.send client http-request body-handler)]
      (process-response http-response response-opts))))
 

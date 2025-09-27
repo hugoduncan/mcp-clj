@@ -1,22 +1,19 @@
 (ns mcp-clj.json-rpc.http-client
   "JSON-RPC client for HTTP transport with SSE support"
   (:require
-    [clojure.data.json :as json]
-    [clojure.string :as str]
-    [mcp-clj.http-client.core :as http-client]
-    [mcp-clj.json-rpc.executor :as executor]
-    [mcp-clj.json-rpc.protocol :as protocol]
-    [mcp-clj.log :as log])
+   [clojure.data.json :as json]
+   [clojure.java.io :as io]
+   [clojure.string :as str]
+   [mcp-clj.http-client.core :as http-client]
+   [mcp-clj.json-rpc.executor :as executor]
+   [mcp-clj.json-rpc.protocol :as protocol]
+   [mcp-clj.log :as log])
   (:import
-    (java.io
-      BufferedReader
-      InputStreamReader)
-    (java.net
-      URI)
-    (java.util.concurrent
-      CompletableFuture
-      ConcurrentHashMap
-      TimeUnit)))
+   (java.io BufferedReader
+            InputStreamReader)
+   (java.util.concurrent CompletableFuture
+                         ConcurrentHashMap
+                         TimeUnit)))
 
 ;; Forward declarations
 (declare http-send-request! http-send-notification! close-http-json-rpc-client!)
@@ -187,70 +184,70 @@
   "Send JSON-RPC request and return CompletableFuture with response"
   [client method params timeout-ms]
   (let [request-id (generate-request-id client)
-        request {:jsonrpc "2.0"
-                 :id request-id
-                 :method method
-                 :params params}
-        future (CompletableFuture.)]
+        request    {:jsonrpc "2.0"
+                    :id      request-id
+                    :method  method
+                    :params  params}
+        future     (CompletableFuture.)]
 
     ;; Store the future for this request
     (.put ^ConcurrentHashMap (:pending-requests client) request-id future)
 
     ;; Send HTTP POST request
     (executor/submit!
-      (:executor client)
-      (fn []
-        (try
-          (log/debug :client/send "Send request" {:method method})
-          (let [url (str (:base-url client) "/")
-                headers (make-headers client)
-                response (http-client/http-post url
-                                                {:headers headers
-                                                 :body (json/write-str request)
-                                                 :content-type :json
-                                                 :accept :json
-                                                 :as :json
-                                                 :throw-exceptions false})]
-            (log/debug :client/send
-                       {:msg "Receive response"
-                        :response response})
-            (if (= 200 (:status response))
-              (do
-                ;; Update session ID if provided
-                (when-let [new-session-id (get-in
-                                            response
-                                            [:headers "x-session-id"])]
-                  (when (not= new-session-id @(:session-id client))
-                    (log/info :http/session-updated {:old @(:session-id client)
-                                                     :new new-session-id})
-                    ;; Update client's session ID
-                    (reset! (:session-id client) new-session-id)
-                    ;; Start SSE with new session
-                    (when-not @(:sse-connection client)
-                      (start-sse-connection! client))))
+     (:executor client)
+     (fn []
+       (try
+         (log/debug :client/send "Send request" {:method method})
+         (let [url      (str (:base-url client) "/")
+               headers  (make-headers client)
+               response (http-client/http-post url
+                                               {:headers          headers
+                                                :body             (json/write-str request)
+                                                :content-type     :json
+                                                :accept           :json
+                                                :as               :json
+                                                :throw-exceptions false})]
+           (log/debug :client/send
+             {:msg      "Receive response"
+              :response response})
+           (if (= 200 (:status response))
+             (do
+               ;; Update session ID if provided
+               (when-let [new-session-id (get-in
+                                          response
+                                          [:headers "x-session-id"])]
+                 (when (not= new-session-id @(:session-id client))
+                   (log/info :http/session-updated {:old @(:session-id client)
+                                                    :new new-session-id})
+                   ;; Update client's session ID
+                   (reset! (:session-id client) new-session-id)
+                   ;; Start SSE with new session
+                   (when-not @(:sse-connection client)
+                     (start-sse-connection! client))))
 
-                ;; Process response
-                (.complete
-                  future
-                  (process-json-rpc-response
-                    client
-                    (json/read-str (:body response) :key-fn keyword))))
-              ;; HTTP error
-              (let [error-msg (str "HTTP error: " (:status response) " - "
-                                   (or (:body response) ""))]
-                (log/error
-                  :http/request-failed
-                  {:status (:status response)
-                   :body (:body response)})
-                (.completeExceptionally
-                  future
-                  (ex-info
-                    error-msg
-                    {:status (:status response)
-                     :body (:body response)})))))
-          (catch Exception e
-            (log/error :http/request-error {:error e :method method})
-            (.completeExceptionally future e)))))
+               ;; Process response
+               (.complete
+                future
+                (process-json-rpc-response
+                 client
+                 (:body response))))
+             ;; HTTP error
+             (let [error-msg (str "HTTP error: " (:status response) " - "
+                                  (or (:body response) ""))]
+               (log/error
+                   :http/request-failed
+                 {:status (:status response)
+                  :body   (:body response)})
+               (.completeExceptionally
+                future
+                (ex-info
+                 error-msg
+                 {:status (:status response)
+                  :body   (:body response)})))))
+         (catch Exception e
+           (log/error :http/request-error {:error e :method method})
+           (.completeExceptionally future e)))))
 
     ;; Set timeout
     (try
@@ -267,21 +264,24 @@
   (executor/submit! (:executor client)
                     (fn []
                       (try
-                        (let [url (str (:base-url client) "/")
-                              headers (make-headers client)
+                        (let [url          (str (:base-url client) "/")
+                              headers      (make-headers client)
                               notification {:jsonrpc "2.0"
-                                            :method method
-                                            :params params}
-                              response (http-client/http-post url
-                                                              {:headers headers
-                                                               :body (json/write-str notification)
-                                                               :content-type :json
-                                                               :throw-exceptions false})]
+                                            :method  method
+                                            :params  params}
+                              response     (http-client/http-post
+                                            url
+                                            {:headers          headers
+                                             :body             (json/write-str notification)
+                                             :content-type     :json
+                                             :throw-exceptions false})]
                           (when (not= 200 (:status response))
-                            (log/error :http/notification-failed {:status (:status response)
-                                                                  :body (:body response)})))
+                            (log/warn :http/notification-failed
+                              {:status (:status response)
+                               :body   (:body response)})))
                         (catch Exception e
-                          (log/error :http/notification-error {:error e :method method}))))))
+                          (log/error :http/notification-error
+                            {:error e :method method}))))))
 
 (defn close-http-json-rpc-client!
   "Close HTTP JSON-RPC client"
