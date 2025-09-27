@@ -30,7 +30,8 @@
       (is (client/client-ready? client))
 
       (testing "can list current directory"
-        (let [result (tools/call-tool-impl client "ls" {"path" "."})]
+        (let [future (tools/call-tool-impl client "ls" {"path" "."})
+              result (:content @future)] ; Deref the future and get :content
           ;; Result should be the parsed content directly
           (is (vector? result))
           (is (seq result)) ; Should have at least some files
@@ -52,7 +53,8 @@
               (is (number? (:total-files data)))))))
 
       (testing "can list specific subdirectory"
-        (let [result (tools/call-tool-impl client "ls" {"path" "components"})]
+        (let [future (tools/call-tool-impl client "ls" {"path" "components"})
+              result (:content @future)] ; Deref the future and get :content
           (is (vector? result))
 
           ;; Should find parsed data with component files
@@ -64,20 +66,22 @@
                    file-paths))))))
 
       (testing "respects max-files parameter"
-        (let [result (tools/call-tool-impl
+        (let [future (tools/call-tool-impl
                       client
                       "ls"
-                      {"path" "." "max-files" 5})]
+                      {"path" "." "max-files" 5})
+              result (:content @future)] ; Deref the future and get :content
           (is (vector? result))
 
           (let [data (:data (first result))]
             (is (<= (count (:files data)) 5)))))
 
       (testing "respects max-depth parameter"
-        (let [result (tools/call-tool-impl
+        (let [future (tools/call-tool-impl
                       client
                       "ls"
                       {"path" "." "max-depth" 1})
+              result (:content @future) ; Deref the future and get :content
               dir (System/getProperty "user.dir")]
           (is (vector? result))
 
@@ -94,14 +98,14 @@
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Tool execution failed"
-             (tools/call-tool-impl
-              client
-              "ls"
-              {"path" "/non-existent-path-12345"})))
+             @(tools/call-tool-impl ; Deref the future
+               client
+               "ls"
+               {"path" "/non-existent-path-12345"})))
 
         ;; Verify the exception contains the expected error content
         (try
-          (tools/call-tool-impl client "ls" {"path" "non-existent-path-12345"})
+          @(tools/call-tool-impl client "ls" {"path" "non-existent-path-12345"}) ; Deref the future
           (is false "Should have thrown exception")
           (catch clojure.lang.ExceptionInfo e
             (let [data (ex-data e)

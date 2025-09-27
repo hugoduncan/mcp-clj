@@ -10,21 +10,21 @@
 (deftest ^:integ simple-http-test
   ;; Simple test to verify HTTP transport basics
   (testing "Basic HTTP transport test"
-    (let [server (server/create-server
-                  {:transport {:type :http :port 0}
-                   :tools
-                   {"echo"
-                    {:name "echo"
-                     :description "Simple echo"
-                     :inputSchema {:type "object"
-                                   :properties {:msg {:type "string"}}
-                                   :required ["msg"]}
-                     :implementation (fn [{:keys [msg]}]
-                                       {:content [{:type "text" :text msg}]})}}})
+    (let [server     (server/create-server
+                      {:transport {:type :http :port 0}
+                       :tools
+                       {"echo"
+                        {:name           "echo"
+                         :description    "Simple echo"
+                         :inputSchema    {:type       "object"
+                                          :properties {:msg {:type "string"}}
+                                          :required   ["msg"]}
+                         :implementation (fn [{:keys [msg]}]
+                                           {:content [{:type "text" :text msg}]})}}})
           ;; Wait for server to be fully initialized with proper timeout
           rpc-server (deref (:json-rpc-server server) 5000 nil)
-          port (when rpc-server
-                 (:port rpc-server))]
+          port       (when rpc-server
+                       (:port rpc-server))]
 
       (log/info :test/server-started {:port port})
       (is (some? port) "Server should have a port")
@@ -45,12 +45,13 @@
 
           ;; Only proceed with client test if server is responding
           (when (= 0 (:exit response))
-            (let [client (client/create-client {:transport {:type :http
-                                                                     :url (str "http://localhost:" port)
-                                                                     :num-threads 2}
-                                                :client-info {:name "test" :version "1.0.0"}
-                                                :capabilities {:tools {}}
-                                                :protocol-version "2024-11-05"})]
+            (let [client (client/create-client
+                          {:transport        {:type        :http
+                                              :url         (str "http://localhost:" port)
+                                              :num-threads 2}
+                           :client-info      {:name "test" :version "1.0.0"}
+                           :capabilities     {:tools {}}
+                           :protocol-version "2024-11-05"})]
 
               (try
                 ;; Wait for ready
@@ -60,12 +61,12 @@
                   (is (client/client-ready? client)))
 
                 (testing "can list tools"
-                  (let [tools (client/list-tools client)]
+                  (let [tools @(client/list-tools client)]
                     (is (= 1 (count (:tools tools))))
                     (is (= "echo" (-> tools :tools first :name)))))
 
                 (testing "can call tool"
-                  (let [result (client/call-tool client "echo" {:msg "Hello"})]
+                  (let [result @(client/call-tool client "echo" {:msg "Hello"})]
                     (is (= "Hello" (-> result first :text)))))
 
                 (finally

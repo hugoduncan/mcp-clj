@@ -64,12 +64,12 @@
 (defmacro debug [id & [data]] `(log :debug  ~id ~data))
 (defmacro trace [id & [data]] `(log :trace  ~id ~data))
 
-(enable! :debug "rpc")
-(enable! :debug "server")
-(enable! :debug "client")
-(enable! :debug "http")
-(enable! :debug "java-sdk")
-(enable! :debug "sdk-server-main")
+;; (enable! :debug "rpc")
+;; (enable! :debug "server")
+;; (enable! :debug "client")
+;; (enable! :debug "http")
+;; (enable! :debug "java-sdk")
+;; (enable! :debug "sdk-server-main")
 
 (comment
   (enable! :info "http")

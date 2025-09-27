@@ -140,3 +140,4 @@ clj -M:dev
 - Component isolation: changes to one component should not require changes to others unless interfaces change
 
 - mcp protocol specification is at https://github.com/modelcontextprotocol/modelcontextprotocol/tree/main/docs/specification
+- use str/includes? rather than .contains

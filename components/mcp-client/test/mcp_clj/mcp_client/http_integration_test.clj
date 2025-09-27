@@ -139,7 +139,8 @@
   (with-http-test-env [server client]
     (testing "HTTP tool discovery integration"
       (testing "client can discover all server tools"
-        (let [result (client/list-tools client)]
+        (let [future (client/list-tools client)
+              result @future] ; Deref the CompletableFuture
           (is (map? result))
           (is (vector? (:tools result)))
           (is (= 4 (count (:tools result))))
@@ -152,7 +153,7 @@
             (is (contains? tool-names "complex")))))
 
       (testing "tool definitions are complete"
-        (let [tools (:tools (client/list-tools client))
+        (let [tools (:tools @(client/list-tools client)) ; Deref the CompletableFuture
               echo-tool (first (filter #(= "echo" (:name %)) tools))]
           (is (some? echo-tool))
           (is (= "Echo the input message with optional prefix" (:description echo-tool)))
@@ -164,7 +165,8 @@
   (with-http-test-env [server client]
     (testing "HTTP tool execution integration"
       (testing "simple echo tool execution"
-        (let [result (client/call-tool client "echo" {:message "Hello, HTTP World!"})]
+        (let [future (client/call-tool client "echo" {:message "Hello, HTTP World!"})
+              result (:content @future)] ; Deref the CompletableFuture and get :content
           (is (vector? result))
           (is (= 1 (count result)))
           (let [content (first result)]
@@ -172,15 +174,18 @@
             (is (= "Hello, HTTP World!" (:text content))))))
 
       (testing "echo tool with prefix"
-        (let [result (client/call-tool client "echo" {:message "Test" :prefix "INFO"})]
+        (let [future (client/call-tool client "echo" {:message "Test" :prefix "INFO"})
+              result (:content @future)] ; Deref the CompletableFuture and get :content
           (is (= "INFO: Test" (-> result first :text)))))
 
       (testing "numeric calculation tool"
-        (let [result (client/call-tool client "add" {:a 15 :b 27})]
+        (let [future (client/call-tool client "add" {:a 15 :b 27})
+              result (:content @future)] ; Deref the CompletableFuture and get :content
           (is (= "Result: 42" (-> result first :text)))))
 
       (testing "complex structured response"
-        (let [result (client/call-tool client "complex" {:count 3})]
+        (let [future (client/call-tool client "complex" {:count 3})
+              result (:content @future)] ; Deref the CompletableFuture and get :content
           (is (= 2 (count result)))
           (is (= "Generated 3 items:" (-> result first :text)))
           (is (= "Item 1, Item 2, Item 3" (-> result second :text))))))))
@@ -193,25 +198,25 @@
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Tool execution failed: nonexistent-tool"
-             (client/call-tool client "nonexistent-tool" {}))))
+             @(client/call-tool client "nonexistent-tool" {}))))
 
       (testing "invalid tool arguments"
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Tool execution failed"
-             (client/call-tool client "add" {:invalid "params"}))))
+             @(client/call-tool client "add" {:invalid "params"}))))
 
       (testing "tool that throws exception"
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Tool execution failed"
-             (client/call-tool client "error" {:message "Test error"}))))
+             @(client/call-tool client "error" {:message "Test error"}))))
 
       (testing "missing required parameters"
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Tool execution failed"
-             (client/call-tool client "echo" {})))))))
+             @(client/call-tool client "echo" {})))))))
 
 (deftest ^:integ http-session-management-integration-test
   ;; Test session management across HTTP transport
@@ -219,9 +224,12 @@
     (testing "HTTP session management integration"
       (testing "multiple requests use same session"
         ;; Make multiple tool calls to verify session persistence
-        (let [result1 (client/call-tool client "echo" {:message "First call"})
-              result2 (client/call-tool client "echo" {:message "Second call"})
-              result3 (client/call-tool client "add" {:a 10 :b 5})]
+        (let [future1 (client/call-tool client "echo" {:message "First call"})
+              future2 (client/call-tool client "echo" {:message "Second call"})
+              future3 (client/call-tool client "add" {:a 10 :b 5})
+              result1 (:content @future1)
+              result2 (:content @future2)
+              result3 (:content @future3)]
 
           (is (= "First call" (-> result1 first :text)))
           (is (= "Second call" (-> result2 first :text)))
@@ -229,8 +237,8 @@
 
       (testing "tool discovery works multiple times"
         ;; Call list-tools multiple times to verify consistency
-        (let [tools1 (:tools (client/list-tools client))
-              tools2 (:tools (client/list-tools client))]
+        (let [tools1 (:tools @(client/list-tools client))
+              tools2 (:tools @(client/list-tools client))]
           (is (= (count tools1) (count tools2)))
           (is (= (set (map :name tools1)) (set (map :name tools2)))))))))
 
@@ -242,7 +250,7 @@
         (let [futures (doall
                        (for [i (range 5)]
                          (future
-                           (client/call-tool client "add" {:a i :b (+ i 10)}))))
+                           (:content @(client/call-tool client "add" {:a i :b (+ i 10)})))))
               results (mapv deref futures)]
 
           ;; Verify all futures completed successfully
@@ -250,12 +258,12 @@
 
           ;; Verify results are correct
           (doseq [[i result] (map-indexed vector results)]
-            (is (= (str "Result: " (+ i (+ i 10))) (-> result first :text))))))
+            (is (= (str "Result: " (+ i (+ i 10))) result)))))
 
       (testing "concurrent tool discovery works"
         (let [futures (doall
                        (for [_ (range 3)]
-                         (future (client/list-tools client))))
+                         (future @(client/list-tools client))))
               results (mapv deref futures)]
 
           ;; All should return the same tool count
@@ -275,7 +283,7 @@
 
           ;; Make many rapid calls
           (dotimes [i call-count]
-            (client/call-tool client "echo" {:message (str "Call " i)}))
+            @(client/call-tool client "echo" {:message (str "Call " i)}))
 
           (let [elapsed-ms (/ (- (System/nanoTime) start-time) 1000000.0)]
             (log/info :test/performance {:calls call-count
@@ -287,7 +295,8 @@
 
       (testing "large response handling"
         ;; Test with the maximum count for complex tool
-        (let [result (client/call-tool client "complex" {:count 10})]
+        (let [future (client/call-tool client "complex" {:count 10})
+              result (:content @future)]
           (is (= 2 (count result)))
           (is (= "Generated 10 items:" (-> result first :text)))
           ;; Should contain all 10 items

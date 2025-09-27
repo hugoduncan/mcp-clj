@@ -1,7 +1,8 @@
 (ns mcp-clj.tools.clj-eval-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [mcp-clj.tools.clj-eval :as clj-eval]))
+   [mcp-clj.tools.clj-eval :as clj-eval]
+   [clojure.string :as str]))
 
 (deftest clj-eval-test
   (testing "clj eval implementation"
@@ -17,7 +18,7 @@
         (let [result (implementation {:code "(/ 1 0)"})]
           (is (:isError result))
           (is (= "text" (-> result :content first :type)))
-          (is (.contains
+          (is (str/includes?
                (-> result :content first :text)
                "Divide by zero"))))
 
@@ -25,6 +26,6 @@
         (let [result (implementation {:code "(/ 1 0"})]
           (is (:isError result))
           (is (= "text" (-> result :content first :type)))
-          (is (.contains
+          (is (str/includes?
                (-> result :content first :text)
                "EOF while reading")))))))

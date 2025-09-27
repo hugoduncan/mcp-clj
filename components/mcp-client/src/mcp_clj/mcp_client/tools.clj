@@ -89,7 +89,7 @@
 (defn call-tool-impl
   "Execute a tool with the given name and arguments.
 
-  Returns a CompletableFuture that will contain the parsed content on success.
+  Returns a CompletableFuture that will contain the tool result on success.
   The future will complete exceptionally on error.
 
   For tools that return JSON strings, the JSON is parsed into Clojure data."
@@ -97,43 +97,54 @@
   (log/info :client/call-tool-start {:tool-name tool-name})
   (try
     (let [transport (:transport client)
-          params    {:name tool-name :arguments (or arguments {})}
-          response  (transport/send-request!
-                     transport
-                     "tools/call"
-                     params
-                     30000)]
+          params {:name tool-name :arguments (or arguments {})}
+          response (transport/send-request!
+                    transport
+                    "tools/call"
+                    params
+                    30000)]
       ;; Transform the response future to handle parsing and errors
       (.thenApply response
                   (reify java.util.function.Function
                     (apply [_ result]
-                      (let [is-error       (:isError result false)
+                      (let [is-error (:isError result false)
                             parsed-content (parse-tool-content
                                             (:content result))]
                         (if is-error
                           (do
                             (log/error :client/call-tool-error
-                              {:tool-name tool-name
-                               :content   parsed-content})
+                                       {:tool-name tool-name
+                                        :content parsed-content})
                             (throw
                              (ex-info (str "Tool execution failed: " tool-name)
                                       {:tool-name tool-name
-                                       :content   parsed-content})))
+                                       :content parsed-content})))
                           (do
                             (log/info :client/call-tool-success
-                              {:tool-name tool-name})
-                            {:content parsed-content})))))))
+                                      {:tool-name tool-name})
+;; Extract the actual value from the tool response
+                            ;; For simple text responses, return just the text
+                            ;; For complex responses, return the content structure
+                            (if (and (vector? parsed-content)
+                                     (= 1 (count parsed-content))
+                                     (let [item (first parsed-content)]
+                                       (and (map? item)
+                                            (= "text" (:type item))
+                                            (string? (:text item))
+                                            (nil? (:data item)))))
+                              (:text (first parsed-content))
+                              parsed-content))))))))
     (catch Exception e
       ;; Return a failed future for immediate exceptions (like transport errors)
       (log/error :client/call-tool-error {:tool-name tool-name
-                                          :error     (.getMessage e)
-                                          :ex        e})
+                                          :error (.getMessage e)
+                                          :ex e})
       (java.util.concurrent.CompletableFuture/failedFuture
        (if (instance? clojure.lang.ExceptionInfo e)
          e
          (ex-info (str "Tool call failed: " tool-name)
                   {:tool-name tool-name
-                   :error     (.getMessage e)}
+                   :error (.getMessage e)}
                   e))))))
 
 (defn available-tools?-impl

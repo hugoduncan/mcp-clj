@@ -6,23 +6,31 @@
    [mcp-clj.mcp-client.tools :as tools]
    [mcp-clj.server-transport.factory :as server-transport-factory])
   (:import
-   [java.util.concurrent CompletableFuture TimeUnit]))
+   [java.util.concurrent
+    CompletableFuture
+    TimeUnit]))
 
 ;;; Transport registration function for robust test isolation
 (defn ensure-in-memory-transport-registered!
   "Ensure in-memory transport is registered in both client and server factories.
   Can be called multiple times safely - registration is idempotent."
   []
-  (client-transport-factory/register-transport! :in-memory
-    (fn [options]
-      (require 'mcp-clj.in-memory-transport.client)
-      (let [create-fn (ns-resolve 'mcp-clj.in-memory-transport.client 'create-transport)]
-        (create-fn options))))
-  (server-transport-factory/register-transport! :in-memory
-    (fn [options handlers]
-      (require 'mcp-clj.in-memory-transport.server)
-      (let [create-server (ns-resolve 'mcp-clj.in-memory-transport.server 'create-in-memory-server)]
-        (create-server options handlers)))))
+  (client-transport-factory/register-transport!
+   :in-memory
+   (fn [options]
+     (require 'mcp-clj.in-memory-transport.client)
+     (let [create-fn (ns-resolve
+                      'mcp-clj.in-memory-transport.client
+                      'create-transport)]
+       (create-fn options))))
+  (server-transport-factory/register-transport!
+   :in-memory
+   (fn [options handlers]
+     (require 'mcp-clj.in-memory-transport.server)
+     (let [create-server (ns-resolve
+                          'mcp-clj.in-memory-transport.server
+                          'create-in-memory-server)]
+       (create-server options handlers)))))
 
 ;;; Ensure transport is registered at namespace load time
 (ensure-in-memory-transport-registered!)
@@ -38,18 +46,23 @@
   [handler]
   ;; Ensure transport is registered before creating client/server
   (ensure-in-memory-transport-registered!)
-  (let [shared-transport (shared/create-shared-transport)
-        session          (atom {})
+  (let [shared-transport    (shared/create-shared-transport)
+        session             (atom {})
         ;; Create server using lazy-loaded function
-        create-server-fn (do (require 'mcp-clj.in-memory-transport.server)
-                             (ns-resolve 'mcp-clj.in-memory-transport.server 'create-in-memory-server))
-        server           (create-server-fn
-                          {:shared shared-transport}
-                          {"tools/list" handler
-                           "tools/call" handler})
+        create-server-fn    (do
+                              (require 'mcp-clj.in-memory-transport.server)
+                              (ns-resolve
+                               'mcp-clj.in-memory-transport.server
+                               'create-in-memory-server))
+        server              (create-server-fn
+                             {:shared shared-transport}
+                             {"tools/list" handler
+                              "tools/call" handler})
         ;; Create transport using lazy-loaded function
         create-transport-fn (do (require 'mcp-clj.in-memory-transport.client)
-                                (ns-resolve 'mcp-clj.in-memory-transport.client 'create-transport))
+                                (ns-resolve
+                                 'mcp-clj.in-memory-transport.client
+                                 'create-transport))
         transport           (create-transport-fn {:shared shared-transport})]
     {:session          session
      :transport        transport
@@ -61,11 +74,11 @@
   (testing "successful tool execution returns CompletableFuture with content"
     (let [handler (fn [method params]
                     {:content "success result" :isError false})
-          client  (create-test-client-with-handler handler)]
+          client (create-test-client-with-handler handler)]
       (try
         (let [future (tools/call-tool-impl client "test-tool" {})]
           (is (instance? CompletableFuture future))
-          (is (= {:content "success result"} (.get future 1 TimeUnit/SECONDS))))
+          (is (= "success result" (.get future 1 TimeUnit/SECONDS))))
         (finally
           (stop-server! (:server client))))))
 
@@ -73,11 +86,11 @@
     (let [handler (fn [method params]
                     {:content [{:type "text" :text "{\"key\": \"value\"}"}]
                      :isError false})
-          client  (create-test-client-with-handler handler)]
+          client (create-test-client-with-handler handler)]
       (try
         ;; Should return the parsed content - access the data field from first item
         (let [future (tools/call-tool-impl client "test-tool" {})
-              result (:content (.get future 1 TimeUnit/SECONDS))]
+              result (.get future 1 TimeUnit/SECONDS)]
           (is (vector? result))
           (is (= 1 (count result)))
           (let [first-item (first result)]
@@ -92,7 +105,7 @@
   (testing "tool execution returns future that throws on error when dereferenced"
     (let [handler (fn [method params]
                     {:content "error message" :isError true})
-          client  (create-test-client-with-handler handler)]
+          client (create-test-client-with-handler handler)]
       (try
         (let [future (tools/call-tool-impl client "test-tool" {})]
           (is (instance? CompletableFuture future))
@@ -119,9 +132,9 @@
   (testing "successful tools list request returns CompletableFuture"
     (let [mock-tools [{:name "echo" :description "Echo tool"}
                       {:name "calc" :description "Calculator tool"}]
-          handler    (fn [method params]
-                       {:tools mock-tools})
-          client     (create-test-client-with-handler handler)]
+          handler (fn [method params]
+                    {:tools mock-tools})
+          client (create-test-client-with-handler handler)]
       (try
         (let [future (tools/list-tools-impl client)]
           (is (instance? CompletableFuture future))
@@ -135,7 +148,7 @@
   (testing "error handling in tools list returns failed future"
     (let [handler (fn [method params]
                     (throw (ex-info "Connection failed" {})))
-          client  (create-test-client-with-handler handler)]
+          client (create-test-client-with-handler handler)]
       (try
         (let [future (tools/list-tools-impl client)]
           (is (instance? CompletableFuture future))
@@ -150,11 +163,11 @@
     (let [handler (fn [method params]
                     {:content "tool result"
                      :isError false})
-          client  (create-test-client-with-handler handler)]
+          client (create-test-client-with-handler handler)]
       (try
         (let [future (tools/call-tool-impl client "test-tool" {:input "test"})]
           (is (instance? CompletableFuture future))
-          (is (= {:content "tool result"} (.get future 1 TimeUnit/SECONDS))))
+          (is (= "tool result" (.get future 1 TimeUnit/SECONDS))))
         (finally
           (stop-server! (:server client))))))
 
@@ -162,7 +175,7 @@
     (let [handler (fn [method params]
                     {:content "Tool execution failed"
                      :isError true})
-          client  (create-test-client-with-handler handler)]
+          client (create-test-client-with-handler handler)]
       (try
         (let [future (tools/call-tool-impl client "failing-tool" {})]
           (is (instance? CompletableFuture future))
@@ -175,7 +188,7 @@
   (testing "tool call with handler exception"
     (let [handler (fn [method params]
                     (throw (ex-info "Handler error" {})))
-          client  (create-test-client-with-handler handler)]
+          client (create-test-client-with-handler handler)]
       (try
         (let [future (tools/call-tool-impl client "test-tool" {})]
           (is (instance? CompletableFuture future))

@@ -15,12 +15,12 @@
 (defn- create-client
   ^AutoCloseable []
   (client/create-client
-   {:transport        {:type :stdio
-                       :command "clj"
-                       :args    ["-M:dev:test" "-m" "mcp-clj.java-sdk.sdk-server-main"]}
-    :client-info      {:name    "java-sdk-integration-test"
-                       :version "0.1.0"}
-    :capabilities     {}
+   {:transport {:type :stdio
+                :command "clj"
+                :args ["-M:dev:test" "-m" "mcp-clj.java-sdk.sdk-server-main"]}
+    :client-info {:name "java-sdk-integration-test"
+                  :version "0.1.0"}
+    :capabilities {}
     :protocol-version "2024-11-05"}))
 
 ;;; MCP Protocol Tests
@@ -53,7 +53,7 @@
       (client/wait-for-ready client 10000) ; 10 second timeout
 
       (testing "list available tools"
-        (let [tools-response (client/list-tools client)]
+        (let [tools-response @(client/list-tools client)] ; Deref the CompletableFuture
           (is (map? tools-response))
           (is (contains? tools-response :tools))
           (is (sequential? (:tools tools-response)))
@@ -83,7 +83,8 @@
       (client/wait-for-ready client 10000) ; 10 second timeout
 
       (testing "echo tool call"
-        (let [result (client/call-tool client "echo" {:message "Hello from Clojure MCP client!"})]
+        (let [future (client/call-tool client "echo" {:message "Hello from Clojure MCP client!"})
+              result (:content @future)] ; Deref the CompletableFuture and get :content
           (is (sequential? result))
 
           (let [first-content (first result)]
@@ -93,7 +94,8 @@
           (log/info :integration-test/echo-result {:result result})))
 
       (testing "add tool call"
-        (let [result (client/call-tool client "add" {:a 42 :b 13})]
+        (let [future (client/call-tool client "add" {:a 42 :b 13})
+              result (:content @future)] ; Deref the CompletableFuture and get :content
           (is (sequential? result))
 
           (let [first-content (first result)]
@@ -103,7 +105,8 @@
           (log/info :integration-test/add-result {:result result})))
 
       (testing "get-time tool call"
-        (let [result (client/call-tool client "get-time" {})]
+        (let [future (client/call-tool client "get-time" {})
+              result (:content @future)] ; Deref the CompletableFuture and get :content
           (is (sequential? result))
 
           (let [first-content (first result)]
@@ -121,7 +124,7 @@
 
       (testing "non-existent tool call"
         (try
-          (client/call-tool client "non-existent-tool" {:param "value"})
+          @(client/call-tool client "non-existent-tool" {:param "value"}) ; Deref the CompletableFuture
           (is false "Should have thrown exception for non-existent tool")
           (catch Exception e
             (is (instance? Exception e))
@@ -130,7 +133,7 @@
       (testing "invalid tool arguments"
         (try
           ;; Try to call add with invalid arguments (missing required params)
-          (client/call-tool client "add" {:invalid "args"})
+          @(client/call-tool client "add" {:invalid "args"}) ; Deref the CompletableFuture
           ;; If it doesn't throw, check for error indication in result
           :no-exception
           (catch Exception e
@@ -147,9 +150,9 @@
         (let [futures (doall
                        (for [i (range 5)]
                          (future
-                           (client/call-tool
-                            client "echo"
-                            {:message (str "Concurrent message " i)}))))]
+                           (:content @(client/call-tool ; Deref the CompletableFuture and get :content
+                                       client "echo"
+                                       {:message (str "Concurrent message " i)})))))]
 
           ;; Wait for all to complete
           (let [results (mapv deref futures)]
@@ -170,14 +173,14 @@
             (log/info :integration-test/concurrent-results {:count (count results)}))))
 
       (testing "mixed operation types concurrently"
-        (let [list-future (future (client/list-tools client))
-              echo-future (future (client/call-tool client "echo" {:message "concurrent"}))
-              add-future  (future (client/call-tool client "add" {:a 10 :b 20}))]
+        (let [list-future (future @(client/list-tools client)) ; Deref the CompletableFuture
+              echo-future (future (:content @(client/call-tool client "echo" {:message "concurrent"}))) ; Deref and get :content
+              add-future (future (:content @(client/call-tool client "add" {:a 10 :b 20})))] ; Deref and get :content
 
           ;; Wait for all to complete
           (let [list-result @list-future
                 echo-result @echo-future
-                add-result  @add-future]
+                add-result @add-future]
 
             ;; List tools result
             (is (map? list-result))
