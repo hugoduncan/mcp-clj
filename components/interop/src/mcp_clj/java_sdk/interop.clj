@@ -4,71 +4,74 @@
   Provides a minimal Clojure API to create and interact with MCP
   clients and servers from the official Java SDK."
   (:require
-    [mcp-clj.log :as log])
+   [mcp-clj.log :as log])
   (:import
-    (com.fasterxml.jackson.databind
-      ObjectMapper)
-    ; Types
-    (io.modelcontextprotocol.client
-      McpAsyncClient
-      McpClient
-      McpSyncClient)
-    (io.modelcontextprotocol.client.transport
-      ServerParameters
-      StdioClientTransport
-      WebClientStreamableHttpTransport
-      WebFluxSseClientTransport)
-    (io.modelcontextprotocol.server
-      McpAsyncServer
-      McpServer
-      McpServerFeatures$AsyncToolSpecification$Builder
-      McpServerFeatures$SyncToolSpecification
-      McpServerFeatures$SyncToolSpecification$Builder
-      McpSyncServer)
-    (io.modelcontextprotocol.server.transport
-      StdioServerTransportProvider
-      WebFluxSseServerTransportProvider
-      WebFluxStatelessServerTransport
-      WebFluxStreamableServerTransportProvider)
-    (io.modelcontextprotocol.spec
-      McpSchema
-      McpSchema$AudioContent
-      McpSchema$BlobResourceContents
-      McpSchema$CallToolRequest
-      McpSchema$CallToolResult
-      McpSchema$Content
-      McpSchema$EmbeddedResource
-      McpSchema$ImageContent
-      McpSchema$InitializeResult
-      McpSchema$ListToolsResult
-      McpSchema$ResourceLink
-      McpSchema$ServerCapabilities
-      McpSchema$ServerCapabilities$Builder
-      McpSchema$ServerCapabilities$PromptCapabilities
-      McpSchema$ServerCapabilities$ResourceCapabilities
-      McpSchema$ServerCapabilities$ToolCapabilities
-      McpSchema$TextContent
-      McpSchema$TextResourceContents
-      McpSchema$Tool
-      McpServerTransportProvider)
-    (java.lang
-      AutoCloseable)
-    (java.util
-      List
-      Map)
-    (java.util.concurrent
-      CompletableFuture
-      TimeUnit)
-    (org.springframework.web.reactive.function.client
-      WebClient
-      WebClient$Builder)))
+   (com.fasterxml.jackson.databind
+    ObjectMapper)
+   ;; Types
+   (io.modelcontextprotocol.client
+    McpAsyncClient
+    McpClient
+    McpSyncClient)
+   (io.modelcontextprotocol.client.transport
+    ServerParameters
+    StdioClientTransport
+    WebClientStreamableHttpTransport
+    WebFluxSseClientTransport)
+   (io.modelcontextprotocol.server
+    McpAsyncServer
+    McpServer
+    McpServer$AsyncSpecification
+    McpServer$SingleSessionSyncSpecification
+    McpServer$StreamableSyncSpecification
+    McpServerFeatures$AsyncToolSpecification$Builder
+    McpServerFeatures$SyncToolSpecification
+    McpServerFeatures$SyncToolSpecification$Builder
+    McpSyncServer)
+   (io.modelcontextprotocol.server.transport
+    StdioServerTransportProvider
+    WebFluxSseServerTransportProvider
+    WebFluxStatelessServerTransport
+    WebFluxStreamableServerTransportProvider)
+   (io.modelcontextprotocol.spec
+    McpSchema
+    McpSchema$AudioContent
+    McpSchema$BlobResourceContents
+    McpSchema$CallToolRequest
+    McpSchema$CallToolResult
+    McpSchema$Content
+    McpSchema$EmbeddedResource
+    McpSchema$ImageContent
+    McpSchema$InitializeResult
+    McpSchema$ListToolsResult
+    McpSchema$ResourceLink
+    McpSchema$ServerCapabilities
+    McpSchema$ServerCapabilities$Builder
+    McpSchema$ServerCapabilities$PromptCapabilities
+    McpSchema$ServerCapabilities$ResourceCapabilities
+    McpSchema$ServerCapabilities$ToolCapabilities
+    McpSchema$TextContent
+    McpSchema$TextResourceContents
+    McpSchema$Tool
+    McpServerTransportProvider)
+   (java.lang
+    AutoCloseable)
+   (java.util
+    List
+    Map)
+   (java.util.concurrent
+    CompletableFuture
+    TimeUnit)
+   (org.springframework.web.reactive.function.client
+    WebClient
+    WebClient$Builder)))
 
 ;; Utility functions
 
 ;; Records for Java SDK client and server wrappers
 
 (defrecord JavaSdkClient
-  [^McpClient client transport async?]
+    [^McpClient client transport async?]
 
   AutoCloseable
 
@@ -84,7 +87,7 @@
         (log/warn :java-sdk/close-error {:error e})))))
 
 (defrecord JavaSdkServer
-  [^McpServer server name version async?]
+    [^McpServer server name version async?]
 
   AutoCloseable
 
@@ -104,10 +107,10 @@
   (cond
     (map? m)
     (java.util.HashMap.
-      ^Map (into {} (map (fn [[k v]]
-                           [(if (keyword? k) (name k) k)
-                            (clj->java-map v)])
-                         m)))
+     ^Map (into {} (map (fn [[k v]]
+                          [(if (keyword? k) (name k) k)
+                           (clj->java-map v)])
+                        m)))
 
     (sequential? m)
     (java.util.ArrayList. ^java.util.Collection (map clj->java-map m))
@@ -152,47 +155,47 @@
   [^McpSchema$Content content]
   (let [m (.meta content)]
     (cond->
-      (condp = (.type content)
-        "text"
-        (let [^McpSchema$TextContent text-content content]
+        (condp = (.type content)
+          "text"
+          (let [^McpSchema$TextContent text-content content]
+            {:type "text"
+             :text (.text text-content)})
+
+          "image"
+          (let [^McpSchema$ImageContent image-content content]
+            {:data (.data image-content)
+             :mime-type (.mimeType image-content)})
+
+          "audio"
+          (let [^McpSchema$AudioContent audio-content content]
+            {:data (.data audio-content)
+             :mime-type (.mimeType audio-content)})
+
+          "resource"
+          (let [^McpSchema$EmbeddedResource embedded-resource content
+                resource (.resource embedded-resource)
+                base {:uri (.uri resource)
+                      :mime-type (.mimeType resource)
+                      :meta (into {} (.meta resource))}]
+            (cond
+              (instance? McpSchema$TextResourceContents resource)
+              (assoc base
+                     :text (.text ^McpSchema$TextResourceContents resource))
+              (instance? McpSchema$BlobResourceContents resource)
+              (assoc base
+                     :blob (.blob ^McpSchema$BlobResourceContents resource))))
+
+          "resource_link"
+          (let [^McpSchema$ResourceLink link content]
+            {:name (.name link)
+             :title (.title link)
+             :uri (.uri link)
+             :descritpion (.description link)
+             :mime-type (.mimeType link)
+             :size (.size link)})
+
           {:type "text"
-           :text (.text text-content)})
-
-        "image"
-        (let [^McpSchema$ImageContent image-content content]
-          {:data (.data image-content)
-           :mime-type (.mimeType image-content)})
-
-        "audio"
-        (let [^McpSchema$AudioContent audio-content content]
-          {:data (.data audio-content)
-           :mime-type (.mimeType audio-content)})
-
-        "resource"
-        (let [^McpSchema$EmbeddedResource embedded-resource content
-              resource (.resource embedded-resource)
-              base {:uri (.uri resource)
-                    :mime-type (.mimeType resource)
-                    :meta (into {} (.meta resource))}]
-          (cond
-            (instance? McpSchema$TextResourceContents resource)
-            (assoc base
-                   :text (.text ^McpSchema$TextResourceContents resource))
-            (instance? McpSchema$BlobResourceContents resource)
-            (assoc base
-                   :blob (.blob ^McpSchema$BlobResourceContents resource))))
-
-        "resource_link"
-        (let [^McpSchema$ResourceLink link content]
-          {:name (.name link)
-           :title (.title link)
-           :uri (.uri link)
-           :descritpion (.description link)
-           :mime-type (.mimeType link)
-           :size (.size link)})
-
-        {:type "text"
-         :text (str content)})
+           :text (str content)})
       (and m (seq m))
       (assoc :meta m))))
 
@@ -240,32 +243,32 @@
   "Convert Java SDK initialization result to Clojure map"
   [^McpSchema$InitializeResult init-result]
   (when init-result
-    (let [server-info (.serverInfo init-result)
+    (let [server-info  (.serverInfo init-result)
           capabilities (.capabilities init-result)]
-      {:serverInfo {:name (when server-info (.name server-info))
-                    :version (when server-info (.version server-info))
-                    :title (when server-info (.title server-info))}
+      {:serverInfo      {:name    (when server-info (.name server-info))
+                         :version (when server-info (.version server-info))
+                         :title   (when server-info (.title server-info))}
        :protocolVersion (.protocolVersion init-result)
-       :capabilities {:tools
-                      (when-let
-                        [^McpSchema$ServerCapabilities$ToolCapabilities
-                         tools-cap
-                         (and capabilities (.tools capabilities))]
-                        {:listChanged (.listChanged tools-cap)})
-                      :resources
-                      (when-let
-                        [^McpSchema$ServerCapabilities$ResourceCapabilities
-                         resources-cap
-                         (and capabilities (.resources capabilities))]
-                        {:listChanged (.listChanged resources-cap)
-                         :subscribe (.subscribe resources-cap)})
-                      :prompts
-                      (when-let
-                        [^McpSchema$ServerCapabilities$PromptCapabilities
-                         prompts-cap
-                         (and capabilities (.prompts capabilities))]
-                        {:listChanged (.listChanged prompts-cap)})}
-       :instructions (.instructions init-result)})))
+       :capabilities    {:tools
+                         (when-let
+                             [^McpSchema$ServerCapabilities$ToolCapabilities
+                              tools-cap
+                              (and capabilities (.tools capabilities))]
+                           {:listChanged (.listChanged tools-cap)})
+                         :resources
+                         (when-let
+                             [^McpSchema$ServerCapabilities$ResourceCapabilities
+                              resources-cap
+                              (and capabilities (.resources capabilities))]
+                           {:listChanged (.listChanged resources-cap)
+                            :subscribe   (.subscribe resources-cap)})
+                         :prompts
+                         (when-let
+                             [^McpSchema$ServerCapabilities$PromptCapabilities
+                              prompts-cap
+                              (and capabilities (.prompts capabilities))]
+                           {:listChanged (.listChanged prompts-cap)})}
+       :instructions    (.instructions init-result)})))
 
 ;; Client API
 
@@ -279,7 +282,7 @@
 
   Returns a JavaSdkClient record that implements AutoCloseable."
   [{:keys [transport timeout async?]
-    :or {timeout 30 async? true}}]
+    :or   {timeout 30 async? true}}]
   (let [client (if async?
                  (-> (McpClient/async transport)
                      (.build))
@@ -305,11 +308,11 @@
                      (throw (ex-info "Invalid command spec" {:command-spec command-spec})))
 
         ;; Build ServerParameters using the builder pattern
-        builder (ServerParameters/builder cmd)
+        builder       (ServerParameters/builder cmd)
         server-params (if args
                         (-> builder
                             (.args
-                              ^"[Ljava.lang.String;" (into-array String args))
+                             ^"[Ljava.lang.String;" (into-array String args))
                             (.build))
                         (.build builder))]
 
@@ -331,7 +334,7 @@
 
   Returns an HTTP transport provider object."
   [{:keys [url use-sse open-connection-on-startup resumable-streams]
-    :or {use-sse false open-connection-on-startup false resumable-streams false}}]
+    :or   {use-sse false open-connection-on-startup false resumable-streams false}}]
   (when-not url
     (throw (ex-info "URL required for HTTP client transport" {:options {:url url}})))
   (if use-sse
@@ -341,11 +344,11 @@
       (WebFluxSseClientTransport. web-client-builder (ObjectMapper.)))
     ;; Use regular HTTP transport
     (let [web-client-builder (WebClient/builder)
-          builder (-> (WebClientStreamableHttpTransport/builder web-client-builder)
-                      (.endpoint url)
-                      (.objectMapper (ObjectMapper.))
-                      (.openConnectionOnStartup open-connection-on-startup)
-                      (.resumableStreams resumable-streams))]
+          builder            (-> (WebClientStreamableHttpTransport/builder web-client-builder)
+                                 (.endpoint url)
+                                 (.objectMapper (ObjectMapper.))
+                                 (.openConnectionOnStartup open-connection-on-startup)
+                                 (.resumableStreams resumable-streams))]
       (.build builder))))
 
 (defn create-http-server-transport
@@ -359,7 +362,7 @@
 
   Returns an HTTP server transport provider object."
   [{:keys [port use-sse stateless endpoint]
-    :or {port 8080 use-sse false stateless false endpoint "/message"}}]
+    :or   {port 8080 use-sse false stateless false endpoint "/message"}}]
   (cond
     stateless
     ;; Note: WebFluxStatelessServerTransport might need different initialization
@@ -403,15 +406,15 @@
       (->  future
            (.thenApply (reify java.util.function.Function
                          (apply
-                           [_ result]
+                             [_ result]
                            (java-tools-result->clj result))))))
     ;; For sync client, wrap the synchronous call in a CompletableFuture
     (CompletableFuture/supplyAsync
-      (reify java.util.function.Supplier
-        (get
-          [_]
-          (let [result (.listTools ^McpSyncClient (:client client-record))]
-            (java-tools-result->clj result)))))))
+     (reify java.util.function.Supplier
+       (get
+           [_]
+         (let [result (.listTools ^McpSyncClient (:client client-record))]
+           (java-tools-result->clj result)))))))
 
 (defn call-tool
   "Call a tool through the Java SDK client.
@@ -438,16 +441,16 @@
         (-> future
             (.thenApply (reify java.util.function.Function
                           (apply
-                            [_ result]
+                              [_ result]
                             (java-tool-result->clj result))))))
       ;; For sync client, wrap the synchronous call in a CompletableFuture
       (CompletableFuture/supplyAsync
-        (reify java.util.function.Supplier
-          (get
-            [_]
-            (let [^McpSyncClient client (:client client-record)
-                  result                (.callTool client request)]
-              (java-tool-result->clj result))))))))
+       (reify java.util.function.Supplier
+         (get
+             [_]
+           (let [^McpSyncClient client (:client client-record)
+                 result                (.callTool client request)]
+             (java-tool-result->clj result))))))))
 
 (defn close-client
   "Close the Java SDK client."
@@ -467,24 +470,33 @@
 
   Returns a JavaSdkServer record that implements AutoCloseable."
   [{:keys [name version async? transport]
-    :or {name "java-sdk-server" version "0.1.0" async? true}}]
-  (log/info :java-sdk/creating-server {:name name :version version :async? async?})
-  (let [^McpServerTransportProvider transport
+    :or   {name "java-sdk-server" version "0.1.0" async? true}}]
+  (log/debug :java-sdk/creating-server
+    {:name name :version version :async? async?})
+  (let [transport
         (or transport (create-stdio-server-transport))
         server (if async?
-                 (-> (McpServer/async transport)
+                 (-> ^McpServer$AsyncSpecification
+                     (if (instance? McpServerTransportProvider transport)
+                       (McpServer/async ^McpServerTransportProvider transport)
+                       (McpServer/async
+                           ^WebFluxStreamableServerTransportProvider transport))
                      (.serverInfo name version)
                      (.capabilities
-                       (-> (McpSchema$ServerCapabilities$Builder.)
-                           (.tools true)
-                           (.build)))
+                      (-> (McpSchema$ServerCapabilities$Builder.)
+                          (.tools true)
+                          (.build)))
                      (.build))
-                 (-> (McpServer/sync transport)
+                 (-> ^McpServer$StreamableSyncSpecification
+                     (if (instance? McpServerTransportProvider transport)
+                       (McpServer/sync ^McpServerTransportProvider transport)
+                       (McpServer/sync
+                        ^WebFluxStreamableServerTransportProvider transport))
                      (.serverInfo name version)
                      (.capabilities
-                       (-> (McpSchema$ServerCapabilities$Builder.)
-                           (.tools true)
-                           (.build)))
+                      (-> (McpSchema$ServerCapabilities$Builder.)
+                          (.tools true)
+                          (.build)))
                      (.build)))]
     (->JavaSdkServer server name version async?)))
 
@@ -499,7 +511,7 @@
   Returns a Process object."
   [command]
   (log/info :java-sdk/starting-process {:command command})
-  (let [pb (ProcessBuilder. ^List command)
+  (let [pb      (ProcessBuilder. ^List command)
         process (.start pb)]
     process))
 
@@ -526,41 +538,41 @@
     (throw (ex-info "Invalid server record" {:server-record server-record})))
   (log/info :java-sdk/registering-tool {:name name})
   ;; Convert input-schema map to JSON string for Java SDK
-  (let [^String schema-json (if (string? input-schema)
-                              input-schema
-                              (.writeValueAsString
-                                (ObjectMapper.)
-                                input-schema))
-        tool (-> (McpSchema$Tool/builder)
-                 (.name name)
-                 (.description description)
-                 (.inputSchema schema-json)
-                 (.build))
+  (let [^String schema-json    (if (string? input-schema)
+                                 input-schema
+                                 (.writeValueAsString
+                                  (ObjectMapper.)
+                                  input-schema))
+        tool                   (-> (McpSchema$Tool/builder)
+                                   (.name name)
+                                   (.description description)
+                                   (.inputSchema schema-json)
+                                   (.build))
         ^McpServer java-server (:server server-record)]
     (if (:async? server-record)
-      (let [f (fn ^McpSchema$CallToolResult
-                [exchange ^McpSchema$CallToolRequest call-tool-request]
-                (let [java-args (.arguments call-tool-request)
-                      clj-args (into {} (map (fn [[k v]] [(keyword k) v]) java-args))
-                      clj-result (implementation clj-args)]
-                  (clj-result->java-result clj-result)))
-            tool-spec (-> (McpServerFeatures$AsyncToolSpecification$Builder.)
-                          (.tool tool)
-                          (.callHandler f)
-                          (.build))
+      (let [f                            (fn ^McpSchema$CallToolResult
+                                           [exchange ^McpSchema$CallToolRequest call-tool-request]
+                                           (let [java-args  (.arguments call-tool-request)
+                                                 clj-args   (into {} (map (fn [[k v]] [(keyword k) v]) java-args))
+                                                 clj-result (implementation clj-args)]
+                                             (clj-result->java-result clj-result)))
+            tool-spec                    (-> (McpServerFeatures$AsyncToolSpecification$Builder.)
+                                             (.tool tool)
+                                             (.callHandler f)
+                                             (.build))
             ^McpAsyncServer async-server java-server]
         ;; Add tool to server
         (.addTool async-server tool-spec))
-      (let [f (fn ^McpSchema$CallToolResult
-                [exchange ^McpSchema$CallToolRequest call-tool-request]
-                (let [java-args (.arguments call-tool-request)
-                      clj-args (into {} (map (fn [[k v]] [(keyword k) v]) java-args))
-                      clj-result (implementation clj-args)]
-                  (clj-result->java-result clj-result)))
-            tool-spec (-> (McpServerFeatures$SyncToolSpecification$Builder.)
-                          (.tool tool)
-                          (.callHandler f)
-                          (.build))
+      (let [f                          (fn ^McpSchema$CallToolResult
+                                         [exchange ^McpSchema$CallToolRequest call-tool-request]
+                                         (let [java-args  (.arguments call-tool-request)
+                                               clj-args   (into {} (map (fn [[k v]] [(keyword k) v]) java-args))
+                                               clj-result (implementation clj-args)]
+                                           (clj-result->java-result clj-result)))
+            tool-spec                  (-> (McpServerFeatures$SyncToolSpecification$Builder.)
+                                           (.tool tool)
+                                           (.callHandler f)
+                                           (.build))
             ^McpSyncServer sync-server java-server]
         ;; Add tool to server
         (.addTool sync-server tool-spec))))
@@ -605,14 +617,14 @@
     :stdio-client (let [command (:command options)]
                     (when-not command
                       (throw
-                        (ex-info
-                          "Command required for stdio client transport"
-                          {:options options})))
+                       (ex-info
+                        "Command required for stdio client transport"
+                        {:options options})))
                     (create-stdio-client-transport command))
     :stdio-server (create-stdio-server-transport)
-    :http-client (create-http-client-transport options)
-    :http-server (create-http-server-transport options)
+    :http-client  (create-http-client-transport options)
+    :http-server  (create-http-server-transport options)
     (throw
-      (ex-info
-        "Unknown transport type"
-        {:transport-type transport-type}))))
+     (ex-info
+      "Unknown transport type"
+      {:transport-type transport-type}))))
