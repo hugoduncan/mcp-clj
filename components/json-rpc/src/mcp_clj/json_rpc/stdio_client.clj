@@ -1,19 +1,19 @@
 (ns mcp-clj.json-rpc.stdio-client
   "JSON-RPC client utilities for stdio communication"
   (:require
-    [mcp-clj.json-rpc.executor :as executor]
-    [mcp-clj.json-rpc.protocol :as protocol]
-    [mcp-clj.json-rpc.stdio :as stdio]
-    [mcp-clj.log :as log])
+   [mcp-clj.json-rpc.executor :as executor]
+   [mcp-clj.json-rpc.protocols :as protocols]
+   [mcp-clj.json-rpc.stdio :as stdio]
+   [mcp-clj.log :as log])
   (:import
-    (java.io
-      BufferedReader
-      BufferedWriter)
-    (java.util.concurrent
-      CompletableFuture
-      ConcurrentHashMap
-      Future
-      TimeUnit)))
+   (java.io
+    BufferedReader
+    BufferedWriter)
+   (java.util.concurrent
+    CompletableFuture
+    ConcurrentHashMap
+    Future
+    TimeUnit)))
 
 ;; Forward declarations
 (declare stdio-send-request! stdio-send-notification! close-json-rpc-client!)
@@ -21,30 +21,27 @@
 ;; JSONRPClient Record
 
 (defrecord JSONRPClient
-  [pending-requests ; ConcurrentHashMap of request-id -> CompletableFuture
-   request-id-counter ; atom for generating unique request IDs
-   executor ; executor for async operations
-   input-stream ; BufferedReader for reading responses
-   output-stream ; BufferedWriter for sending requests
-   running ; atom for controlling message reader loop
-   reader-future] ; future for background message reader
+           [pending-requests ; ConcurrentHashMap of request-id -> CompletableFuture
+            request-id-counter ; atom for generating unique request IDs
+            executor ; executor for async operations
+            input-stream ; BufferedReader for reading responses
+            output-stream ; BufferedWriter for sending requests
+            running ; atom for controlling message reader loop
+            reader-future] ; future for background message reader
 
-  protocol/JSONRPCClient
+  protocols/JSONRPCClient
 
   (send-request!
     [this method params timeout-ms]
     (stdio-send-request! this method params timeout-ms))
 
-
   (send-notification!
     [this method params]
     (stdio-send-notification! this method params))
 
-
   (close!
     [this]
     (close-json-rpc-client! this))
-
 
   (alive?
     [this]
@@ -59,20 +56,20 @@
   ([input-stream output-stream]
    (create-json-rpc-client input-stream output-stream {}))
   ([input-stream output-stream {:keys [num-threads]
-                                :or   {num-threads 2}}]
-   (let [running       (atom true)
-         client        (->JSONRPClient
-                         (ConcurrentHashMap.)
-                         (atom 0)
-                         (executor/create-executor num-threads)
-                         input-stream
-                         output-stream
-                         running
-                         nil)
+                                :or {num-threads 2}}]
+   (let [running (atom true)
+         client (->JSONRPClient
+                 (ConcurrentHashMap.)
+                 (atom 0)
+                 (executor/create-executor num-threads)
+                 input-stream
+                 output-stream
+                 running
+                 nil)
          ;; Start background message reader
          reader-future (executor/submit!
-                         (:executor client)
-                         #(message-reader-loop input-stream running client))]
+                        (:executor client)
+                        #(message-reader-loop input-stream running client))]
      (assoc client :reader-future reader-future))))
 
 (defn generate-request-id
@@ -140,16 +137,16 @@
   "Send JSON-RPC request using JSONRPClient's output stream"
   [json-rpc-client method params timeout-ms]
   (let [request-id (generate-request-id json-rpc-client)
-        future     (CompletableFuture.)
-        request    {:jsonrpc "2.0"
-                    :id      request-id
-                    :method  method
-                    :params  params}]
+        future (CompletableFuture.)
+        request {:jsonrpc "2.0"
+                 :id request-id
+                 :method method
+                 :params params}]
 
     ;; Register pending request
     (.put
-      ^ConcurrentHashMap (:pending-requests json-rpc-client)
-      request-id future)
+     ^ConcurrentHashMap (:pending-requests json-rpc-client)
+     request-id future)
 
     ;; Send request using JSONRPClient's output stream
     (try
@@ -161,8 +158,8 @@
       future
       (catch Exception e
         (.remove
-          ^ConcurrentHashMap (:pending-requests json-rpc-client)
-          request-id)
+         ^ConcurrentHashMap (:pending-requests json-rpc-client)
+         request-id)
         (.completeExceptionally future e)
         future))))
 
@@ -200,9 +197,9 @@
 (defn send-request!
   "Send JSON-RPC request using JSONRPClient's output stream"
   [json-rpc-client method params timeout-ms]
-  (protocol/send-request! json-rpc-client method params timeout-ms))
+  (protocols/send-request! json-rpc-client method params timeout-ms))
 
 (defn send-notification!
   "Send JSON-RPC notification using JSONRPClient's output stream"
   [json-rpc-client method params]
-  (protocol/send-notification! json-rpc-client method params))
+  (protocols/send-notification! json-rpc-client method params))
