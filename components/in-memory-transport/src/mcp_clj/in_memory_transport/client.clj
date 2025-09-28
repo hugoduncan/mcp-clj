@@ -38,17 +38,19 @@
           ;; Set timeout if specified
           (when (and timeout-ms (pos? timeout-ms))
             (let [executor (Executors/newSingleThreadScheduledExecutor)]
-              (.schedule executor
-                         ^Runnable
-                         (fn []
-                           (when-not (.isDone future)
-                             (shared/remove-pending-request! shared-transport request-id)
-                             (.completeExceptionally future
-                                                     (ex-info "Request timeout"
-                                                              {:request-id request-id
-                                                               :timeout-ms timeout-ms}))))
-                         timeout-ms
-                         TimeUnit/MILLISECONDS)))
+              (.schedule
+                executor
+                ^Runnable
+                (fn []
+                  (when-not (.isDone future)
+                    (shared/remove-pending-request! shared-transport request-id)
+                    (.completeExceptionally
+                      future
+                      (ex-info "Request timeout"
+                               {:request-id request-id
+                                :timeout-ms timeout-ms}))))
+                (long timeout-ms)
+                TimeUnit/MILLISECONDS)))
           future
           (catch Exception e
             (shared/remove-pending-request! shared-transport request-id)
@@ -106,11 +108,14 @@
                        (cond
                          ;; Response to request
                          (:id message)
-                         (when-let [future (shared/remove-pending-request! shared-transport (:id message))]
+                         (when-let [future (shared/remove-pending-request!
+                                             shared-transport
+                                             (:id message))]
                            (if (:error message)
-                             (.completeExceptionally future
-                                                     (ex-info "Server error"
-                                                              {:error (:error message)}))
+                             (.completeExceptionally
+                               future
+                               (ex-info "Server error"
+                                        {:error (:error message)}))
                              (.complete future (:result message))))
 
                          ;; Notification from server
@@ -130,7 +135,7 @@
 
 (defn create-transport
   "Create in-memory transport for MCP client.
-  
+
   Options:
   - :shared - SharedTransport instance (required)
   - :notification-handler - Function to handle server notifications (optional)"
