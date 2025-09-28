@@ -102,7 +102,14 @@ Include REFINE to refine the spec
 - [x] add projects/java-sdk-wrapper to build a jar with the SDK interop
       component
 
-- [ ] add a github action to run the tests
+- [x] add a github action to run the tests
+
+- [x] factor out the list of versions, and get-latest-version, from
+      mcp-clj.mcp-server.version into a new versions namespace in a new
+      polylith style component that can be used by both server and
+      client
+
+- [ ] merge mcp-clj.json-rpc.protocol and mcp-clj.json-rpc.protocols
 
 - [ ] extend the interop to enable use of SSE transport ? not sure this
       is worth doing still
@@ -154,6 +161,55 @@ Include REFINE to refine the spec
 	  - Tool response formatting (structured content support)
 	  - Comprehensive test coverage for all version-specific behaviors
 	  - Utility functions for version comparison and feature detection
+
+- [ ] Add a release workflow
+
+Release Process:
+
+Trigger: Use GitHub's workflow dispatch to start a release
+Build & Test: Runs full test suite and builds JAR
+Smoke Tests: Validates the built artifact works
+Changelog: Auto-generates changelog from git commits
+Tag & Push: Creates git tag and pushes to repository
+Deploy: Pushes to Clojars
+GitHub Release: Creates release with changelog and JAR attachment
+
+Key Features:
+
+Dry run option to test the pipeline without deploying
+Automatic changelog generation from git history
+Smoke testing of built artifacts before deployment
+Proper Maven metadata for Clojars compatibility
+Rollback safety - only tags and deploys after all tests pass
+
+Next Steps:
+
+Set up the Clojars account and get deploy tokens
+Add the secrets to your GitHub repository
+Customize the smoke tests for your specific project
+Test with a dry run first
+
+The workflow is designed to be safe - it won't deploy anything until all
+tests pass and artifacts are validated.
+
+- use deps.edn and tools.build
+- use Major.minor.commit-seq-num
+
+
+- [ ] add a ci check for reflection
+
+ Add reflection checking to GitHub Actions:
+  - name: Check for reflection warnings
+    run: |
+      clojure -M:dev -e "
+      (set! *warn-on-reflection* true)
+      (require 'poly.all-components :reload)" 2>&1 |
+      tee reflection-warnings.log
+
+      if grep -q "Reflection warning" reflection-warnings.log; then
+        echo "Reflection warnings found!"
+        exit 1
+      fi
 
 
 - [ ] proper capabilities handling

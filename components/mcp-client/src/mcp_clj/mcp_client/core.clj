@@ -7,7 +7,7 @@
     [mcp-clj.mcp-client.session :as session]
     [mcp-clj.mcp-client.tools :as tools]
     [mcp-clj.mcp-client.transport :as transport]
-    [mcp-clj.mcp-server.version :as version])
+    [mcp-clj.versions :as version])
   (:import
     (java.lang
       AutoCloseable)

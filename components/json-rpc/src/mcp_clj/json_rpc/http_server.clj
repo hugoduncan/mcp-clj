@@ -9,14 +9,7 @@
     [mcp-clj.json-rpc.json-protocol :as json-protocol]
     [mcp-clj.json-rpc.protocols :as protocols]
     [mcp-clj.log :as log]
-    [mcp-clj.sse :as sse])
-  (:import
-    (java.util.concurrent
-      RejectedExecutionException)))
-
-;; Configuration
-
-(def ^:private request-timeout-ms 30000)
+    [mcp-clj.sse :as sse]))
 
 ;; Session Management
 

@@ -7,12 +7,9 @@
       Callable
       ExecutorService
       Executors
-      RejectedExecutionException
       ScheduledExecutorService
       ThreadPoolExecutor
       TimeUnit)))
-
-(def ^:private default-request-timeout-ms 30000)
 
 (defn- wrap-log-throwables
   "Wrap a function to log any exceptions"
