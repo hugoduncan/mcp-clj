@@ -1,16 +1,16 @@
 (ns mcp-clj.http-server.adapter
   "Adapter for Java's com.sun.net.httpserver.HttpServer with SSE support"
   (:require
-    [clojure.string :as str]
-    [mcp-clj.log :as log])
+   [clojure.string :as str]
+   [mcp-clj.log :as log])
   (:import
-    (com.sun.net.httpserver
-      HttpExchange
-      HttpHandler
-      HttpServer)
-    (java.net
-      InetSocketAddress
-      URLDecoder)))
+   (com.sun.net.httpserver
+    HttpExchange
+    HttpHandler
+    HttpServer)
+   (java.net
+    InetSocketAddress
+    URLDecoder)))
 
 (defn- set-response-header!
   [^HttpExchange exchange k v]
@@ -31,7 +31,7 @@
 
 (defn- parse-query
   [raw-query]
-  (let [decode #(URLDecoder/decode % "UTF-8")]
+  (let [decode #(URLDecoder/decode ^String % "UTF-8")]
     (if (str/blank? raw-query)
       {}
       (into {}
@@ -51,7 +51,7 @@
    :query-params      (fn query-params
                         []
                         (parse-query
-                          (.getRawQuery (.getRequestURI exchange))))
+                         (.getRawQuery (.getRequestURI exchange))))
    :scheme            :http
    :request-method    (-> exchange .getRequestMethod .toLowerCase keyword)
    :headers           (into {}
@@ -78,13 +78,13 @@
     (send-streaming-response exchange response)
     (let [{:keys [status headers body]}
           response
-          _          (log/info :http/response {:body-type (type body)})
-          body-bytes (if (string? body)
-                       (.getBytes body)
-                       body)
-          n          (if body-bytes
-                       (alength body-bytes)
-                       0)]
+          _                  (log/info :http/response {:body-type (type body)})
+          ^bytes  body-bytes (if (string? body)
+                               (.getBytes ^String body)
+                               body)
+          n                  (if body-bytes
+                               (alength body-bytes)
+                               0)]
       (set-response-headers! exchange headers)
       (send-response-headers! exchange status (if (pos? n) n -1))
       (if (pos? n)
@@ -96,22 +96,21 @@
 (defn run-server
   "Start an HttpServer instance with the given Ring handler.
    Returns a server map containing :server and :stop fn."
-  [handler {:keys [executor port join?]
-            :or   {port  8080
-                   join? false}}]
+  [handler {:keys [executor port]
+            :or   {port 8080}}]
   (let [server     (HttpServer/create (InetSocketAddress. port) 0)
         handler-fn (reify HttpHandler
                      (handle
-                       [_ exchange]
+                         [_ exchange]
                        (try
                          (let [request  (exchange->request-map exchange)
                                response (handler request)]
                            (log/info
-                             :http/request
+                               :http/request
                              {:request
                               (select-keys
-                                request
-                                [:uri :method :headers])
+                               request
+                               [:uri :method :headers])
                               :response response})
                            (if (fn? (:body response))
                              (send-streaming-response exchange response)
@@ -124,11 +123,6 @@
     (.createContext server "/" handler-fn)
     (.setExecutor server executor)
     (.start server)
-    (when join?
-      (.awaitTermination
-        (.getExecutor server)
-        Long/MAX_VALUE
-        java.util.concurrent.TimeUnit/SECONDS))
     {:server server
      :port   (.getPort (.getAddress server))
      :stop   (fn [] (.stop server 0))}))

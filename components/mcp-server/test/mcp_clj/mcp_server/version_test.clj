@@ -1,7 +1,8 @@
 (ns mcp-clj.mcp-server.version-test
   (:require
     [clojure.test :refer [deftest is testing]]
-    [mcp-clj.mcp-server.version :as version]))
+    [mcp-clj.mcp-server.version :as version]
+    [mcp-clj.versions :as versions]))
 
 (deftest negotiate-version-test
   (testing "version negotiation according to MCP specification"
@@ -38,14 +39,14 @@
 
 (deftest supported?-test
   (testing "version support checking"
-    (is (true? (version/supported? "2025-06-18")))
-    (is (true? (version/supported? "2024-11-05")))
-    (is (false? (version/supported? "2024-01-01")))
-    (is (false? (version/supported? "0.2")))))
+    (is (true? (versions/supported? "2025-06-18")))
+    (is (true? (versions/supported? "2024-11-05")))
+    (is (false? (versions/supported? "2024-01-01")))
+    (is (false? (versions/supported? "0.2")))))
 
 (deftest get-latest-version-test
   (testing "latest version retrieval"
-    (is (= "2025-06-18" (version/get-latest-version)))))
+    (is (= "2025-06-18" (versions/get-latest-version)))))
 
 (deftest version-specific-behavior-test
   (testing "version-specific behavior dispatch"

@@ -10,7 +10,8 @@
                  "components/log/test"
                  "components/mcp-client/test"
                  "components/mcp-server/test"
-                 "components/tools/test"]
+                 "components/tools/test"
+                 "components/versions/test"]
    :extra-deps
    {poly/client-transport         {:local/root "components/client-transport"}
     poly/http                     {:local/root "components/http"}
@@ -24,6 +25,7 @@
     poly/mcp-server               {:local/root "components/mcp-server"}
     poly/server-transport         {:local/root "components/server-transport"}
     poly/tools                    {:local/root "components/tools"}
+    poly/versions                 {:local/root "components/versions"}
     lambdaisland/kaocha           {:mvn/version "1.87.1366"}
     lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}
     org.clojure/clojure           {:mvn/version "1.12.0"}}
@@ -40,7 +42,8 @@
                          "components/log/test"
                          "components/mcp-client/test"
                          "components/mcp-server/test"
-                         "components/tools/test"]
+                         "components/tools/test"
+                         "components/versions/test"]
            :extra-deps
            {org.clojure/test.check                         {:mvn/version "1.1.1"}
             org.clojure/clojure                            {:mvn/version "1.12.0"}
@@ -48,6 +51,7 @@
             poly/in-memory-transport                       {:local/root "components/in-memory-transport"}
             poly/interop                                   {:local/root "components/interop"}
             poly/server-transport                          {:local/root "components/server-transport"}
+            poly/versions                                  {:local/root "components/versions"}
             ;; MCP Java SDK for cross-implementation testing
             io.modelcontextprotocol.sdk/mcp                {:mvn/version "0.11.2"}
             ;; MCP Java SDK Spring WebFlux support for HTTP transport
@@ -63,6 +67,7 @@
             poly/in-memory-transport      {:local/root "components/in-memory-transport"}
             poly/interop                  {:local/root "components/interop"}
             poly/server-transport         {:local/root "components/server-transport"}
+            poly/versions                 {:local/root "components/versions"}
             hato/hato                     {:mvn/version "1.0.0"}}
            :exec-fn   kaocha.runner/exec-fn
            :exec-args {}

@@ -13,7 +13,8 @@
                           "components/mcp-client/src"
                           "components/mcp-server/src"
                           "components/stdio-server/src"
-                          "components/tools/src"]
+                          "components/tools/src"
+                          "components/versions/src"]
            :test-paths ["components/client-transport/test"
                         "components/http-client/test"
                         "components/http-server/test"
@@ -23,7 +24,8 @@
                         "components/mcp-client/test"
                         "components/mcp-server/test"
                         "components/stdio-server/test"
-                        "components/tools/test"]
+                        "components/tools/test"
+                        "components/versions/test"]
            :skip-meta [:very-slow :integ]}
 
           {:kaocha.testable/id :integration
@@ -39,7 +41,8 @@
                           "components/mcp-client/src"
                           "components/mcp-server/src"
                           "components/stdio-server/src"
-                          "components/tools/src"]
+                          "components/tools/src"
+                          "components/versions/src"]
            :test-paths ["components/client-transport/test"
                         "components/http-server/test"
                         "components/in-memory-transport/test"
@@ -48,7 +51,8 @@
                         "components/mcp-client/test"
                         "components/mcp-server/test"
                         "components/stdio-server/test"
-                        "components/tools/test"]
+                        "components/tools/test"
+                        "components/versions/test"]
            :kaocha.filter/focus-meta [:integ]}]
 
   :plugins [:kaocha.plugin/randomize

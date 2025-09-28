@@ -1,19 +1,6 @@
 (ns mcp-clj.mcp-server.version
-  "MCP protocol version negotiation utilities")
-
-(def ^:private supported-versions
-  "Supported MCP protocol versions in descending order (newest first)"
-  ["2025-06-18" "2025-03-26" "2024-11-05"])
-
-(defn get-latest-version
-  "Get the latest supported protocol version"
-  []
-  (first supported-versions))
-
-(defn supported?
-  "Check if a protocol version is supported"
-  [version]
-  (boolean (some #{version} supported-versions)))
+  "MCP protocol version negotiation utilities"
+  (:require [mcp-clj.versions :as versions]))
 
 (defn negotiate-version
   "Negotiate protocol version according to MCP specification.
@@ -31,17 +18,17 @@
     - :client-was-supported? - Whether the client's version was supported
     - :supported-versions - List of all supported versions"
   [client-requested-version]
-  (let [client-supported?  (supported? client-requested-version)
+  (let [client-supported?  (versions/supported? client-requested-version)
         negotiated-version (if client-supported?
                              client-requested-version
                              ;; Find the highest version supported by both. For
                              ;; now, we assume client supports standard versions
                              ;; In a real implementation, we'd need client's
                              ;; supported versions
-                             (get-latest-version))]
+                             (versions/get-latest-version))]
     {:negotiated-version    negotiated-version
      :client-was-supported? client-supported?
-     :supported-versions    supported-versions}))
+     :supported-versions    versions/supported-versions}))
 
 ;; Version comparison utilities
 
