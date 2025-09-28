@@ -5,7 +5,7 @@
    [clojure.string :as str]
    [mcp-clj.http-client.core :as http-client]
    [mcp-clj.json-rpc.executor :as executor]
-   [mcp-clj.json-rpc.protocol :as protocol]
+   [mcp-clj.json-rpc.protocols :as protocols]
    [mcp-clj.log :as log])
   (:import
    (java.io BufferedReader
@@ -20,31 +20,28 @@
 ;; HTTP JSON-RPC Client
 
 (defrecord HTTPJSONRPCClient
-  [base-url ; Base URL for the MCP server
-   session-id ; atom holding Session ID for this client
-   pending-requests ; ConcurrentHashMap of request-id -> CompletableFuture
-   request-id-counter ; atom for generating unique request IDs
-   executor ; executor for async operations
-   running ; atom for controlling SSE reader
-   sse-connection ; atom holding SSE connection details
-   notification-handler] ; function to handle notifications
+           [base-url ; Base URL for the MCP server
+            session-id ; atom holding Session ID for this client
+            pending-requests ; ConcurrentHashMap of request-id -> CompletableFuture
+            request-id-counter ; atom for generating unique request IDs
+            executor ; executor for async operations
+            running ; atom for controlling SSE reader
+            sse-connection ; atom holding SSE connection details
+            notification-handler] ; function to handle notifications
 
-  protocol/JSONRPCClient
+  protocols/JSONRPCClient
 
   (send-request!
     [this method params timeout-ms]
     (http-send-request! this method params timeout-ms))
 
-
   (send-notification!
     [this method params]
     (http-send-notification! this method params))
 
-
   (close!
     [this]
     (close-http-json-rpc-client! this))
-
 
   (alive?
     [this]
@@ -168,14 +165,14 @@
   [{:keys [url session-id notification-handler num-threads]
     :or {num-threads 2}}]
   (let [client (->HTTPJSONRPCClient
-                 url
-                 (atom session-id)
-                 (ConcurrentHashMap.)
-                 (atom 0)
-                 (executor/create-executor num-threads)
-                 (atom true)
-                 (atom nil)
-                 notification-handler)]
+                url
+                (atom session-id)
+                (ConcurrentHashMap.)
+                (atom 0)
+                (executor/create-executor num-threads)
+                (atom true)
+                (atom nil)
+                notification-handler)]
     ;; Don't start SSE immediately - let it be established after first request with session
     client))
 
@@ -183,11 +180,11 @@
   "Send JSON-RPC request and return CompletableFuture with response"
   [client method params timeout-ms]
   (let [request-id (generate-request-id client)
-        request    {:jsonrpc "2.0"
-                    :id      request-id
-                    :method  method
-                    :params  params}
-        future     (CompletableFuture.)]
+        request {:jsonrpc "2.0"
+                 :id request-id
+                 :method method
+                 :params params}
+        future (CompletableFuture.)]
 
     ;; Store the future for this request
     (.put ^ConcurrentHashMap (:pending-requests client) request-id future)
@@ -198,18 +195,18 @@
      (fn []
        (try
          (log/debug :client/send "Send request" {:method method})
-         (let [url      (str (:base-url client) "/")
-               headers  (make-headers client)
+         (let [url (str (:base-url client) "/")
+               headers (make-headers client)
                response (http-client/http-post url
-                                               {:headers          headers
-                                                :body             (json/write-str request)
-                                                :content-type     :json
-                                                :accept           :json
-                                                :as               :json
+                                               {:headers headers
+                                                :body (json/write-str request)
+                                                :content-type :json
+                                                :accept :json
+                                                :as :json
                                                 :throw-exceptions false})]
            (log/debug :client/send
-             {:msg      "Receive response"
-              :response response})
+                      {:msg "Receive response"
+                       :response response})
            (if (= 200 (:status response))
              (do
                ;; Update session ID if provided
@@ -235,15 +232,15 @@
              (let [error-msg (str "HTTP error: " (:status response) " - "
                                   (or (:body response) ""))]
                (log/error
-                   :http/request-failed
-                 {:status (:status response)
-                  :body   (:body response)})
+                :http/request-failed
+                {:status (:status response)
+                 :body (:body response)})
                (.completeExceptionally
                 future
                 (ex-info
                  error-msg
                  {:status (:status response)
-                  :body   (:body response)})))))
+                  :body (:body response)})))))
          (catch Exception e
            (log/error :http/request-error {:error e :method method})
            (.completeExceptionally future e)))))
@@ -263,24 +260,24 @@
   (executor/submit! (:executor client)
                     (fn []
                       (try
-                        (let [url          (str (:base-url client) "/")
-                              headers      (make-headers client)
+                        (let [url (str (:base-url client) "/")
+                              headers (make-headers client)
                               notification {:jsonrpc "2.0"
-                                            :method  method
-                                            :params  params}
-                              response     (http-client/http-post
-                                            url
-                                            {:headers          headers
-                                             :body             (json/write-str notification)
-                                             :content-type     :json
-                                             :throw-exceptions false})]
+                                            :method method
+                                            :params params}
+                              response (http-client/http-post
+                                        url
+                                        {:headers headers
+                                         :body (json/write-str notification)
+                                         :content-type :json
+                                         :throw-exceptions false})]
                           (when (not= 200 (:status response))
                             (log/warn :http/notification-failed
-                              {:status (:status response)
-                               :body   (:body response)})))
+                                      {:status (:status response)
+                                       :body (:body response)})))
                         (catch Exception e
                           (log/error :http/notification-error
-                            {:error e :method method}))))))
+                                     {:error e :method method}))))))
 
 (defn close-http-json-rpc-client!
   "Close HTTP JSON-RPC client"
@@ -308,12 +305,12 @@
 (defn send-request!
   "Send JSON-RPC request and return CompletableFuture with response"
   [client method params timeout-ms]
-  (protocol/send-request! client method params timeout-ms))
+  (protocols/send-request! client method params timeout-ms))
 
 (defn send-notification!
   "Send JSON-RPC notification (no response expected)"
   [client method params]
-  (protocol/send-notification! client method params))
+  (protocols/send-notification! client method params))
 
 (defn update-session-id!
   "Update the session ID and restart SSE connection if needed"

@@ -1,19 +1,19 @@
 (ns mcp-clj.client-transport.stdio
   "Stdio transport implementation for MCP client"
   (:require
-    [clojure.java.process :as process]
-    [mcp-clj.client-transport.protocol :as transport-protocol]
-    [mcp-clj.json-rpc.protocol :as json-rpc-protocol]
-    [mcp-clj.json-rpc.stdio-client :as stdio-client]
-    [mcp-clj.log :as log])
+   [clojure.java.process :as process]
+   [mcp-clj.client-transport.protocol :as transport-protocol]
+   [mcp-clj.json-rpc.protocols :as json-rpc-protocol]
+   [mcp-clj.json-rpc.stdio-client :as stdio-client]
+   [mcp-clj.log :as log])
   (:import
-    (java.io
-      BufferedReader
-      BufferedWriter
-      InputStreamReader
-      OutputStreamWriter)
-    (java.util.concurrent
-      TimeUnit)))
+   (java.io
+    BufferedReader
+    BufferedWriter
+    InputStreamReader
+    OutputStreamWriter)
+   (java.util.concurrent
+    TimeUnit)))
 
 ;; Process Management
 
@@ -54,9 +54,9 @@
 ;; Transport Implementation
 
 (defrecord StdioTransport
-  [server-command
-   process-info
-   json-rpc-client] ; JSONRPClient instance
+           [server-command
+            process-info
+            json-rpc-client] ; JSONRPClient instance
 
   transport-protocol/Transport
 
@@ -64,11 +64,9 @@
     [_ method params timeout-ms]
     (json-rpc-protocol/send-request! json-rpc-client method params timeout-ms))
 
-
   (send-notification!
     [_ method params]
     (json-rpc-protocol/send-notification! json-rpc-client method params))
-
 
   (close!
     [_]
@@ -85,12 +83,10 @@
         (catch Exception e
           (log/error :client/process-close-error {:error e})))))
 
-
   (alive?
     [_]
     (and (json-rpc-protocol/alive? json-rpc-client)
          (.isAlive ^Process (:process process-info))))
-
 
   (get-json-rpc-client
     [_]
@@ -103,6 +99,6 @@
         {:keys [stdin stdout]} process-info
         json-rpc-client (stdio-client/create-json-rpc-client stdout stdin)]
     (->StdioTransport
-      server-command
-      process-info
-      json-rpc-client)))
+     server-command
+     process-info
+     json-rpc-client)))

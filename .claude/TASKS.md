@@ -109,7 +109,7 @@ Include REFINE to refine the spec
       polylith style component that can be used by both server and
       client
 
-- [ ] merge mcp-clj.json-rpc.protocol and mcp-clj.json-rpc.protocols
+- [x] merge mcp-clj.json-rpc.protocol and mcp-clj.json-rpc.protocols
 
 - [ ] extend the interop to enable use of SSE transport ? not sure this
       is worth doing still
