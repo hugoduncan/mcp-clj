@@ -116,6 +116,11 @@ Include REFINE to refine the spec
 	  server functions:
       https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-06-18/server/prompts.mdx
 
+- [ ] add mcp-client support for resources, similar to the support for
+      tools and prompts.
+	  server functions:
+	  https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-06-18/server/resources.mdx
+
 - [ ] extend the interop to enable use of SSE transport ? not sure this
       is worth doing still
 

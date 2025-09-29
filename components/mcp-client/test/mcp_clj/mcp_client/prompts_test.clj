@@ -78,7 +78,7 @@
                          :description "Another test prompt"}]
           handler (fn [request _params]
                     (let [method (:method request)]
-                        (case method
+                      (case method
                         "prompts/list" {:prompts mock-prompts}
                         nil)))
           client (create-test-client-with-handler handler)]
@@ -97,7 +97,7 @@
   (testing "list-prompts-impl handles pagination correctly"
     (let [handler (fn [request params]
                     (let [method (:method request)]
-                        (case method
+                      (case method
                         "prompts/list"
                         (if (:cursor params)
                           {:prompts [{:name "page2-prompt"}]}
