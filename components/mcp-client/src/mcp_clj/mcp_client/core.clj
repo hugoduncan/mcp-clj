@@ -4,6 +4,7 @@
     [mcp-clj.client-transport.factory :as transport-factory]
     [mcp-clj.client-transport.protocol :as transport-protocol]
     [mcp-clj.log :as log]
+    [mcp-clj.mcp-client.prompts :as prompts]
     [mcp-clj.mcp-client.session :as session]
     [mcp-clj.mcp-client.tools :as tools]
     [mcp-clj.mcp-client.transport :as transport]
@@ -238,3 +239,38 @@
   Uses cached tools if available, otherwise queries the server."
   [client]
   (tools/available-tools?-impl client))
+
+;; Prompt Calling API
+
+(defn list-prompts
+  "Discover available prompts from the server.
+
+  Returns a CompletableFuture that will contain a map with :prompts key
+  containing vector of prompt definitions. Each prompt has :name, :description,
+  and :arguments.
+
+  Supports pagination with optional options map containing :cursor."
+  ([client]
+   (prompts/list-prompts-impl client))
+  ([client options]
+   (prompts/list-prompts-impl client options)))
+
+(defn get-prompt
+  "Get a specific prompt with optional arguments for templating.
+
+  Returns a CompletableFuture that will contain the prompt result on success.
+  The future will complete exceptionally on error.
+
+  Arguments are used for template substitution in prompt messages."
+  ([client prompt-name]
+   (prompts/get-prompt-impl client prompt-name))
+  ([client prompt-name arguments]
+   (prompts/get-prompt-impl client prompt-name arguments)))
+
+(defn available-prompts?
+  "Check if any prompts are available from the server.
+
+  Returns true if prompts are available, false otherwise.
+  Uses cached prompts if available, otherwise queries the server."
+  [client]
+  (prompts/available-prompts?-impl client))
