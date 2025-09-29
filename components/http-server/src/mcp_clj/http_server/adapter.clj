@@ -25,6 +25,11 @@
   [^HttpExchange exchange status num-bytes]
   (.sendResponseHeaders exchange status num-bytes))
 
+(defn- flush-response!
+  [^HttpExchange exchange]
+  (let  [os (.getResponseBody exchange)]
+    (.flush os)))
+
 (defn- close-response-body!
   [^HttpExchange exchange]
   (.close (.getResponseBody exchange)))
@@ -117,7 +122,8 @@
                              (send-ring-response exchange response)))
                          (catch Exception e
                            (.printStackTrace e)
-                           (send-response-headers! exchange 500 0))
+                           (send-response-headers! exchange 500 0)
+                           (flush-response! exchange))
                          ;; Removed exchange close from finally block
                          )))]
     (.createContext server "/" handler-fn)

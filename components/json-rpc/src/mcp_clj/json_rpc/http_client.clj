@@ -186,11 +186,11 @@
   "Send JSON-RPC request and return CompletableFuture with response"
   [client method params timeout-ms]
   (let [request-id (generate-request-id client)
-        request {:jsonrpc "2.0"
-                 :id request-id
-                 :method method
-                 :params params}
-        future (CompletableFuture.)]
+        request    {:jsonrpc "2.0"
+                    :id      request-id
+                    :method  method
+                    :params  params}
+        future     (CompletableFuture.)]
 
     ;; Store the future for this request
     (.put ^ConcurrentHashMap (:pending-requests client) request-id future)
@@ -201,17 +201,17 @@
       (fn []
         (try
           (log/debug :client/send "Send request" {:method method})
-          (let [url (str (:base-url client) "/")
-                headers (make-headers client)
+          (let [url      (str (:base-url client) "/")
+                headers  (make-headers client)
                 response (http-client/http-post url
-                                                {:headers headers
-                                                 :body (json/write-str request)
-                                                 :content-type :json
-                                                 :accept :json
-                                                 :as :json
+                                                {:headers          headers
+                                                 :body             (json/write-str request)
+                                                 :content-type     :json
+                                                 :accept           :json
+                                                 :as               :json
                                                  :throw-exceptions false})]
             (log/debug :client/send
-                       {:msg "Receive response"
+                       {:msg      "Receive response"
                         :response response})
             (if (= 200 (:status response))
               (do
@@ -240,25 +240,25 @@
                 (log/error
                   :http/request-failed
                   {:status (:status response)
-                   :body (:body response)})
+                   :body   (:body response)})
                 (.completeExceptionally
                   future
                   (ex-info
                     error-msg
                     {:status (:status response)
-                     :body (:body response)})))))
+                     :body   (:body response)})))))
           (catch Exception e
             (log/error :http/request-error {:error e :method method})
-            (.completeExceptionally future e))))))
+            (.completeExceptionally future e)))))
 
-  ;; Set timeout
-  (try
-    (.get future timeout-ms TimeUnit/MILLISECONDS)
-    (catch Exception e
-      ;; Remove from pending if timeout/error
-      (.remove ^ConcurrentHashMap (:pending-requests client) request-id)
-      (throw e)))
-  future)
+    ;; Set timeout
+    (try
+      (.get future timeout-ms TimeUnit/MILLISECONDS)
+      (catch Exception e
+        ;; Remove from pending if timeout/error
+        (.remove ^ConcurrentHashMap (:pending-requests client) request-id)
+        (throw e)))
+    future))
 
 (defn http-send-notification!
   "Send JSON-RPC notification (no response expected)"

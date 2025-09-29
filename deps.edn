@@ -68,10 +68,12 @@
             poly/interop                  {:local/root "components/interop"}
             poly/server-transport         {:local/root "components/server-transport"}
             poly/versions                 {:local/root "components/versions"}
-            hato/hato                     {:mvn/version "1.0.0"}}
+            hato/hato                     {:mvn/version "1.0.0"}
+            org.slf4j/slf4j-nop           {:mvn/version "2.0.17"}}
            :exec-fn   kaocha.runner/exec-fn
            :exec-args {}
            :jvm-opts  ["-XX:-OmitStackTraceInFastThrow"
+                       "--enable-native-access=ALL-UNNAMED"
                        "-Dclojure.main.report=stderr"]
            :main-opts ["-m" "kaocha.runner"]}
 
