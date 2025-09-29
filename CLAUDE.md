@@ -151,6 +151,13 @@ clj -M:stdio-server
 - Uses Kaocha test runner with plugins for randomization, filtering, and profiling
 - Integration tests marked with `^:integ` metadata for server startup or external processes
 
+**Transport Testing Coverage:**
+- **In-Memory**: Fast bidirectional testing without external processes
+- **STDIO**: JSON-RPC over stdin/stdout with mock streams
+- **HTTP/SSE**: Real HTTP servers for integration testing
+- **Cross-Implementation**: Java SDK ↔ Clojure client/server compatibility testing
+- **Protocol Compliance**: Tests ensure MCP specification adherence across all transports
+
 ### MCP Protocol Integration
 - Implements both server-side and client-side MCP with support for tools, prompts, and resources
 - Supports multiple transports: SSE (Server-Sent Events), STDIO, HTTP, and in-memory for testing
