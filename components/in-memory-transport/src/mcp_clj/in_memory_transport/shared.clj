@@ -1,30 +1,30 @@
 (ns mcp-clj.in-memory-transport.shared
   "Shared transport state for in-memory MCP client/server communication"
   (:require
-   [mcp-clj.in-memory-transport.atomic :as atomic]
-   [mcp-clj.in-memory-transport.queue :as queue])
+    [mcp-clj.in-memory-transport.atomic :as atomic]
+    [mcp-clj.in-memory-transport.queue :as queue])
   (:import
-   (java.util.concurrent
-    CompletableFuture)))
+    (java.util.concurrent
+      CompletableFuture)))
 
 (defrecord SharedTransport
-    [client-to-server-queue ; LinkedBlockingQueue for client->server messages
-     server-to-client-queue ; LinkedBlockingQueue for server->client messages
-     alive? ; AtomicBoolean for transport status
-     request-id-counter ; AtomicLong for generating request IDs
-     pending-requests ; Atom containing map of request-id -> CompletableFuture
-     server-handler]) ; Server message handler function ; Server message handler function
+  [client-to-server-queue ; LinkedBlockingQueue for client->server messages
+   server-to-client-queue ; LinkedBlockingQueue for server->client messages
+   alive? ; AtomicBoolean for transport status
+   request-id-counter ; AtomicLong for generating request IDs
+   pending-requests ; Atom containing map of request-id -> CompletableFuture
+   server-handler]) ; Server message handler function ; Server message handler function
 
 (defn create-shared-transport
   "Create shared transport state for connecting client and server in-memory"
   []
   (->SharedTransport
-   (queue/create-queue)
-   (queue/create-queue)
-   (atomic/create-atomic-boolean true)
-   (atomic/create-atomic-long 0)
-   (atom {})
-   (atom nil)))
+    (queue/create-queue)
+    (queue/create-queue)
+    (atomic/create-atomic-boolean true)
+    (atomic/create-atomic-long 0)
+    (atom {})
+    (atom nil)))
 
 ;; Type-hinted wrapper functions for queue operations
 

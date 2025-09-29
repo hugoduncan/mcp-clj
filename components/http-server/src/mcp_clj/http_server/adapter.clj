@@ -1,16 +1,16 @@
 (ns mcp-clj.http-server.adapter
   "Adapter for Java's com.sun.net.httpserver.HttpServer with SSE support"
   (:require
-   [clojure.string :as str]
-   [mcp-clj.log :as log])
+    [clojure.string :as str]
+    [mcp-clj.log :as log])
   (:import
-   (com.sun.net.httpserver
-    HttpExchange
-    HttpHandler
-    HttpServer)
-   (java.net
-    InetSocketAddress
-    URLDecoder)))
+    (com.sun.net.httpserver
+      HttpExchange
+      HttpHandler
+      HttpServer)
+    (java.net
+      InetSocketAddress
+      URLDecoder)))
 
 (defn- set-response-header!
   [^HttpExchange exchange k v]
@@ -24,6 +24,11 @@
 (defn- send-response-headers!
   [^HttpExchange exchange status num-bytes]
   (.sendResponseHeaders exchange status num-bytes))
+
+(defn- flush-response!
+  [^HttpExchange exchange]
+  (let  [os (.getResponseBody exchange)]
+    (.flush os)))
 
 (defn- close-response-body!
   [^HttpExchange exchange]
@@ -51,7 +56,7 @@
    :query-params      (fn query-params
                         []
                         (parse-query
-                         (.getRawQuery (.getRequestURI exchange))))
+                          (.getRawQuery (.getRequestURI exchange))))
    :scheme            :http
    :request-method    (-> exchange .getRequestMethod .toLowerCase keyword)
    :headers           (into {}
@@ -101,23 +106,24 @@
   (let [server     (HttpServer/create (InetSocketAddress. port) 0)
         handler-fn (reify HttpHandler
                      (handle
-                         [_ exchange]
+                       [_ exchange]
                        (try
                          (let [request  (exchange->request-map exchange)
                                response (handler request)]
                            (log/info
-                               :http/request
+                             :http/request
                              {:request
                               (select-keys
-                               request
-                               [:uri :method :headers])
+                                request
+                                [:uri :method :headers])
                               :response response})
                            (if (fn? (:body response))
                              (send-streaming-response exchange response)
                              (send-ring-response exchange response)))
                          (catch Exception e
                            (.printStackTrace e)
-                           (send-response-headers! exchange 500 0))
+                           (send-response-headers! exchange 500 0)
+                           (flush-response! exchange))
                          ;; Removed exchange close from finally block
                          )))]
     (.createContext server "/" handler-fn)

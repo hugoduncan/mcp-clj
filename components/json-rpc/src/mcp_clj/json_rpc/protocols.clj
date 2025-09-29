@@ -1,8 +1,8 @@
 (ns mcp-clj.json-rpc.protocols
   "Protocols for JSON-RPC client and server operations"
   (:import
-   (java.util.concurrent
-    CompletableFuture)))
+    (java.util.concurrent
+      CompletableFuture)))
 
 (defprotocol JSONRPCClient
   "Protocol for JSON-RPC client implementations that handle MCP communication"

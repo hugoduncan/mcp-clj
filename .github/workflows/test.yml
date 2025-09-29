@@ -1,0 +1,51 @@
+name: Tests
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        java: [25, 21]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: ${{ matrix.java }}
+
+    - name: Install Clojure tools
+      uses: DeLaGuardo/setup-clojure@12.5
+      with:
+        cli: 1.11.1.1429
+        cljstyle: 0.15.0
+
+    - name: Cache Clojure dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.m2/repository
+          ~/.gitlibs
+          ~/.clojure
+        key: ${{ runner.os }}-clojure-${{ hashFiles('**/deps.edn') }}
+        restore-keys: |
+          ${{ runner.os }}-clojure-
+
+    - name: Check code style
+      run: cljstyle check
+
+    - name: Run unit tests
+      run: clojure -M:kaocha:dev:test
+
+    - name: Run integration tests
+      run: clojure -M:kaocha:dev:test --focus :integration

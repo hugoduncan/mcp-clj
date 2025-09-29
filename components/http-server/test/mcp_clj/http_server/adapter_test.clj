@@ -1,15 +1,15 @@
 (ns mcp-clj.http-server.adapter-test
   "Tests for adapter for Java's HttpServer"
   (:require
-   [clojure.test :refer [deftest is testing use-fixtures]]
-   [mcp-clj.http :as http]
-   [mcp-clj.http-server.adapter :as adapter])
+    [clojure.test :refer [deftest is testing use-fixtures]]
+    [mcp-clj.http :as http]
+    [mcp-clj.http-server.adapter :as adapter])
   (:import
-   (java.io
-    OutputStream)
-   (java.net
-    HttpURLConnection
-    URL)))
+    (java.io
+      OutputStream)
+    (java.net
+      HttpURLConnection
+      URL)))
 
 (defn test-handler
   [request]
@@ -18,24 +18,24 @@
             (http/content-type "text/plain"))
 
     "/stream" (-> (http/response
-                   (fn []
-                     (with-open [^OutputStream out (:response-body request)]
-                       (doseq [n (range 3)]
-                         (.write out (.getBytes (str "data: " n "\n\n"))))
-                       (.flush out))))
+                    (fn []
+                      (with-open [^OutputStream out (:response-body request)]
+                        (doseq [n (range 3)]
+                          (.write out (.getBytes (str "data: " n "\n\n"))))
+                        (.flush out))))
                   (http/content-type "text/event-stream"))
 
     "/echo-headers" (-> (http/response
-                         (pr-str {:headers (:headers request)}))
+                          (pr-str {:headers (:headers request)}))
                         (http/content-type "application/edn"))
 
     "/echo-query" (-> (http/response
-                       (pr-str {:query-string (:query-string request)
-                                :query-params ((:query-params request))}))
+                        (pr-str {:query-string (:query-string request)
+                                 :query-params ((:query-params request))}))
                       (http/content-type "application/edn"))
 
     "/post-echo" (-> (http/response
-                      (slurp (:body request)))
+                       (slurp (:body request)))
                      (http/content-type "text/plain"))
 
     "/throw-error" (throw (RuntimeException. "Deliberate test error"))

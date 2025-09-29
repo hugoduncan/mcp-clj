@@ -80,8 +80,8 @@
     (log/info :java-sdk/closing-client)
     (try
       (if async?
-        (.close ^McpAsyncClient client)
-        (.close ^McpSyncClient client))
+        (.closeGracefully ^McpAsyncClient client)
+        (.closeGracefully ^McpSyncClient client))
       (.close ^StdioClientTransport transport)
       (catch Exception e
         (log/warn :java-sdk/close-error {:error e})))))
@@ -295,7 +295,8 @@
 
   Args can be:
   - A string command (e.g., \"node server.js\")
-  - A map with :command and optional :args (e.g., {:command \"node\" :args [\"server.js\"]})"
+  - A map with :command and optional :args
+     (e.g., {:command \"node\" :args [\"server.js\"]})"
   [command-spec]
   (let [[cmd args] (cond
                      (string? command-spec)
@@ -305,7 +306,10 @@
                      [(:command command-spec) (:args command-spec)]
 
                      :else
-                     (throw (ex-info "Invalid command spec" {:command-spec command-spec})))
+                     (throw
+                       (ex-info
+                         "Invalid command spec"
+                         {:command-spec command-spec})))
 
         ;; Build ServerParameters using the builder pattern
         builder       (ServerParameters/builder cmd)

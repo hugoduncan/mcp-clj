@@ -1,21 +1,22 @@
-{:files   {:extensions #{".clj" ".cljs" ".cljc" ".edn"}}
- :rules   {:blank-lines {:max-consecutive   1
-                         :trim-consecutive? true
-                         :padding-lines     1
-                         :insert-padding?   true}
-           :whitespace  {:remove-surrounding? true
-                         :remove-trailing?    true
-                         :insert-missing?     true}
-           :eof-newline {:enabled?         true
-                         :trailing-blanks? false}
-           :comments    {#_#_:inline-prefix  " "
-                         #_#_:leading-prefix " "}
-           :vars        {:enabled? true}
-           :functions   {:enabled? true}
-           :types       {:types?     true
-                         :protocols? true
-                         :reifies?   true
-                         :proxies?   true}
-           :namespaces  {:indent-size        0
-                         :break-libs?        true
-                         :import-break-width 0}}}
+;; -*- mode: clojure -*-
+{:files {:extensions #{".clj" ".cljs" ".cljc" ".edn"}}
+ :rules {:blank-lines {:max-consecutive   1
+                       :trim-consecutive? true
+                       :padding-lines     1
+                       :insert-padding?   true}
+         :whitespace  {:remove-surrounding? true
+                       :remove-trailing?    true
+                       :insert-missing?     true}
+         :eof-newline {:enabled?	 true
+                       :trailing-blanks? false}
+         :comments    {#_#_:inline-prefix  " "
+                       #_#_:leading-prefix " "}
+         :vars        {:enabled? true}
+         :functions   {:enabled? true}
+         :types       {:types?     true
+                       :protocols? true
+                       :reifies?   true
+                       :proxies?   true}
+         :namespaces  {:indent-size        0
+                       :break-libs?        true
+                       :import-break-width 0}}}
