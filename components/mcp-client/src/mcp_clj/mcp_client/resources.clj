@@ -1,0 +1,129 @@
+(ns mcp-clj.mcp-client.resources
+  "Resource access implementation for MCP client"
+  (:require
+    [mcp-clj.log :as log]
+    [mcp-clj.mcp-client.transport :as transport])
+  (:import
+    (java.util.concurrent
+      CompletableFuture)))
+
+(defn- get-resources-cache
+  "Get or create resources cache in client session"
+  [client]
+  (let [session-atom (:session client)]
+    (or (:resources-cache @session-atom)
+        (let [cache (atom nil)]
+          (swap! session-atom assoc :resources-cache cache)
+          cache))))
+
+(defn- cache-resources!
+  "Cache discovered resources in client session"
+  [client resources]
+  (let [cache (get-resources-cache client)]
+    (reset! cache resources)
+    resources))
+
+(defn- get-cached-resources
+  "Get cached resources from client session"
+  [client]
+  @(get-resources-cache client))
+
+(defn list-resources-impl
+  "Discover available resources from the server.
+
+  Returns a CompletableFuture that will contain a map with :resources key
+  containing vector of resource definitions. Each resource
+  has :uri, :name, and optional :title, :description, :mimeType, :size, :annotations.
+
+  Supports pagination with optional :cursor parameter."
+  ^CompletableFuture [client & [{:keys [cursor]}]]
+  (try
+    (let [transport (:transport client)
+          params (cond-> {}
+                   cursor (assoc :cursor cursor))
+          response (transport/send-request!
+                     transport
+                     "resources/list"
+                     params
+                     30000)]
+      ;; Transform the response future to handle caching and return resources
+      (.thenApply response
+                  (reify java.util.function.Function
+                    (apply
+                      [_ result]
+                      (if-let [resources (:resources result)]
+                        (do
+                          (when-not cursor ; Only cache first page
+                            (cache-resources! client resources))
+                          (cond-> {:resources resources}
+                            (:nextCursor result)
+                            (assoc :nextCursor (:nextCursor result))))
+                        {:resources []})))))
+    (catch Exception e
+      (log/error :client/list-resources-error {:error (.getMessage e)})
+      ;; Return a failed future for immediate exceptions
+      (java.util.concurrent.CompletableFuture/failedFuture e))))
+
+(defn read-resource-impl
+  "Read a specific resource by URI.
+
+  Returns a CompletableFuture that will contain the resource content on success.
+  For errors, the future contains a map with :isError true.
+
+  Content can be text (with :text field) or binary (with :blob field containing base64)."
+  ^CompletableFuture [client resource-uri]
+  (log/info :client/read-resource-start {:resource-uri resource-uri})
+  (try
+    (let [transport (:transport client)
+          params {:uri resource-uri}]
+      (.thenApply
+        (transport/send-request!
+          transport
+          "resources/read"
+          params
+          30000)
+        (reify java.util.function.Function
+          (apply
+            [_ result]
+            (let [is-error (:isError result false)]
+              (if is-error
+                (do
+                  (log/error :client/read-resource-error
+                             {:resource-uri resource-uri
+                              :content (:content result)})
+                  ;; Return error map instead of throwing
+                  {:isError true
+                   :resource-uri resource-uri
+                   :content (:content result)})
+                (do
+                  (log/info :client/read-resource-success
+                            {:resource-uri resource-uri})
+                  ;; Return the resource content
+                  result)))))))
+    (catch Exception e
+      ;; Return a failed future for immediate exceptions (like transport errors)
+      (log/error :client/read-resource-error {:resource-uri resource-uri
+                                              :error (.getMessage e)
+                                              :ex e})
+      (CompletableFuture/failedFuture
+        (ex-info
+          (str "Resource read failed: " resource-uri)
+          {:resource-uri resource-uri
+           :error (.getMessage e)}
+          e)))))
+
+(defn available-resources?-impl
+  "Check if any resources are available from the server.
+
+  Returns true if resources are available, false otherwise.
+  Uses cached resources if available, otherwise queries the server."
+  [client]
+  (try
+    (if-let [cached-resources (get-cached-resources client)]
+      (boolean (seq cached-resources))
+      (when-let [result-future (list-resources-impl client)]
+        (let [result @result-future]
+          (boolean (seq (:resources result))))))
+    (catch Exception e
+      (log/debug :client/available-resources-error {:error (.getMessage e)})
+      false)))

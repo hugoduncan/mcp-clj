@@ -5,6 +5,7 @@
     [mcp-clj.client-transport.protocol :as transport-protocol]
     [mcp-clj.log :as log]
     [mcp-clj.mcp-client.prompts :as prompts]
+    [mcp-clj.mcp-client.resources :as resources]
     [mcp-clj.mcp-client.session :as session]
     [mcp-clj.mcp-client.tools :as tools]
     [mcp-clj.mcp-client.transport :as transport]
@@ -274,3 +275,36 @@
   Uses cached prompts if available, otherwise queries the server."
   [client]
   (prompts/available-prompts?-impl client))
+
+;; Resource API
+
+(defn list-resources
+  "Discover available resources from the server.
+
+  Returns a CompletableFuture that will contain a map with :resources key
+  containing vector of resource definitions. Each resource has :uri, :name,
+  and optional :title, :description, :mimeType, :size, :annotations.
+
+  Supports pagination with optional options map containing :cursor."
+  ([client]
+   (resources/list-resources-impl client))
+  ([client options]
+   (resources/list-resources-impl client options)))
+
+(defn read-resource
+  "Read a specific resource by URI.
+
+  Returns a CompletableFuture that will contain the resource content on success.
+  The future will complete exceptionally on error.
+
+  Content can be text (with :text field) or binary (with :blob field containing base64)."
+  [client resource-uri]
+  (resources/read-resource-impl client resource-uri))
+
+(defn available-resources?
+  "Check if any resources are available from the server.
+
+  Returns true if resources are available, false otherwise.
+  Uses cached resources if available, otherwise queries the server."
+  [client]
+  (resources/available-resources?-impl client))
