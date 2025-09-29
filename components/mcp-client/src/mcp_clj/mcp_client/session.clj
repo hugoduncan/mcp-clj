@@ -1,7 +1,7 @@
 (ns mcp-clj.mcp-client.session
   "MCP client session state management"
   (:require
-    [mcp-clj.log :as log]))
+   [mcp-clj.log :as log]))
 
 ;; Session States
 
@@ -10,13 +10,13 @@
 ;; Session Record
 
 (defrecord Session
-  [state ; Current session state
-   client-info ; Client information sent in initialize
-   capabilities ; Client capabilities
-   server-info ; Server info from initialize response
-   server-capabilities ; Server capabilities from initialize response
-   protocol-version ; Negotiated protocol version
-   error-info]) ; Error information if state is :error
+           [state ; Current session state
+            client-info ; Client information sent in initialize
+            capabilities ; Client capabilities
+            server-info ; Server info from initialize response
+            server-capabilities ; Server capabilities from initialize response
+            protocol-version ; Negotiated protocol version
+            error-info]) ; Error information if state is :error
 
 ;; Session State Transitions
 
@@ -42,13 +42,13 @@
          capabilities {}
          protocol-version "2025-06-18"}}]
   (->Session
-    :disconnected
-    client-info
-    capabilities
-    nil ; server-info
-    nil ; server-capabilities
-    protocol-version
-    nil)) ; error-info
+   :disconnected
+   client-info
+   capabilities
+   nil ; server-info
+   nil ; server-capabilities
+   protocol-version
+   nil)) ; error-info
 
 (defn transition-state!
   "Transition session to new state with optional data"
@@ -86,10 +86,56 @@
 (defn get-session-info
   "Get human-readable session information"
   [session]
-  {:state               (:state session)
-   :protocol-version    (:protocol-version session)
-   :client-info         (:client-info session)
+  {:state (:state session)
+   :protocol-version (:protocol-version session)
+   :client-info (:client-info session)
    :client-capabilities (:capabilities session)
-   :server-info         (:server-info session)
+   :server-info (:server-info session)
    :server-capabilities (:server-capabilities session)
-   :error-info          (:error-info session)})
+   :error-info (:error-info session)})
+
+(defn server-supports?
+  "Check if server supports a specific capability.
+
+  Capability path is a vector of keys, e.g., [:tools] or [:resources :subscribe].
+  Returns boolean indicating if the capability is present and truthy."
+  [session capability-path]
+  (boolean (get-in (:server-capabilities session) capability-path)))
+
+(defn server-supports-tools?
+  "Check if server supports tools capability"
+  [session]
+  (server-supports? session [:tools]))
+
+(defn server-supports-prompts?
+  "Check if server supports prompts capability"
+  [session]
+  (server-supports? session [:prompts]))
+
+(defn server-supports-resources?
+  "Check if server supports resources capability"
+  [session]
+  (server-supports? session [:resources]))
+
+(defn server-supports-sampling?
+  "Check if server supports sampling capability"
+  [session]
+  (server-supports? session [:sampling]))
+
+(defn client-supports?
+  "Check if client supports a specific capability.
+
+  Capability path is a vector of keys, e.g., [:sampling] or [:notifications].
+  Returns boolean indicating if the capability is present and truthy."
+  [session capability-path]
+  (boolean (get-in (:capabilities session) capability-path)))
+
+(defn client-supports-sampling?
+  "Check if client supports sampling capability"
+  [session]
+  (client-supports? session [:sampling]))
+
+(defn client-supports-notifications?
+  "Check if client supports notification handling"
+  [session]
+  (client-supports? session [:notifications]))
