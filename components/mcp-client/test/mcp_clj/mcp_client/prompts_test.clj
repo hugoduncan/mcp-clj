@@ -48,16 +48,26 @@
   (ensure-in-memory-transport-registered!)
   (let [shared-transport (shared/create-shared-transport)
         session (atom {})
-        transport ((:create-client-transport shared-transport)
-                   {:shared-transport shared-transport})
-        server ((:create-server-transport shared-transport)
-                {:shared-transport shared-transport}
-                handler)
-        client {:transport transport
-                :session session}]
-    {:client client
+        ;; Create server using lazy-loaded function
+        create-server-fn (do
+                           (require 'mcp-clj.in-memory-transport.server)
+                           (ns-resolve
+                             'mcp-clj.in-memory-transport.server
+                             'create-in-memory-server))
+        server (create-server-fn
+                 {:shared shared-transport}
+                 {"prompts/list" handler
+                  "prompts/get" handler})
+        ;; Create transport using lazy-loaded function
+        create-transport-fn (do (require 'mcp-clj.in-memory-transport.client)
+                                (ns-resolve
+                                  'mcp-clj.in-memory-transport.client
+                                  'create-transport))
+        transport (create-transport-fn {:shared shared-transport})]
+    {:session session
+     :transport transport
      :server server
-     :stop-fn #(stop-server! server)}))
+     :shared-transport shared-transport}))
 
 (deftest test-list-prompts-success
   (testing "list-prompts-impl returns available prompts"
@@ -66,11 +76,12 @@
                          :arguments [{:name "input" :description "Test input"}]}
                         {:name "another-prompt"
                          :description "Another test prompt"}]
-          handler (fn [method _params]
-                    (case method
-                      "prompts/list" {:prompts mock-prompts}
-                      nil))
-          {:keys [client stop-fn]} (create-test-client-with-handler handler)]
+          handler (fn [request _params]
+                    (let [method (:method request)]
+                        (case method
+                        "prompts/list" {:prompts mock-prompts}
+                        nil)))
+          client (create-test-client-with-handler handler)]
 
       (try
         (let [result-future (prompts/list-prompts-impl client)
@@ -80,19 +91,20 @@
           (is (= 2 (count (:prompts result)))))
 
         (finally
-          (stop-fn))))))
+          (stop-server! (:server client)))))))
 
 (deftest test-list-prompts-with-pagination
   (testing "list-prompts-impl handles pagination correctly"
-    (let [handler (fn [method params]
-                    (case method
-                      "prompts/list"
-                      (if (:cursor params)
-                        {:prompts [{:name "page2-prompt"}]}
-                        {:prompts [{:name "page1-prompt"}]
-                         :nextCursor "page2"})
-                      nil))
-          {:keys [client stop-fn]} (create-test-client-with-handler handler)]
+    (let [handler (fn [request params]
+                    (let [method (:method request)]
+                        (case method
+                        "prompts/list"
+                        (if (:cursor params)
+                          {:prompts [{:name "page2-prompt"}]}
+                          {:prompts [{:name "page1-prompt"}]
+                           :nextCursor "page2"})
+                        nil)))
+          client (create-test-client-with-handler handler)]
 
       (try
         ;; Test first page
@@ -110,7 +122,7 @@
           (is (nil? (:nextCursor result))))
 
         (finally
-          (stop-fn))))))
+          (stop-server! (:server client)))))))
 
 (deftest test-get-prompt-success
   (testing "get-prompt-impl returns specific prompt"
@@ -118,15 +130,16 @@
                        :messages [{:role "user"
                                    :content {:type "text"
                                              :text "Please help with {{task}}"}}]}
-          handler (fn [method params]
-                    (case method
-                      "prompts/get"
-                      (if (= "test-prompt" (:name params))
-                        mock-prompt
-                        {:content [{:type "text" :text "Prompt not found"}]
-                         :isError true})
-                      nil))
-          {:keys [client stop-fn]} (create-test-client-with-handler handler)]
+          handler (fn [request params]
+                    (let [method (:method request)]
+                      (case method
+                        "prompts/get"
+                        (if (= "test-prompt" (:name params))
+                          mock-prompt
+                          {:content [{:type "text" :text "Prompt not found"}]
+                           :isError true})
+                        nil)))
+          client (create-test-client-with-handler handler)]
 
       (try
         (let [result-future (prompts/get-prompt-impl client "test-prompt")
@@ -137,23 +150,24 @@
           (is (= 1 (count (:messages result)))))
 
         (finally
-          (stop-fn))))))
+          (stop-server! (:server client)))))))
 
 (deftest test-get-prompt-with-arguments
   (testing "get-prompt-impl passes arguments for templating"
-    (let [handler (fn [method params]
-                    (case method
-                      "prompts/get"
-                      (if (and (= "test-prompt" (:name params))
-                               (:arguments params))
-                        {:description "Test prompt with args"
-                         :messages [{:role "user"
-                                     :content {:type "text"
-                                               :text "Task: coding"}}]}
-                        {:content [{:type "text" :text "Missing arguments"}]
-                         :isError true})
-                      nil))
-          {:keys [client stop-fn]} (create-test-client-with-handler handler)]
+    (let [handler (fn [request params]
+                    (let [method (:method request)]
+                      (case method
+                        "prompts/get"
+                        (if (and (= "test-prompt" (:name params))
+                                 (:arguments params))
+                          {:description "Test prompt with args"
+                           :messages [{:role "user"
+                                       :content {:type "text"
+                                                 :text "Task: coding"}}]}
+                          {:content [{:type "text" :text "Missing arguments"}]
+                           :isError true})
+                        nil)))
+          client (create-test-client-with-handler handler)]
 
       (try
         (let [result-future (prompts/get-prompt-impl client "test-prompt" {:task "coding"})
@@ -163,16 +177,17 @@
           (is (= "Task: coding" (get-in result [:messages 0 :content :text]))))
 
         (finally
-          (stop-fn))))))
+          (stop-server! (:server client)))))))
 
 (deftest test-get-prompt-error
   (testing "get-prompt-impl handles errors gracefully"
-    (let [handler (fn [method _params]
-                    (case method
-                      "prompts/get" {:content [{:type "text" :text "Prompt not found"}]
-                                     :isError true}
-                      nil))
-          {:keys [client stop-fn]} (create-test-client-with-handler handler)]
+    (let [handler (fn [request _params]
+                    (let [method (:method request)]
+                      (case method
+                        "prompts/get" {:content [{:type "text" :text "Prompt not found"}]
+                                       :isError true}
+                        nil)))
+          client (create-test-client-with-handler handler)]
 
       (try
         (let [result-future (prompts/get-prompt-impl client "nonexistent")
@@ -183,16 +198,17 @@
           (is (= [{:type "text" :text "Prompt not found"}] (:content result))))
 
         (finally
-          (stop-fn))))))
+          (stop-server! (:server client)))))))
 
 (deftest test-available-prompts-with-cache
   (testing "available-prompts?-impl uses cached prompts when available"
     (let [mock-prompts [{:name "test-prompt"}]
-          handler (fn [method _params]
-                    (case method
-                      "prompts/list" {:prompts mock-prompts}
-                      nil))
-          {:keys [client stop-fn]} (create-test-client-with-handler handler)]
+          handler (fn [request _params]
+                    (let [method (:method request)]
+                      (case method
+                        "prompts/list" {:prompts mock-prompts}
+                        nil)))
+          client (create-test-client-with-handler handler)]
 
       (try
         ;; First call should query server and cache results
@@ -203,31 +219,33 @@
         (is (true? (prompts/available-prompts?-impl client)))
 
         (finally
-          (stop-fn))))))
+          (stop-server! (:server client)))))))
 
 (deftest test-available-prompts-no-cache
   (testing "available-prompts?-impl queries server when no cache"
     (let [mock-prompts [{:name "test-prompt"}]
-          handler (fn [method _params]
-                    (case method
-                      "prompts/list" {:prompts mock-prompts}
-                      nil))
-          {:keys [client stop-fn]} (create-test-client-with-handler handler)]
+          handler (fn [request _params]
+                    (let [method (:method request)]
+                      (case method
+                        "prompts/list" {:prompts mock-prompts}
+                        nil)))
+          client (create-test-client-with-handler handler)]
 
       (try
         ;; Should query server directly
         (is (true? (prompts/available-prompts?-impl client)))
 
         (finally
-          (stop-fn))))))
+          (stop-server! (:server client)))))))
 
 (deftest test-empty-prompts-list
   (testing "list-prompts-impl handles empty prompts list"
-    (let [handler (fn [method _params]
-                    (case method
-                      "prompts/list" {:prompts []}
-                      nil))
-          {:keys [client stop-fn]} (create-test-client-with-handler handler)]
+    (let [handler (fn [request _params]
+                    (let [method (:method request)]
+                      (case method
+                        "prompts/list" {:prompts []}
+                        nil)))
+          client (create-test-client-with-handler handler)]
 
       (try
         (let [result-future (prompts/list-prompts-impl client)
@@ -239,4 +257,4 @@
         (is (false? (prompts/available-prompts?-impl client)))
 
         (finally
-          (stop-fn))))))
+          (stop-server! (:server client)))))))
