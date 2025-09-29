@@ -111,6 +111,11 @@ Include REFINE to refine the spec
 
 - [x] merge mcp-clj.json-rpc.protocol and mcp-clj.json-rpc.protocols
 
+- [x] add mcp-client support for prompts, similar to the support for
+      tools.
+	  server functions:
+      https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-06-18/server/prompts.mdx
+
 - [ ] extend the interop to enable use of SSE transport ? not sure this
       is worth doing still
 
