@@ -1,14 +1,14 @@
 (ns mcp-clj.mcp-client.tools-test
   (:require
-    [clojure.test :refer [deftest is testing]]
-    [mcp-clj.client-transport.factory :as client-transport-factory]
-    [mcp-clj.in-memory-transport.shared :as shared]
-    [mcp-clj.mcp-client.tools :as tools]
-    [mcp-clj.server-transport.factory :as server-transport-factory])
+   [clojure.test :refer [deftest is testing]]
+   [mcp-clj.client-transport.factory :as client-transport-factory]
+   [mcp-clj.in-memory-transport.shared :as shared]
+   [mcp-clj.mcp-client.tools :as tools]
+   [mcp-clj.server-transport.factory :as server-transport-factory])
   (:import
-    (java.util.concurrent
-      CompletableFuture
-      TimeUnit)))
+   (java.util.concurrent
+    CompletableFuture
+    TimeUnit)))
 
 ;; Transport registration function for robust test isolation
 (defn ensure-in-memory-transport-registered!
@@ -16,21 +16,21 @@
   Can be called multiple times safely - registration is idempotent."
   []
   (client-transport-factory/register-transport!
-    :in-memory
-    (fn [options]
-      (require 'mcp-clj.in-memory-transport.client)
-      (let [create-fn (ns-resolve
-                        'mcp-clj.in-memory-transport.client
-                        'create-transport)]
-        (create-fn options))))
+   :in-memory
+   (fn [options]
+     (require 'mcp-clj.in-memory-transport.client)
+     (let [create-fn (ns-resolve
+                      'mcp-clj.in-memory-transport.client
+                      'create-transport)]
+       (create-fn options))))
   (server-transport-factory/register-transport!
-    :in-memory
-    (fn [options handlers]
-      (require 'mcp-clj.in-memory-transport.server)
-      (let [create-server (ns-resolve
-                            'mcp-clj.in-memory-transport.server
-                            'create-in-memory-server)]
-        (create-server options handlers)))))
+   :in-memory
+   (fn [options handlers]
+     (require 'mcp-clj.in-memory-transport.server)
+     (let [create-server (ns-resolve
+                          'mcp-clj.in-memory-transport.server
+                          'create-in-memory-server)]
+       (create-server options handlers)))))
 
 ;; Ensure transport is registered at namespace load time
 (ensure-in-memory-transport-registered!)
@@ -47,22 +47,22 @@
   ;; Ensure transport is registered before creating client/server
   (ensure-in-memory-transport-registered!)
   (let [shared-transport (shared/create-shared-transport)
-        session (atom {})
+        session (atom {:server-capabilities {:tools {}}})
         ;; Create server using lazy-loaded function
         create-server-fn (do
                            (require 'mcp-clj.in-memory-transport.server)
                            (ns-resolve
-                             'mcp-clj.in-memory-transport.server
-                             'create-in-memory-server))
+                            'mcp-clj.in-memory-transport.server
+                            'create-in-memory-server))
         server (create-server-fn
-                 {:shared shared-transport}
-                 {"tools/list" handler
-                  "tools/call" handler})
+                {:shared shared-transport}
+                {"tools/list" handler
+                 "tools/call" handler})
         ;; Create transport using lazy-loaded function
         create-transport-fn (do (require 'mcp-clj.in-memory-transport.client)
                                 (ns-resolve
-                                  'mcp-clj.in-memory-transport.client
-                                  'create-transport))
+                                 'mcp-clj.in-memory-transport.client
+                                 'create-transport))
         transport (create-transport-fn {:shared shared-transport})]
     {:session session
      :transport transport
@@ -74,7 +74,7 @@
   (testing "successful tool execution returns CompletableFuture with content"
     (let [handler (fn [method params]
                     {:content "success result" :isError false})
-          client  (create-test-client-with-handler handler)]
+          client (create-test-client-with-handler handler)]
       (try
         (let [future (tools/call-tool-impl client "test-tool" {})]
           (is (instance? CompletableFuture future))
@@ -87,7 +87,7 @@
     (let [handler (fn [method params]
                     {:content [{:type "text" :text "{\"key\": \"value\"}"}]
                      :isError false})
-          client  (create-test-client-with-handler handler)]
+          client (create-test-client-with-handler handler)]
       (try
         ;; Should return the parsed content - access the data field from first item
         (let [future (tools/call-tool-impl client "test-tool" {})
@@ -164,7 +164,7 @@
     (let [handler (fn [method params]
                     {:content "tool result"
                      :isError false})
-          client  (create-test-client-with-handler handler)]
+          client (create-test-client-with-handler handler)]
       (try
         (let [future (tools/call-tool-impl client "test-tool" {:input "test"})]
           (is (instance? CompletableFuture future))
@@ -177,7 +177,7 @@
     (let [handler (fn [method params]
                     {:content "Tool execution failed"
                      :isError true})
-          client  (create-test-client-with-handler handler)]
+          client (create-test-client-with-handler handler)]
       (try
         (let [future (tools/call-tool-impl client "failing-tool" {})
               result (.get future 1 TimeUnit/SECONDS)]
@@ -191,7 +191,7 @@
   (testing "tool call with handler exception"
     (let [handler (fn [method params]
                     (throw (ex-info "Handler error" {})))
-          client  (create-test-client-with-handler handler)]
+          client (create-test-client-with-handler handler)]
       (try
         (let [^CompletableFuture future
               (tools/call-tool-impl client "test-tool" {})]
@@ -204,26 +204,26 @@
 (deftest available-tools?-impl-test
   ;; Tests available tools checking logic
   (testing "returns true when cached tools exist"
-    (let [client {:session (atom {})}]
+    (let [client {:session (atom {:server-capabilities {:tools {}}})}]
       (#'tools/cache-tools! client [{:name "test-tool"}])
       (is (true? (tools/available-tools?-impl client)))))
 
   (testing "returns false when no cached tools and no server tools"
-    (let [client {:session (atom {})}]
+    (let [client {:session (atom {:server-capabilities {:tools {}}})}]
       (with-redefs [tools/list-tools-impl
                     (fn [_client]
                       (CompletableFuture/completedFuture {:tools []}))]
         (is (false? (tools/available-tools?-impl client))))))
 
   (testing "queries server when no cached tools"
-    (let [client {:session (atom {})}]
+    (let [client {:session (atom {:server-capabilities {:tools {}}})}]
       (with-redefs [tools/list-tools-impl
                     (fn [_client]
                       (CompletableFuture/completedFuture {:tools [{:name "server-tool"}]}))]
         (is (true? (tools/available-tools?-impl client))))))
 
   (testing "returns false on server error"
-    (let [client {:session (atom {})}]
+    (let [client {:session (atom {:server-capabilities {:tools {}}})}]
       (with-redefs [tools/list-tools-impl
                     (fn [_client]
                       (let [future (CompletableFuture.)]
