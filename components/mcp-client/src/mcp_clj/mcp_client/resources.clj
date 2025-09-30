@@ -41,12 +41,7 @@
   (try
     (let [session @(:session client)]
       (if-not (session/server-supports-resources? session)
-        (do
-          (log/warn :client/resources-not-supported
-                    {:server-capabilities (:server-capabilities session)})
-          (CompletableFuture/failedFuture
-           (ex-info "Server does not support resources capability"
-                    {:server-capabilities (:server-capabilities session)})))
+        (session/capability-not-supported "resources" session {})
         (let [transport (:transport client)
               params (cond-> {}
                        cursor (assoc :cursor cursor))
@@ -85,13 +80,7 @@
   (try
     (let [session @(:session client)]
       (if-not (session/server-supports-resources? session)
-        (do
-          (log/warn :client/resources-not-supported
-                    {:server-capabilities (:server-capabilities session)})
-          (CompletableFuture/failedFuture
-           (ex-info "Server does not support resources capability"
-                    {:server-capabilities (:server-capabilities session)
-                     :resource-uri resource-uri})))
+        (session/capability-not-supported "resources" session {:resource-uri resource-uri})
         (let [transport (:transport client)
               params {:uri resource-uri}]
           (.thenApply

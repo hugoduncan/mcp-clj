@@ -41,12 +41,7 @@
   (try
     (let [session @(:session client)]
       (if-not (session/server-supports-prompts? session)
-        (do
-          (log/warn :client/prompts-not-supported
-                    {:server-capabilities (:server-capabilities session)})
-          (CompletableFuture/failedFuture
-           (ex-info "Server does not support prompts capability"
-                    {:server-capabilities (:server-capabilities session)})))
+        (session/capability-not-supported "prompts" session {})
         (let [transport (:transport client)
               params (cond-> {}
                        cursor (assoc :cursor cursor))
@@ -85,13 +80,7 @@
   (try
     (let [session @(:session client)]
       (if-not (session/server-supports-prompts? session)
-        (do
-          (log/warn :client/prompts-not-supported
-                    {:server-capabilities (:server-capabilities session)})
-          (CompletableFuture/failedFuture
-           (ex-info "Server does not support prompts capability"
-                    {:server-capabilities (:server-capabilities session)
-                     :prompt-name prompt-name})))
+        (session/capability-not-supported "prompts" session {:prompt-name prompt-name})
         (let [transport (:transport client)
               params (cond-> {:name prompt-name}
                        arguments (assoc :arguments arguments))]

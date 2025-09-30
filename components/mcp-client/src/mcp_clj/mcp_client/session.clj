@@ -1,7 +1,10 @@
 (ns mcp-clj.mcp-client.session
   "MCP client session state management"
   (:require
-   [mcp-clj.log :as log]))
+   [mcp-clj.log :as log])
+  (:import
+   (java.util.concurrent
+    CompletableFuture)))
 
 ;; Session States
 
@@ -139,3 +142,15 @@
   "Check if client supports notification handling"
   [session]
   (client-supports? session [:notifications]))
+
+(defn capability-not-supported
+  "Create a failed future for when a capability is not supported.
+
+  Returns a CompletableFuture that completes exceptionally with an ex-info."
+  [capability-name session extra-data]
+  (log/warn (keyword "client" (str capability-name "-not-supported"))
+            {:server-capabilities (:server-capabilities session)})
+  (CompletableFuture/failedFuture
+   (ex-info (str "Server does not support " capability-name " capability")
+            (merge {:server-capabilities (:server-capabilities session)}
+                   extra-data))))

@@ -40,12 +40,7 @@
   (try
     (let [session @(:session client)]
       (if-not (session/server-supports-tools? session)
-        (do
-          (log/warn :client/tools-not-supported
-                    {:server-capabilities (:server-capabilities session)})
-          (CompletableFuture/failedFuture
-           (ex-info "Server does not support tools capability"
-                    {:server-capabilities (:server-capabilities session)})))
+        (session/capability-not-supported "tools" session {})
         (let [transport (:transport client)
               response (transport/send-request!
                         transport
@@ -138,13 +133,7 @@
   (try
     (let [session @(:session client)]
       (if-not (session/server-supports-tools? session)
-        (do
-          (log/warn :client/tools-not-supported
-                    {:server-capabilities (:server-capabilities session)})
-          (CompletableFuture/failedFuture
-           (ex-info "Server does not support tools capability"
-                    {:server-capabilities (:server-capabilities session)
-                     :tool-name tool-name})))
+        (session/capability-not-supported "tools" session {:tool-name tool-name})
         (let [transport (:transport client)
               params {:name tool-name :arguments (or arguments {})}]
           (transport/send-request!
