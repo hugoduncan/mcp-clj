@@ -1,12 +1,12 @@
 (ns mcp-clj.mcp-client.resources
   "Resource access implementation for MCP client"
   (:require
-   [mcp-clj.log :as log]
-   [mcp-clj.mcp-client.session :as session]
-   [mcp-clj.mcp-client.transport :as transport])
+    [mcp-clj.log :as log]
+    [mcp-clj.mcp-client.session :as session]
+    [mcp-clj.mcp-client.transport :as transport])
   (:import
-   (java.util.concurrent
-    CompletableFuture)))
+    (java.util.concurrent
+      CompletableFuture)))
 
 (defn- get-resources-cache
   "Get or create resources cache in client session"
@@ -46,10 +46,10 @@
               params (cond-> {}
                        cursor (assoc :cursor cursor))
               response (transport/send-request!
-                        transport
-                        "resources/list"
-                        params
-                        30000)]
+                         transport
+                         "resources/list"
+                         params
+                         30000)]
           ;; Transform the response future to handle caching and return resources
           (.thenApply response
                       (reify java.util.function.Function
@@ -84,40 +84,40 @@
         (let [transport (:transport client)
               params {:uri resource-uri}]
           (.thenApply
-           (transport/send-request!
-            transport
-            "resources/read"
-            params
-            30000)
-           (reify java.util.function.Function
-             (apply
-               [_ result]
-               (let [is-error (:isError result false)]
-                 (if is-error
-                   (do
-                     (log/error :client/read-resource-error
-                                {:resource-uri resource-uri
-                                 :content (:content result)})
-                     ;; Return error map instead of throwing
-                     {:isError true
-                      :resource-uri resource-uri
-                      :content (:content result)})
-                   (do
-                     (log/info :client/read-resource-success
-                               {:resource-uri resource-uri})
-                     ;; Return the resource content
-                     result)))))))))
+            (transport/send-request!
+              transport
+              "resources/read"
+              params
+              30000)
+            (reify java.util.function.Function
+              (apply
+                [_ result]
+                (let [is-error (:isError result false)]
+                  (if is-error
+                    (do
+                      (log/error :client/read-resource-error
+                                 {:resource-uri resource-uri
+                                  :content (:content result)})
+                      ;; Return error map instead of throwing
+                      {:isError true
+                       :resource-uri resource-uri
+                       :content (:content result)})
+                    (do
+                      (log/info :client/read-resource-success
+                                {:resource-uri resource-uri})
+                      ;; Return the resource content
+                      result)))))))))
     (catch Exception e
       ;; Return a failed future for immediate exceptions (like transport errors)
       (log/error :client/read-resource-error {:resource-uri resource-uri
                                               :error (.getMessage e)
                                               :ex e})
       (CompletableFuture/failedFuture
-       (ex-info
-        (str "Resource read failed: " resource-uri)
-        {:resource-uri resource-uri
-         :error (.getMessage e)}
-        e)))))
+        (ex-info
+          (str "Resource read failed: " resource-uri)
+          {:resource-uri resource-uri
+           :error (.getMessage e)}
+          e)))))
 
 (defn available-resources?-impl
   "Check if any resources are available from the server.

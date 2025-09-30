@@ -1,10 +1,10 @@
 (ns mcp-clj.mcp-client.session
   "MCP client session state management"
   (:require
-   [mcp-clj.log :as log])
+    [mcp-clj.log :as log])
   (:import
-   (java.util.concurrent
-    CompletableFuture)))
+    (java.util.concurrent
+      CompletableFuture)))
 
 ;; Session States
 
@@ -13,13 +13,13 @@
 ;; Session Record
 
 (defrecord Session
-           [state ; Current session state
-            client-info ; Client information sent in initialize
-            capabilities ; Client capabilities
-            server-info ; Server info from initialize response
-            server-capabilities ; Server capabilities from initialize response
-            protocol-version ; Negotiated protocol version
-            error-info]) ; Error information if state is :error
+  [state ; Current session state
+   client-info ; Client information sent in initialize
+   capabilities ; Client capabilities
+   server-info ; Server info from initialize response
+   server-capabilities ; Server capabilities from initialize response
+   protocol-version ; Negotiated protocol version
+   error-info]) ; Error information if state is :error
 
 ;; Session State Transitions
 
@@ -45,13 +45,13 @@
          capabilities {}
          protocol-version "2025-06-18"}}]
   (->Session
-   :disconnected
-   client-info
-   capabilities
-   nil ; server-info
-   nil ; server-capabilities
-   protocol-version
-   nil)) ; error-info
+    :disconnected
+    client-info
+    capabilities
+    nil ; server-info
+    nil ; server-capabilities
+    protocol-version
+    nil)) ; error-info
 
 (defn transition-state!
   "Transition session to new state with optional data"
@@ -151,6 +151,6 @@
   (log/warn (keyword "client" (str capability-name "-not-supported"))
             {:server-capabilities (:server-capabilities session)})
   (CompletableFuture/failedFuture
-   (ex-info (str "Server does not support " capability-name " capability")
-            (merge {:server-capabilities (:server-capabilities session)}
-                   extra-data))))
+    (ex-info (str "Server does not support " capability-name " capability")
+             (merge {:server-capabilities (:server-capabilities session)}
+                    extra-data))))
