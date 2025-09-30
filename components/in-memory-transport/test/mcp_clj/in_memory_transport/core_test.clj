@@ -1,14 +1,14 @@
 (ns mcp-clj.in-memory-transport.core-test
   "Tests for in-memory transport implementation"
   (:require
-   [clojure.test :refer [deftest testing is]]
-   [mcp-clj.client-transport.protocol :as transport-protocol]
-   [mcp-clj.in-memory-transport.client :as client]
-   [mcp-clj.in-memory-transport.shared :as shared])
+    [clojure.test :refer [deftest testing is]]
+    [mcp-clj.client-transport.protocol :as transport-protocol]
+    [mcp-clj.in-memory-transport.client :as client]
+    [mcp-clj.in-memory-transport.shared :as shared])
   (:import
-   (java.util.concurrent
-    CompletableFuture
-    TimeUnit)))
+    (java.util.concurrent
+      CompletableFuture
+      TimeUnit)))
 
 ;; Unit Tests for SharedTransport
 
@@ -36,9 +36,9 @@
 
       (testing "throws error when shared transport missing"
         (is (thrown-with-msg?
-             clojure.lang.ExceptionInfo
-             #"Missing :shared transport"
-             (client/create-transport {})))))))
+              clojure.lang.ExceptionInfo
+              #"Missing :shared transport"
+              (client/create-transport {})))))))
 
 (deftest test-client-transport-lifecycle
   ;; Test client transport lifecycle operations
@@ -66,33 +66,33 @@
   (testing "transport sends messages to queues"
     (let [shared-transport (shared/create-shared-transport)
           transport (client/create-transport
-                     {:shared shared-transport})]
+                      {:shared shared-transport})]
 
       (testing "send-notification puts message in queue"
         (let [future (transport-protocol/send-notification!
-                      transport "test" {:data "hello"})]
+                       transport "test" {:data "hello"})]
           ;; Should complete successfully
           (is (nil? (.get future 1 TimeUnit/SECONDS)))
           ;; Should have message in queue
           (let [message (shared/poll-from-client!
-                         shared-transport
-                         poll-timeout-ms)]
+                          shared-transport
+                          poll-timeout-ms)]
             (is (some? message))
             (is (= "test" (:method message)))
             (is (= {:data "hello"} (:params message))))))
 
       (testing "send-request puts message in queue"
         (let [future (transport-protocol/send-request!
-                      transport
-                      "test-req"
-                      {:input "world"}
-                      1000)]
+                       transport
+                       "test-req"
+                       {:input "world"}
+                       1000)]
           ;; Should create a pending future
           (is (instance? CompletableFuture future))
           ;; Should have message in queue
           (let [message (shared/poll-from-client!
-                         shared-transport
-                         poll-timeout-ms)]
+                          shared-transport
+                          poll-timeout-ms)]
             (is (some? message))
             (is (= "test-req" (:method message)))
             (is (= {:input "world"} (:params message)))
@@ -116,8 +116,8 @@
 
             ;; Client should be able to poll the response
             (let [received-message (shared/poll-from-server!
-                                    shared-transport
-                                    poll-timeout-ms)]
+                                     shared-transport
+                                     poll-timeout-ms)]
               (is (some? received-message))
               (is (= 123 (:id received-message)))
               (is (= {:content "server response"} (:result received-message)))))
@@ -136,8 +136,8 @@
 
             ;; Client should be able to receive it
             (let [received-notification (shared/poll-from-server!
-                                         shared-transport
-                                         poll-timeout-ms)]
+                                          shared-transport
+                                          poll-timeout-ms)]
               (is (some? received-notification))
               (is (= "server/notification" (:method received-notification)))
               (is (= {:data "notification data"}
@@ -156,23 +156,23 @@
         (let [test-message {:test "direct-queue-test"}]
           (shared/offer-to-client! shared-transport test-message)
           (let [polled-message (shared/poll-from-server!
-                                shared-transport
-                                poll-timeout-ms)]
+                                 shared-transport
+                                 poll-timeout-ms)]
             (is (some? polled-message))
             (is (= test-message polled-message)))))
 
       (testing "full request-response cycle"
         ;; 1. Client sends request
         (transport-protocol/send-request!
-         transport
-         "test-method"
-         {:input "test-data"}
-         5000)
+          transport
+          "test-method"
+          {:input "test-data"}
+          5000)
 
         ;; 2. Verify request is in client-to-server queue
         (let [request-message (shared/poll-from-client!
-                               shared-transport
-                               poll-timeout-ms)]
+                                shared-transport
+                                poll-timeout-ms)]
           (is (some? request-message))
           (is (= "test-method" (:method request-message)))
           (is (= {:input "test-data"} (:params request-message)))
@@ -186,8 +186,8 @@
 
             ;; 4. Verify response is available in server-to-client queue
             (let [response-message (shared/poll-from-server!
-                                    shared-transport
-                                    poll-timeout-ms)]
+                                     shared-transport
+                                     poll-timeout-ms)]
               (is (some? response-message))
               (is (= (:id request-message) (:id response-message)))
               (is (= {:processed "test-data"} (:result response-message)))))))
@@ -203,29 +203,29 @@
           test-handlers {"test-method"
                          (fn [request params]
                            (swap!
-                            received-requests
-                            conj
-                            {:request request :params params})
+                             received-requests
+                             conj
+                             {:request request :params params})
                            {:result "success"})}]
 
       ;; Create server with handlers that capture requests
       (require 'mcp-clj.in-memory-transport.server)
       (let [create-server (ns-resolve
-                           'mcp-clj.in-memory-transport.server
-                           'create-in-memory-server)
+                            'mcp-clj.in-memory-transport.server
+                            'create-in-memory-server)
             server (create-server
-                    {:shared shared-transport}
-                    test-handlers)
+                     {:shared shared-transport}
+                     test-handlers)
             client-transport (client/create-transport
-                              {:shared shared-transport})]
+                               {:shared shared-transport})]
 
         (try
           ;; Send a test request
           (let [request-future (transport-protocol/send-request!
-                                client-transport
-                                "test-method"
-                                {:test "data"}
-                                5000)]
+                                 client-transport
+                                 "test-method"
+                                 {:test "data"}
+                                 5000)]
 
             ;; Wait for completion
             (.get request-future 5 TimeUnit/SECONDS)
