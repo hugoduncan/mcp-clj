@@ -44,7 +44,7 @@
   ;; Test client transport lifecycle operations
   (testing "client transport lifecycle"
     (let [shared-transport (shared/create-shared-transport)
-          transport        (client/create-transport {:shared shared-transport})]
+          transport (client/create-transport {:shared shared-transport})]
 
       (testing "transport is initially alive"
         (is (transport-protocol/alive? transport)))
@@ -65,8 +65,8 @@
   ;; Test that transport can send messages to queues
   (testing "transport sends messages to queues"
     (let [shared-transport (shared/create-shared-transport)
-          transport        (client/create-transport
-                             {:shared shared-transport})]
+          transport (client/create-transport
+                      {:shared shared-transport})]
 
       (testing "send-notification puts message in queue"
         (let [future (transport-protocol/send-notification!
@@ -104,48 +104,52 @@
 (deftest test-server-to-client-communication
   ;; Test that server can send responses back to client
   (testing "server can send responses to client"
-    (let [shared-transport (shared/create-shared-transport)
-          transport        (client/create-transport {:shared shared-transport})]
+    (testing "server can put response in server-to-client queue"
+      (let [shared-transport (shared/create-shared-transport)
+            transport (client/create-transport {:shared shared-transport})]
+        (try
+          ;; Simulate server putting a response message
+          (let [response {:jsonrpc "2.0"
+                          :id 123
+                          :result {:content "server response"}}]
+            (shared/offer-to-client! shared-transport response)
 
-      (testing "server can put response in server-to-client queue"
-        ;; Simulate server putting a response message
-        (let [response {:jsonrpc "2.0"
-                        :id      123
-                        :result  {:content "server response"}}]
-          (shared/offer-to-client! shared-transport response)
+            ;; Client should be able to poll the response
+            (let [received-message (shared/poll-from-server!
+                                     shared-transport
+                                     poll-timeout-ms)]
+              (is (some? received-message))
+              (is (= 123 (:id received-message)))
+              (is (= {:content "server response"} (:result received-message)))))
+          (finally
+            (transport-protocol/close! transport)))))
 
-          ;; Client should be able to poll the response
-          (let [received-message (shared/poll-from-server!
-                                   shared-transport
-                                   poll-timeout-ms)]
-            (is (some? received-message))
-            (is (= 123 (:id received-message)))
-            (is (= {:content "server response"} (:result received-message))))))
+    (testing "client can receive notifications from server"
+      (let [shared-transport (shared/create-shared-transport)
+            transport (client/create-transport {:shared shared-transport})]
+        (try
+          ;; Simulate server sending a notification
+          (let [notification {:jsonrpc "2.0"
+                              :method "server/notification"
+                              :params {:data "notification data"}}]
+            (shared/offer-to-client! shared-transport notification)
 
-      (testing "client can receive notifications from server"
-        ;; Simulate server sending a notification
-        (let [notification {:jsonrpc "2.0"
-                            :method  "server/notification"
-                            :params  {:data "notification data"}}]
-          (shared/offer-to-client! shared-transport notification)
-
-          ;; Client should be able to receive it
-          (let [received-notification (shared/poll-from-server!
-                                        shared-transport
-                                        poll-timeout-ms)]
-            (is (some? received-notification))
-            (is (= "server/notification" (:method received-notification)))
-            (is (= {:data "notification data"}
-                   (:params received-notification))))))
-
-      ;; Cleanup
-      (transport-protocol/close! transport))))
+            ;; Client should be able to receive it
+            (let [received-notification (shared/poll-from-server!
+                                          shared-transport
+                                          poll-timeout-ms)]
+              (is (some? received-notification))
+              (is (= "server/notification" (:method received-notification)))
+              (is (= {:data "notification data"}
+                     (:params received-notification)))))
+          (finally
+            (transport-protocol/close! transport)))))))
 
 (deftest test-bidirectional-communication
   ;; Test complete round-trip communication
   (testing "bidirectional communication works"
     (let [shared-transport (shared/create-shared-transport)
-          transport        (client/create-transport {:shared shared-transport})]
+          transport (client/create-transport {:shared shared-transport})]
 
       (testing "direct queue operations work"
         ;; Test direct queue operations first
@@ -176,8 +180,8 @@
 
           ;; 3. Simulate server processing and sending response
           (let [response {:jsonrpc "2.0"
-                          :id      (:id request-message)
-                          :result  {:processed "test-data"}}]
+                          :id (:id request-message)
+                          :result {:processed "test-data"}}]
             (shared/offer-to-client! shared-transport response)
 
             ;; 4. Verify response is available in server-to-client queue
@@ -194,24 +198,24 @@
 (deftest test-session-handling
   ;; Test that in-memory transport properly handles session IDs in requests
   (testing "in-memory transport includes session ID in request objects"
-    (let [shared-transport  (shared/create-shared-transport)
+    (let [shared-transport (shared/create-shared-transport)
           received-requests (atom [])
-          test-handlers     {"test-method"
-                             (fn [request params]
-                               (swap!
-                                 received-requests
-                                 conj
-                                 {:request request :params params})
-                               {:result "success"})}]
+          test-handlers {"test-method"
+                         (fn [request params]
+                           (swap!
+                             received-requests
+                             conj
+                             {:request request :params params})
+                           {:result "success"})}]
 
       ;; Create server with handlers that capture requests
       (require 'mcp-clj.in-memory-transport.server)
-      (let [create-server    (ns-resolve
-                               'mcp-clj.in-memory-transport.server
-                               'create-in-memory-server)
-            server           (create-server
-                               {:shared shared-transport}
-                               test-handlers)
+      (let [create-server (ns-resolve
+                            'mcp-clj.in-memory-transport.server
+                            'create-in-memory-server)
+            server (create-server
+                     {:shared shared-transport}
+                     test-handlers)
             client-transport (client/create-transport
                                {:shared shared-transport})]
 

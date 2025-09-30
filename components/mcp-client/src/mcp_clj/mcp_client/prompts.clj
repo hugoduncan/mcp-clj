@@ -2,6 +2,7 @@
   "Prompt calling implementation for MCP client"
   (:require
     [mcp-clj.log :as log]
+    [mcp-clj.mcp-client.session :as session]
     [mcp-clj.mcp-client.transport :as transport])
   (:import
     (java.util.concurrent
@@ -38,27 +39,30 @@
   Supports pagination with optional :cursor parameter."
   ^CompletableFuture [client & [{:keys [cursor]}]]
   (try
-    (let [transport (:transport client)
-          params    (cond-> {}
-                      cursor (assoc :cursor cursor))
-          response  (transport/send-request!
-                      transport
-                      "prompts/list"
-                      params
-                      30000)]
-      ;; Transform the response future to handle caching and return prompts
-      (.thenApply response
-                  (reify java.util.function.Function
-                    (apply
-                      [_ result]
-                      (if-let [prompts (:prompts result)]
-                        (do
-                          (when-not cursor ; Only cache first page
-                            (cache-prompts! client prompts))
-                          (cond-> {:prompts prompts}
-                            (:nextCursor result)
-                            (assoc :nextCursor (:nextCursor result))))
-                        {:prompts []})))))
+    (let [session @(:session client)]
+      (if-not (session/server-supports-prompts? session)
+        (session/capability-not-supported "prompts" session {})
+        (let [transport (:transport client)
+              params (cond-> {}
+                       cursor (assoc :cursor cursor))
+              response (transport/send-request!
+                         transport
+                         "prompts/list"
+                         params
+                         30000)]
+          ;; Transform the response future to handle caching and return prompts
+          (.thenApply response
+                      (reify java.util.function.Function
+                        (apply
+                          [_ result]
+                          (if-let [prompts (:prompts result)]
+                            (do
+                              (when-not cursor ; Only cache first page
+                                (cache-prompts! client prompts))
+                              (cond-> {:prompts prompts}
+                                (:nextCursor result)
+                                (assoc :nextCursor (:nextCursor result))))
+                            {:prompts []})))))))
     (catch Exception e
       (log/error :client/list-prompts-error {:error (.getMessage e)})
       ;; Return a failed future for immediate exceptions
@@ -74,43 +78,46 @@
   ^CompletableFuture [client prompt-name & [arguments]]
   (log/info :client/get-prompt-start {:prompt-name prompt-name})
   (try
-    (let [transport (:transport client)
-          params    (cond-> {:name prompt-name}
-                      arguments (assoc :arguments arguments))]
-      (.thenApply
-        (transport/send-request!
-          transport
-          "prompts/get"
-          params
-          30000)
-        (reify java.util.function.Function
-          (apply
-            [_ result]
-            (let [is-error (:isError result false)]
-              (if is-error
-                (do
-                  (log/error :client/get-prompt-error
-                             {:prompt-name prompt-name
-                              :content     (:content result)})
-                  ;; Return error map instead of throwing
-                  {:isError     true
-                   :prompt-name prompt-name
-                   :content     (:content result)})
-                (do
-                  (log/info :client/get-prompt-success
-                            {:prompt-name prompt-name})
-                  ;; Return the prompt result
-                  result)))))))
+    (let [session @(:session client)]
+      (if-not (session/server-supports-prompts? session)
+        (session/capability-not-supported "prompts" session {:prompt-name prompt-name})
+        (let [transport (:transport client)
+              params (cond-> {:name prompt-name}
+                       arguments (assoc :arguments arguments))]
+          (.thenApply
+            (transport/send-request!
+              transport
+              "prompts/get"
+              params
+              30000)
+            (reify java.util.function.Function
+              (apply
+                [_ result]
+                (let [is-error (:isError result false)]
+                  (if is-error
+                    (do
+                      (log/error :client/get-prompt-error
+                                 {:prompt-name prompt-name
+                                  :content (:content result)})
+                      ;; Return error map instead of throwing
+                      {:isError true
+                       :prompt-name prompt-name
+                       :content (:content result)})
+                    (do
+                      (log/info :client/get-prompt-success
+                                {:prompt-name prompt-name})
+                      ;; Return the prompt result
+                      result)))))))))
     (catch Exception e
       ;; Return a failed future for immediate exceptions (like transport errors)
       (log/error :client/get-prompt-error {:prompt-name prompt-name
-                                           :error       (.getMessage e)
-                                           :ex          e})
+                                           :error (.getMessage e)
+                                           :ex e})
       (CompletableFuture/failedFuture
         (ex-info
           (str "Prompt request failed: " prompt-name)
           {:prompt-name prompt-name
-           :error       (.getMessage e)}
+           :error (.getMessage e)}
           e)))))
 
 (defn available-prompts?-impl
@@ -120,11 +127,17 @@
   Uses cached prompts if available, otherwise queries the server."
   [client]
   (try
-    (if-let [cached-prompts (get-cached-prompts client)]
-      (boolean (seq cached-prompts))
-      (when-let [result-future (list-prompts-impl client)]
-        (let [result @result-future]
-          (boolean (seq (:prompts result))))))
+    (let [session @(:session client)]
+      (if-not (session/server-supports-prompts? session)
+        (do
+          (log/debug :client/prompts-not-supported
+                     {:server-capabilities (:server-capabilities session)})
+          false)
+        (if-let [cached-prompts (get-cached-prompts client)]
+          (boolean (seq cached-prompts))
+          (when-let [result-future (list-prompts-impl client)]
+            (let [result @result-future]
+              (boolean (seq (:prompts result))))))))
     (catch Exception e
       (log/debug :client/available-prompts-error {:error (.getMessage e)})
       false)))

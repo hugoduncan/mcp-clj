@@ -47,7 +47,7 @@
   ;; Ensure transport is registered before creating client/server
   (ensure-in-memory-transport-registered!)
   (let [shared-transport (shared/create-shared-transport)
-        session (atom {})
+        session (atom {:server-capabilities {:prompts {}}})
         ;; Create server using lazy-loaded function
         create-server-fn (do
                            (require 'mcp-clj.in-memory-transport.server)

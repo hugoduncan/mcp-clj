@@ -121,6 +121,21 @@ Include REFINE to refine the spec
 	  server functions:
 	  https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-06-18/server/resources.mdx
 
+- [x] Add compliance with @doc/capability-negotiation.md
+
+  Implementation completed:
+  - Added capability helper functions to mcp-clj.mcp-client.session:
+    - server-supports?, server-supports-tools?, server-supports-prompts?,
+      server-supports-resources?, server-supports-sampling?
+    - client-supports?, client-supports-sampling?, client-supports-notifications?
+  - Client checks server capabilities before making requests in:
+    - mcp-clj.mcp-client.tools (list-tools-impl, call-tool-impl, available-tools?-impl)
+    - mcp-clj.mcp-client.prompts (list-prompts-impl, get-prompt-impl, available-prompts?-impl)
+    - mcp-clj.mcp-client.resources (list-resources-impl, read-resource-impl, available-resources?-impl)
+  - Returns error futures with logging when capabilities are missing
+  - Server has capability helper functions for future use with notifications and sampling
+  - Comprehensive test coverage in mcp-clj.mcp-client.session-test
+
 - [ ] extend the interop to enable use of SSE transport ? not sure this
       is worth doing still
 

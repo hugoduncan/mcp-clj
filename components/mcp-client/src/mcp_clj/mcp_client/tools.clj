@@ -3,6 +3,7 @@
   (:require
     [clojure.data.json :as json]
     [mcp-clj.log :as log]
+    [mcp-clj.mcp-client.session :as session]
     [mcp-clj.mcp-client.transport :as transport])
   (:import
     (java.util.concurrent
@@ -37,22 +38,25 @@
   has :name, :description, and :inputSchema."
   ^CompletableFuture [client]
   (try
-    (let [transport (:transport client)
-          response  (transport/send-request!
-                      transport
-                      "tools/list"
-                      {}
-                      30000)]
-      ;; Transform the response future to handle caching and return tools
-      (.thenApply response
-                  (reify java.util.function.Function
-                    (apply
-                      [_ result]
-                      (if-let [tools (:tools result)]
-                        (do
-                          (cache-tools! client tools)
-                          {:tools tools})
-                        {:tools []})))))
+    (let [session @(:session client)]
+      (if-not (session/server-supports-tools? session)
+        (session/capability-not-supported "tools" session {})
+        (let [transport (:transport client)
+              response (transport/send-request!
+                         transport
+                         "tools/list"
+                         {}
+                         30000)]
+          ;; Transform the response future to handle caching and return tools
+          (.thenApply response
+                      (reify java.util.function.Function
+                        (apply
+                          [_ result]
+                          (if-let [tools (:tools result)]
+                            (do
+                              (cache-tools! client tools)
+                              {:tools tools})
+                            {:tools []})))))))
     (catch Exception e
       (log/error :client/list-tools-error {:error (.getMessage e)})
       ;; Return a failed future for immediate exceptions
@@ -89,18 +93,18 @@
 
 (defn- parse-response
   [result tool-name]
-  (let [is-error       (:isError result false)
+  (let [is-error (:isError result false)
         parsed-content (parse-tool-content
                          (:content result))]
     (if is-error
       (do
         (log/error :client/call-tool-error
                    {:tool-name tool-name
-                    :content   parsed-content})
+                    :content parsed-content})
         ;; Return error map instead of throwing
-        {:isError   true
+        {:isError true
          :tool-name tool-name
-         :content   parsed-content})
+         :content parsed-content})
       (do
         (log/info :client/call-tool-success
                   {:tool-name tool-name})
@@ -127,23 +131,26 @@
   ^CompletableFuture [client tool-name arguments]
   (log/info :client/call-tool-start {:tool-name tool-name})
   (try
-    (let [transport (:transport client)
-          params    {:name tool-name :arguments (or arguments {})}]
-      (transport/send-request!
-        transport
-        "tools/call"
-        params
-        30000))
+    (let [session @(:session client)]
+      (if-not (session/server-supports-tools? session)
+        (session/capability-not-supported "tools" session {:tool-name tool-name})
+        (let [transport (:transport client)
+              params {:name tool-name :arguments (or arguments {})}]
+          (transport/send-request!
+            transport
+            "tools/call"
+            params
+            30000))))
     (catch Exception e
       ;; Return a failed future for immediate exceptions (like transport errors)
       (log/error :client/call-tool-error {:tool-name tool-name
-                                          :error     (.getMessage e)
-                                          :ex        e})
+                                          :error (.getMessage e)
+                                          :ex e})
       (CompletableFuture/failedFuture
         (ex-info
           (str "Tool call failed: " tool-name)
           {:tool-name tool-name
-           :error     (.getMessage e)}
+           :error (.getMessage e)}
           e)))))
 
 (defn available-tools?-impl
@@ -153,11 +160,17 @@
   Uses cached tools if available, otherwise queries the server."
   [client]
   (try
-    (if-let [cached-tools (get-cached-tools client)]
-      (boolean (seq cached-tools))
-      (when-let [result-future (list-tools-impl client)]
-        (let [result @result-future]
-          (boolean (seq (:tools result))))))
+    (let [session @(:session client)]
+      (if-not (session/server-supports-tools? session)
+        (do
+          (log/debug :client/tools-not-supported
+                     {:server-capabilities (:server-capabilities session)})
+          false)
+        (if-let [cached-tools (get-cached-tools client)]
+          (boolean (seq cached-tools))
+          (when-let [result-future (list-tools-impl client)]
+            (let [result @result-future]
+              (boolean (seq (:tools result))))))))
     (catch Exception e
       (log/debug :client/available-tools-error {:error (.getMessage e)})
       false)))

@@ -43,6 +43,24 @@
         session-id->session (:session-id->session server)]
     (get @session-id->session session-id)))
 
+(defn- client-supports?
+  "Check if client supports a specific capability.
+
+  Capability path is a vector of keys, e.g., [:sampling] or [:notifications].
+  Returns boolean indicating if the capability is present and truthy."
+  [session capability-path]
+  (boolean (get-in (:client-capabilities session) capability-path)))
+
+(defn- client-supports-sampling?
+  "Check if client supports sampling capability"
+  [session]
+  (client-supports? session [:sampling]))
+
+(defn- client-supports-notifications?
+  "Check if client supports notification handling"
+  [session]
+  (client-supports? session [:notifications]))
+
 (defn- notify-tools-changed!
   "Notify all sessions that the tool list has changed"
   [server]
@@ -419,17 +437,17 @@
                     :prompts {...}})"
   ^MCPServer
   [{:keys [transport tools prompts resources]
-    :or   {tools     tools/default-tools
-           prompts   prompts/default-prompts
-           resources resources/default-resources}
-    :as   opts}]
+    :or {tools tools/default-tools
+         prompts prompts/default-prompts
+         resources resources/default-resources}
+    :as opts}]
   (when-not transport
     (throw (ex-info "Missing :transport configuration"
-                    {:config   opts
+                    {:config opts
                      :expected "Map with :type key and transport-specific options"})))
   (when-not (:type transport)
     (throw (ex-info "Missing :type in transport configuration"
-                    {:transport       transport
+                    {:transport transport
                      :supported-types [:stdio :sse :http]})))
   (doseq [tool (vals tools)]
     (when-not (tools/valid-tool? tool)
@@ -437,33 +455,33 @@
   (doseq [prompt (vals prompts)]
     (when-not (prompts/valid-prompt? prompt)
       (throw (ex-info "Invalid prompt in constructor" {:prompt prompt}))))
-  (let [session-id->session      (atom {})
-        tool-registry            (atom tools)
-        prompt-registry          (atom prompts)
-        resource-registry        (atom resources)
-        rpc-server-prom          (promise)
-        server                   (->MCPServer
-                                   rpc-server-prom
-                                   session-id->session
-                                   tool-registry
-                                   prompt-registry
-                                   resource-registry)
+  (let [session-id->session (atom {})
+        tool-registry (atom tools)
+        prompt-registry (atom prompts)
+        resource-registry (atom resources)
+        rpc-server-prom (promise)
+        server (->MCPServer
+                 rpc-server-prom
+                 session-id->session
+                 tool-registry
+                 prompt-registry
+                 resource-registry)
         ;; Create handlers before creating the JSON-RPC server to avoid race
         ;; conditions
-        handlers                 (create-handlers server)
+        handlers (create-handlers server)
         ;; Add callbacks to transport options
         transport-with-callbacks (merge transport
                                         {:on-sse-connect (partial on-sse-connect server)
-                                         :on-sse-close   (partial on-sse-close server)})
-        json-rpc-server          (transport-factory/create-transport
-                                   transport-with-callbacks
-                                   handlers)
-        server                   (assoc server
-                                        :stop #(do
-                                                 (log/info :server/stopping {})
-                                                 (stop! server)
-                                                 (json-rpc-protocols/stop! json-rpc-server)
-                                                 (log/info :server/stopped {})))]
+                                         :on-sse-close (partial on-sse-close server)})
+        json-rpc-server (transport-factory/create-transport
+                          transport-with-callbacks
+                          handlers)
+        server (assoc server
+                      :stop #(do
+                               (log/info :server/stopping {})
+                               (stop! server)
+                               (json-rpc-protocols/stop! json-rpc-server)
+                               (log/info :server/stopped {})))]
     ;; Set handlers immediately after creating the JSON-RPC server to minimize
     ;; race window
     (json-rpc-protocols/set-handlers! json-rpc-server handlers)
