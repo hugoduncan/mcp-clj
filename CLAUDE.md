@@ -3,6 +3,9 @@
 This file provides guidance to Claude Code (claude.ai/code) when working
 with code in this repository.
 
+@doc/glossary.md
+@doc/mcp-specification.md
+
 ## Architecture Overview
 
 This is a Clojure implementation of the Model Context Protocol (MCP)
@@ -37,6 +40,18 @@ organization:
 
 - `sse-server/` - Server-Sent Events (SSE) transport server base
 - `stdio-server/` - Standard I/O transport server base
+
+Each operation for a server capability is implemented has a handler in
+the mcp-server component in the `mcp-clj.mcp-server.core` namespace.
+The implementation for implementing each capability is in the
+`mcp-clj.mcp-server.<capability>` namespace.
+
+Each operation for a server capability is exposed in the mcp-client
+component in the `mcp-clj.mcp-client.core` namespace.  The
+implementation for exposing each capability is in the
+`mcp-clj.mcp-client.<capability>` namespace.
+
+Concerns follow the same pattern as capabilities.
 
 ### Key Design Patterns
 
@@ -186,8 +201,6 @@ clj -M:stdio-server
 - Component isolation: changes to one component should not require
   changes to others unless interfaces change
 
-- mcp protocol specification is at
-  https://github.com/modelcontextprotocol/modelcontextprotocol/tree/main/docs/specification
-
 - use `str/includes?` rather than `.contains`
 - run `cljstyle fix` before committing
+- use semantic commit and PR messages
