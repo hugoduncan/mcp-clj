@@ -9,246 +9,17 @@
   Version-specific behavior is tested using conditional assertions."
   (:require
    [clojure.test :refer [deftest is testing]]
-   [mcp-clj.client-transport.factory :as client-transport-factory]
-   [mcp-clj.in-memory-transport.shared :as shared]
+   [mcp-clj.compliance-test.test-helpers :as helpers]
    [mcp-clj.java-sdk.interop :as java-sdk]
-   [mcp-clj.log :as log]
    [mcp-clj.mcp-client.core :as client]
-   [mcp-clj.mcp-server.core :as server]
-   [mcp-clj.server-transport.factory :as server-transport-factory])
-  (:import
-   (java.util.concurrent
-    CompletableFuture
-    TimeUnit)))
-
-;;; Transport Registration
-
-(defn ensure-in-memory-transport-registered!
-  "Ensure in-memory transport is registered in both client and server factories"
-  []
-  (client-transport-factory/register-transport!
-   :in-memory
-   (fn [options]
-     (require 'mcp-clj.in-memory-transport.client)
-     (let [create-fn (ns-resolve
-                      'mcp-clj.in-memory-transport.client
-                      'create-transport)]
-       (create-fn options))))
-  (server-transport-factory/register-transport!
-   :in-memory
-   (fn [options handlers]
-     (require 'mcp-clj.in-memory-transport.server)
-     (let [create-server (ns-resolve
-                          'mcp-clj.in-memory-transport.server
-                          'create-in-memory-server)]
-       (create-server options handlers)))))
-
-(ensure-in-memory-transport-registered!)
-
-;;; Test Tools Definition
-
-(defn create-test-tools
-  "Create test tools with version-appropriate fields"
-  [protocol-version]
-  (let [base-tools
-        {"echo"
-         {:name "echo"
-          :description "Echo the input message"
-          :inputSchema {:type "object"
-                        :properties {:message {:type "string"
-                                               :description "Message to echo"}}
-                        :required ["message"]}
-          :implementation (fn [{:keys [message]}]
-                            {:content [{:type "text"
-                                        :text (str "Echo: " message)}]
-                             :isError false})}
-
-         "add"
-         {:name "add"
-          :description "Add two numbers"
-          :inputSchema {:type "object"
-                        :properties {:a {:type "number"
-                                         :description "First number"}
-                                     :b {:type "number"
-                                         :description "Second number"}}
-                        :required ["a" "b"]}
-          :implementation (fn [{:keys [a b]}]
-                            {:content [{:type "text"
-                                        :text (str (+ a b))}]
-                             :isError false})}
-
-         "error"
-         {:name "error"
-          :description "Tool that always throws an error"
-          :inputSchema {:type "object"
-                        :properties {:message {:type "string"
-                                               :description "Error message"}}
-                        :required ["message"]}
-          :implementation (fn [{:keys [message]}]
-                            (throw (ex-info message {:type :test-error})))}}
-
-        ;; Add annotations for 2025-03-26+
-        with-annotations (if (>= (compare protocol-version "2025-03-26") 0)
-                           (-> base-tools
-                               (assoc-in ["echo" :annotations] {:category "utility"})
-                               (assoc-in ["add" :annotations] {:category "math"}))
-                           base-tools)
-
-        ;; Add title and outputSchema for 2025-06-18+
-        with-extended (if (>= (compare protocol-version "2025-06-18") 0)
-                        (-> with-annotations
-                            (assoc-in ["echo" :title] "Echo Tool")
-                            (assoc-in ["add" :title] "Addition Calculator")
-                            (assoc-in ["add" :outputSchema]
-                                      {:type "object"
-                                       :properties {:result {:type "number"}}
-                                       :required ["result"]}))
-                        with-annotations)]
-
-    with-extended))
-
-;;; Helper Functions for Creating Test Environments
-
-(defn- stop-in-memory-server!
-  "Stop an in-memory server"
-  [server]
-  (require 'mcp-clj.in-memory-transport.server)
-  ((ns-resolve 'mcp-clj.in-memory-transport.server 'stop!) server))
-
-(defn create-clojure-pair
-  "Create Clojure client + Clojure server pair using in-memory transport"
-  [protocol-version]
-  (let [test-tools (create-test-tools protocol-version)
-        shared-transport (shared/create-shared-transport)
-
-        ;; Create server
-        mcp-server (server/create-server
-                    {:transport {:type :in-memory
-                                 :shared shared-transport}
-                     :tools test-tools
-                     :server-info {:name "test-server"
-                                   :version "1.0.0"}})
-
-        ;; Create client
-        mcp-client (client/create-client
-                    {:transport {:type :in-memory
-                                 :shared shared-transport}
-                     :client-info {:name "test-client"
-                                   :version "1.0.0"}
-                     :protocol-version protocol-version})]
-
-    ;; Wait for client to initialize
-    (client/wait-for-ready mcp-client 5000)
-
-    {:client mcp-client
-     :server mcp-server
-     :cleanup-fn (fn []
-                   (client/close! mcp-client)
-                   ((:stop mcp-server)))}))
-
-(defn create-clojure-client-java-server-pair
-  "Create Clojure client + Java SDK server pair using stdio transport"
-  [protocol-version]
-  (let [test-tools (create-test-tools protocol-version)
-
-        ;; Create Java SDK server
-        java-server (java-sdk/create-java-server
-                     {:name "java-test-server"
-                      :version "1.0.0"
-                      :async? true})
-
-        ;; Register test tools
-        _ (doseq [[_name tool] test-tools]
-            (java-sdk/register-tool java-server tool))
-
-        ;; Start the server
-        _ (java-sdk/start-server java-server)
-
-        ;; Create transport for Clojure client to connect to Java server
-        transport (java-sdk/create-stdio-client-transport
-                   {:command "clojure"
-                    :args ["-M:dev:test" "-m"
-                           "mcp-clj.java-sdk.sdk-server-main"]})
-
-        ;; Create Clojure client
-        mcp-client (client/create-client
-                    {:transport {:type :stdio
-                                 :transport-instance transport}
-                     :client-info {:name "test-client"
-                                   :version "1.0.0"}
-                     :protocol-version protocol-version})]
-
-    ;; Wait for client to initialize
-    (client/wait-for-ready mcp-client 5000)
-
-    {:client mcp-client
-     :server java-server
-     :cleanup-fn (fn []
-                   (client/close! mcp-client)
-                   (java-sdk/stop-server java-server))}))
-
-(defn create-java-client-clojure-server-pair
-  "Create Java SDK client + Clojure server pair using stdio transport"
-  [protocol-version]
-  (let [test-tools (create-test-tools protocol-version)
-
-        ;; Create Clojure server with stdio transport
-        mcp-server (server/create-server
-                    {:transport {:type :stdio}
-                     :tools test-tools
-                     :server-info {:name "test-server"
-                                   :version "1.0.0"}})
-
-        ;; Create Java SDK client
-        transport (java-sdk/create-stdio-client-transport
-                   {:command "clojure"
-                    :args ["-M:dev:test" "-m"
-                           "mcp-clj.stdio-server"]})
-
-        java-client (java-sdk/create-java-client
-                     {:transport transport
-                      :async? true})]
-
-    ;; Initialize client
-    (java-sdk/initialize-client java-client)
-
-    {:client java-client
-     :server mcp-server
-     :cleanup-fn (fn []
-                   (java-sdk/close-client java-client)
-                   ((:stop mcp-server)))}))
-
-;;; Test Execution Helper
-
-(def test-protocol-versions
-  "Protocol versions to test"
-  ["2024-11-05" "2025-03-26" "2025-06-18"])
-
-(def test-implementations
-  "Implementation combinations to test"
-  [{:name "Clojure client + Clojure server"
-    :create-fn create-clojure-pair
-    :client-type :clojure
-    :integ? false}])
-
-(defn run-test-across-implementations
-  "Run test-fn across all implementation combinations and protocol versions"
-  [test-fn]
-  (doseq [impl test-implementations
-          protocol-version test-protocol-versions]
-    (testing (str (:name impl) " [" protocol-version "]")
-      (let [pair ((:create-fn impl) protocol-version)]
-        (try
-          (test-fn (:client-type impl) protocol-version pair)
-          (finally
-            ((:cleanup-fn pair))))))))
+   [mcp-clj.mcp-server.core :as mcp-server]))
 
 ;;; Compliance Tests
 
 (deftest ^:integ tools-list-compliance-test
   ;; Test that tools/list returns available tools with correct schema
   (testing "tools/list returns available tools"
-    (run-test-across-implementations
+    (helpers/run-test-across-implementations
      (fn [client-type protocol-version {:keys [client]}]
        (let [result (if (= client-type :clojure)
                       @(client/list-tools client)
@@ -290,7 +61,7 @@
 (deftest ^:integ tools-call-compliance-test
   ;; Test that tools/call executes tools with arguments and returns results
   (testing "tools/call executes tools correctly"
-    (run-test-across-implementations
+    (helpers/run-test-across-implementations
      (fn [client-type protocol-version {:keys [client]}]
        (testing "echo tool execution"
          (let [result (if (= client-type :clojure)
@@ -316,7 +87,7 @@
 (deftest ^:integ tools-error-handling-compliance-test
   ;; Test error handling for invalid tool calls
   (testing "error handling for invalid tool calls"
-    (run-test-across-implementations
+    (helpers/run-test-across-implementations
      (fn [client-type protocol-version {:keys [client]}]
        (testing "tool execution error"
          (let [result (if (= client-type :clojure)
@@ -345,9 +116,34 @@
            (is (true? (:isError result)))))))))
 
 (deftest ^:integ tools-list-changed-notification-test
-  ;; TODO: Fix notification delivery in in-memory transport
-  ;; Notifications are declared in server capabilities but not being received by client
-  ;; Test notifications/tools/list_changed is sent when tools change
+  ;; Test that notifications/tools/list_changed is sent when tools change
   (testing "notifications/tools/list_changed sent when tools change"
-    ;; Skip for now - notification system needs investigation
-    (is true "Notification test temporarily disabled pending investigation")))
+    (helpers/run-test-across-implementations
+     (fn [client-type protocol-version {:keys [client server]}]
+       (let [received-notifications (atom [])
+             ;; Set up notification handler by subscribing to tools changes
+             _ (when (= client-type :clojure)
+                 (client/subscribe-tools-changed!
+                  client
+                  (fn [params]
+                    (swap! received-notifications conj
+                           {:method "notifications/tools/list_changed" :params params}))))
+             ;; Add a new tool to trigger notification
+             new-tool {:name "new-tool"
+                       :description "A new test tool"
+                       :inputSchema {:type "object"
+                                     :properties {:value {:type "string"}}
+                                     :required ["value"]}
+                       :implementation (fn [{:keys [value]}]
+                                         {:content [{:type "text" :text (str "New: " value)}]
+                                          :isError false})}
+             _ (mcp-server/add-tool! server new-tool)
+             ;; Wait for notification to be processed
+             _ (Thread/sleep 200)]
+
+         ;; Verify notification was received
+         (is (seq @received-notifications)
+             "Should receive at least one notification")
+         (is (some #(= "notifications/tools/list_changed" (:method %))
+                   @received-notifications)
+             "Should receive tools/list_changed notification"))))))

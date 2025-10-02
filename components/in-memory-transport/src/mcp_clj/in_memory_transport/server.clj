@@ -1,16 +1,16 @@
 (ns mcp-clj.in-memory-transport.server
   "In-memory server transport for unit testing MCP communication"
   (:require
-    [mcp-clj.in-memory-transport.atomic :as atomic]
-    [mcp-clj.in-memory-transport.shared :as shared]
-    [mcp-clj.json-rpc.protocols :as json-rpc-protocols]
-    [mcp-clj.log :as log])
+   [mcp-clj.in-memory-transport.atomic :as atomic]
+   [mcp-clj.in-memory-transport.shared :as shared]
+   [mcp-clj.json-rpc.protocols :as json-rpc-protocols]
+   [mcp-clj.log :as log])
   (:import
-    (java.util.concurrent
-      Executors)))
+   (java.util.concurrent
+    Executors)))
 
 (defrecord InMemoryServer
-  [shared-transport server-alive? handlers])
+           [shared-transport server-alive? handlers])
 
 (defn- handle-request
   "Process a client request and send response"
@@ -71,7 +71,7 @@
                        (handle-request server message))
                      (catch InterruptedException _
                             ;; Thread interrupted, exit
-                            )
+                       )
                      (catch Exception e
                        (log/error :in-memory/server-processor-error {:error (.getMessage e)})))
                    (recur)))))))
@@ -91,9 +91,9 @@
       (throw (ex-info "Missing :shared transport in server configuration"
                       {:config options})))
     (let [server (->InMemoryServer
-                   shared
-                   (atomic/create-atomic-boolean true)
-                   (atom handlers))]
+                  shared
+                  (atomic/create-atomic-boolean true)
+                  (atom handlers))]
       ;; Start message processing
       (start-server-message-processor! server)
       (log/info :in-memory/server-created {})
@@ -127,9 +127,12 @@
 
   (notify-all! [server method params]
     (log/debug :in-memory/notify-all {:method method :params params})
-    ;; For in-memory transport, we don't have multiple clients to notify
-    ;; This is a no-op as mentioned in the protocol docs
-    )
+    ;; Send notification to client via shared transport
+    (let [notification {:jsonrpc "2.0"
+                        :method method
+                        :params params}]
+      (shared/offer-to-client! (:shared-transport server) notification)
+      (log/debug :in-memory/notification-sent {:method method})))
 
   (stop! [server]
     (atomic/set-boolean! (:server-alive? server) false)

@@ -164,7 +164,7 @@
   (let [subscription-registry (subscriptions/create-registry)
         notification-handler (create-notification-handler subscription-registry)
         ;; Add notification handler to transport config
-        transport-config (assoc config :notification-handler notification-handler)
+        transport-config (assoc-in config [:transport :notification-handler] notification-handler)
         transport (transport-factory/create-transport transport-config)
         session (session/create-session
                  (cond->
