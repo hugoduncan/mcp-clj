@@ -1,0 +1,6 @@
+{:deps
+ {poly/mcp-client {:local/root "../../components/mcp-client"}
+  poly/mcp-server {:local/root "../../components/mcp-server"}
+  poly/interop {:local/root "../../components/interop"}
+  poly/in-memory-transport {:local/root "../../components/in-memory-transport"}
+  poly/log {:local/root "../../components/log"}}}
