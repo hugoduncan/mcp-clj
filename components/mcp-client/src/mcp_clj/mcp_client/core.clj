@@ -1,32 +1,34 @@
 (ns mcp-clj.mcp-client.core
   "MCP client implementation with initialization support"
   (:require
-    [mcp-clj.client-transport.factory :as transport-factory]
-    [mcp-clj.client-transport.protocol :as transport-protocol]
-    [mcp-clj.log :as log]
-    [mcp-clj.mcp-client.prompts :as prompts]
-    [mcp-clj.mcp-client.resources :as resources]
-    [mcp-clj.mcp-client.session :as session]
-    [mcp-clj.mcp-client.tools :as tools]
-    [mcp-clj.mcp-client.transport :as transport]
-    [mcp-clj.versions :as version])
+   [mcp-clj.client-transport.factory :as transport-factory]
+   [mcp-clj.client-transport.protocol :as transport-protocol]
+   [mcp-clj.log :as log]
+   [mcp-clj.mcp-client.prompts :as prompts]
+   [mcp-clj.mcp-client.resources :as resources]
+   [mcp-clj.mcp-client.session :as session]
+   [mcp-clj.mcp-client.subscriptions :as subscriptions]
+   [mcp-clj.mcp-client.tools :as tools]
+   [mcp-clj.mcp-client.transport :as transport]
+   [mcp-clj.versions :as version])
   (:import
-    (java.lang
-      AutoCloseable)
-    (java.util.concurrent
-      CompletableFuture
-      ExecutionException
-      TimeUnit
-      TimeoutException)))
+   (java.lang
+    AutoCloseable)
+   (java.util.concurrent
+    CompletableFuture
+    ExecutionException
+    TimeUnit
+    TimeoutException)))
 
 ;; Client Record
 
 (declare close!)
 
 (defrecord MCPClient
-  [transport ; Transport implementation (stdio)
-   session ; Session state (atom)
-   initialization-future] ; CompletableFuture for initialization process
+           [transport ; Transport implementation (stdio, http, etc)
+            session ; Session state (atom)
+            subscription-registry ; Subscription registry for notifications
+            initialization-future] ; CompletableFuture for initialization process
   AutoCloseable
 
   (close [this] (close! this))) ; Session state (atom)
@@ -45,18 +47,18 @@
             expected-version (:protocol-version current-session)]
         (when (not= protocolVersion expected-version)
           (throw (ex-info
-                   "Protocol version mismatch"
-                   {:expected expected-version
-                    :received protocolVersion
-                    :response response}))))
+                  "Protocol version mismatch"
+                  {:expected expected-version
+                   :received protocolVersion
+                   :response response}))))
 
       ;; Transition to ready state with server info
       (swap! session-atom
              #(session/transition-state!
-                %
-                :ready
-                :server-info serverInfo
-                :server-capabilities capabilities))
+               %
+               :ready
+               :server-info serverInfo
+               :server-capabilities capabilities))
 
       (log/info :client/session-ready
                 {:server-info serverInfo
@@ -66,10 +68,10 @@
       (log/error :client/initialize-error {:error e})
       (swap! session-atom
              #(session/transition-state!
-                %
-                :error
-                :error-info {:type :initialization-failed
-                             :error e})))))
+               %
+               :error
+               :error-info {:type :initialization-failed
+                            :error e})))))
 
 (defn- send-initialized-notification
   "Send initialized notification after successful initialization"
@@ -105,10 +107,10 @@
                            :capabilities (:capabilities session)
                            :clientInfo (:client-info session)}
               response-future (transport/send-request!
-                                transport
-                                "initialize"
-                                init-params
-                                30000)]
+                               transport
+                               "initialize"
+                               init-params
+                               30000)]
 
           (log/debug :mcp/initialize-sent {:params init-params})
 
@@ -132,6 +134,18 @@
                                 (.completeExceptionally ready-future e)))
                             ready-future))))))))
 
+(defn- create-notification-handler
+  "Create notification handler that dispatches to subscription registry"
+  [subscription-registry]
+  (fn [notification]
+    (log/debug :client/notification-received {:notification notification})
+    (try
+      (subscriptions/dispatch-notification! subscription-registry notification)
+      (catch Exception e
+        (log/error :client/notification-handler-error
+                   {:notification notification
+                    :error e})))))
+
 ;; Client Management
 
 (defn create-client
@@ -147,15 +161,22 @@
   ^AutoCloseable [{:keys [transport client-info capabilities protocol-version]
                    :or {protocol-version (version/get-latest-version)}
                    :as config}]
-  (let [transport (transport-factory/create-transport config)
+  (let [subscription-registry (subscriptions/create-registry)
+        notification-handler (create-notification-handler subscription-registry)
+        ;; Add notification handler to transport config
+        transport-config (assoc config :notification-handler notification-handler)
+        transport (transport-factory/create-transport transport-config)
         session (session/create-session
-                  (cond->
-                    {:client-info client-info
-                     :capabilities capabilities}
-                    protocol-version
-                    (assoc :protocol-version protocol-version)))
-        client (->MCPClient transport (atom session) nil)
+                 (cond->
+                  {:client-info client-info
+                   :capabilities capabilities}
+                   protocol-version
+                   (assoc :protocol-version protocol-version)))
+        client (->MCPClient transport (atom session) subscription-registry nil)
         init-future (start-initialization! client)]
+    ;; Set up automatic cache invalidation for tools and prompts
+    (tools/setup-cache-invalidation! client)
+    (prompts/setup-cache-invalidation! client)
     (assoc client :initialization-future init-future)))
 
 (defn close!
@@ -308,3 +329,65 @@
   Uses cached resources if available, otherwise queries the server."
   [client]
   (resources/available-resources?-impl client))
+
+;;; Subscription API
+
+(defn subscribe-resource!
+  "Subscribe to resource updates for a specific URI.
+
+  Returns a CompletableFuture that resolves when the subscription is established.
+  The callback-fn will be called with notification params when the resource changes.
+
+  Example:
+    (subscribe-resource! client \"file:///path/to/file\"
+      (fn [notification]
+        (println \"Resource updated:\" (:uri notification))))"
+  [client uri callback-fn]
+  (resources/subscribe-resource-impl! client uri callback-fn))
+
+(defn unsubscribe-resource!
+  "Unsubscribe from resource updates for a specific URI.
+
+  Returns a CompletableFuture that resolves when the unsubscription is complete."
+  [client uri]
+  (resources/unsubscribe-resource-impl! client uri))
+
+(defn subscribe-tools-changed!
+  "Subscribe to tools list changed notifications.
+
+  Returns a CompletableFuture that resolves immediately (no server request needed).
+  The callback-fn will be called when the server sends tools/list_changed notifications.
+
+  Example:
+    (subscribe-tools-changed! client
+      (fn [notification]
+        (println \"Tools list changed\")))"
+  [client callback-fn]
+  (tools/subscribe-tools-changed-impl! client callback-fn))
+
+(defn unsubscribe-tools-changed!
+  "Unsubscribe from tools list changed notifications.
+
+  Returns a CompletableFuture that resolves immediately."
+  [client callback-fn]
+  (tools/unsubscribe-tools-changed-impl! client callback-fn))
+
+(defn subscribe-prompts-changed!
+  "Subscribe to prompts list changed notifications.
+
+  Returns a CompletableFuture that resolves immediately (no server request needed).
+  The callback-fn will be called when the server sends prompts/list_changed notifications.
+
+  Example:
+    (subscribe-prompts-changed! client
+      (fn [notification]
+        (println \"Prompts list changed\")))"
+  [client callback-fn]
+  (prompts/subscribe-prompts-changed-impl! client callback-fn))
+
+(defn unsubscribe-prompts-changed!
+  "Unsubscribe from prompts list changed notifications.
+
+  Returns a CompletableFuture that resolves immediately."
+  [client callback-fn]
+  (prompts/unsubscribe-prompts-changed-impl! client callback-fn))

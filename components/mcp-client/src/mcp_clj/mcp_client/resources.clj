@@ -1,12 +1,13 @@
 (ns mcp-clj.mcp-client.resources
   "Resource access implementation for MCP client"
   (:require
-    [mcp-clj.log :as log]
-    [mcp-clj.mcp-client.session :as session]
-    [mcp-clj.mcp-client.transport :as transport])
+   [mcp-clj.log :as log]
+   [mcp-clj.mcp-client.session :as session]
+   [mcp-clj.mcp-client.subscriptions :as subscriptions]
+   [mcp-clj.mcp-client.transport :as transport])
   (:import
-    (java.util.concurrent
-      CompletableFuture)))
+   (java.util.concurrent
+    CompletableFuture)))
 
 (defn- get-resources-cache
   "Get or create resources cache in client session"
@@ -46,10 +47,10 @@
               params (cond-> {}
                        cursor (assoc :cursor cursor))
               response (transport/send-request!
-                         transport
-                         "resources/list"
-                         params
-                         30000)]
+                        transport
+                        "resources/list"
+                        params
+                        30000)]
           ;; Transform the response future to handle caching and return resources
           (.thenApply response
                       (reify java.util.function.Function
@@ -84,40 +85,40 @@
         (let [transport (:transport client)
               params {:uri resource-uri}]
           (.thenApply
-            (transport/send-request!
-              transport
-              "resources/read"
-              params
-              30000)
-            (reify java.util.function.Function
-              (apply
-                [_ result]
-                (let [is-error (:isError result false)]
-                  (if is-error
-                    (do
-                      (log/error :client/read-resource-error
-                                 {:resource-uri resource-uri
-                                  :content (:content result)})
+           (transport/send-request!
+            transport
+            "resources/read"
+            params
+            30000)
+           (reify java.util.function.Function
+             (apply
+               [_ result]
+               (let [is-error (:isError result false)]
+                 (if is-error
+                   (do
+                     (log/error :client/read-resource-error
+                                {:resource-uri resource-uri
+                                 :content (:content result)})
                       ;; Return error map instead of throwing
-                      {:isError true
-                       :resource-uri resource-uri
-                       :content (:content result)})
-                    (do
-                      (log/info :client/read-resource-success
-                                {:resource-uri resource-uri})
+                     {:isError true
+                      :resource-uri resource-uri
+                      :content (:content result)})
+                   (do
+                     (log/info :client/read-resource-success
+                               {:resource-uri resource-uri})
                       ;; Return the resource content
-                      result)))))))))
+                     result)))))))))
     (catch Exception e
       ;; Return a failed future for immediate exceptions (like transport errors)
       (log/error :client/read-resource-error {:resource-uri resource-uri
                                               :error (.getMessage e)
                                               :ex e})
       (CompletableFuture/failedFuture
-        (ex-info
-          (str "Resource read failed: " resource-uri)
-          {:resource-uri resource-uri
-           :error (.getMessage e)}
-          e)))))
+       (ex-info
+        (str "Resource read failed: " resource-uri)
+        {:resource-uri resource-uri
+         :error (.getMessage e)}
+        e)))))
 
 (defn available-resources?-impl
   "Check if any resources are available from the server.
@@ -140,3 +141,81 @@
     (catch Exception e
       (log/debug :client/available-resources-error {:error (.getMessage e)})
       false)))
+
+(defn subscribe-resource-impl!
+  "Subscribe to resource updates for a specific URI.
+
+  Returns a CompletableFuture that resolves when the subscription is established.
+  The callback-fn will be called with notification params when the resource changes."
+  ^CompletableFuture [client uri callback-fn]
+  (log/info :client/subscribe-resource-start {:uri uri})
+  (try
+    (let [session @(:session client)]
+      (if-not (session/server-supports-resources? session)
+        (session/capability-not-supported "resources" session {:uri uri})
+        (let [transport (:transport client)
+              subscription-registry (:subscription-registry client)
+              params {:uri uri}]
+          ;; Register callback in subscription registry first
+          (subscriptions/subscribe-resource! subscription-registry uri callback-fn)
+
+          ;; Send subscribe request to server
+          (.thenApply
+           (transport/send-request!
+            transport
+            "resources/subscribe"
+            params
+            30000)
+           (reify java.util.function.Function
+             (apply
+               [_ result]
+               (log/info :client/subscribe-resource-success {:uri uri})
+               result))))))
+    (catch Exception e
+      (log/error :client/subscribe-resource-error {:uri uri
+                                                   :error (.getMessage e)
+                                                   :ex e})
+      (CompletableFuture/failedFuture
+       (ex-info
+        (str "Resource subscription failed: " uri)
+        {:uri uri
+         :error (.getMessage e)}
+        e)))))
+
+(defn unsubscribe-resource-impl!
+  "Unsubscribe from resource updates for a specific URI.
+
+  Returns a CompletableFuture that resolves when the unsubscription is complete."
+  ^CompletableFuture [client uri]
+  (log/info :client/unsubscribe-resource-start {:uri uri})
+  (try
+    (let [session @(:session client)]
+      (if-not (session/server-supports-resources? session)
+        (session/capability-not-supported "resources" session {:uri uri})
+        (let [transport (:transport client)
+              subscription-registry (:subscription-registry client)
+              params {:uri uri}]
+          ;; Send unsubscribe request to server
+          (.thenApply
+           (transport/send-request!
+            transport
+            "resources/unsubscribe"
+            params
+            30000)
+           (reify java.util.function.Function
+             (apply
+               [_ result]
+               ;; Remove callback from subscription registry after successful unsubscribe
+               (subscriptions/unsubscribe-resource! subscription-registry uri)
+               (log/info :client/unsubscribe-resource-success {:uri uri})
+               result))))))
+    (catch Exception e
+      (log/error :client/unsubscribe-resource-error {:uri uri
+                                                     :error (.getMessage e)
+                                                     :ex e})
+      (CompletableFuture/failedFuture
+       (ex-info
+        (str "Resource unsubscription failed: " uri)
+        {:uri uri
+         :error (.getMessage e)}
+        e)))))
