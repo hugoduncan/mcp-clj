@@ -100,6 +100,55 @@
 
     with-extended))
 
+(defn create-test-prompts
+  "Create test prompts with version-appropriate fields.
+
+  Protocol version differences:
+  - 2024-11-05: Base version with name, description, arguments, messages
+  - 2025-03-26: No prompt-specific changes (adds audio content type support)
+  - 2025-06-18: Adds title field to prompt definitions"
+  [protocol-version]
+  (let [base-prompts
+        {"simple"
+         {:name "simple"
+          :description "A simple prompt with no arguments"
+          :messages [{:role "user"
+                      :content {:type "text"
+                                :text "Please help me with a task."}}]}
+
+         "template"
+         {:name "template"
+          :description "A prompt with template substitution"
+          :arguments [{:name "task"
+                       :description "The task to perform"
+                       :required true}]
+          :messages [{:role "user"
+                      :content {:type "text"
+                                :text "Please help me with: {{task}}"}}]}
+
+         "optional-args"
+         {:name "optional-args"
+          :description "A prompt with optional arguments"
+          :arguments [{:name "context"
+                       :description "Optional context"
+                       :required false}]
+          :messages [{:role "system"
+                      :content {:type "text"
+                                :text "You are a helpful assistant."}}
+                     {:role "user"
+                      :content {:type "text"
+                                :text "Context: {{context}}"}}]}}
+
+        ;; Add title for 2025-06-18+
+        with-title (if (>= (compare protocol-version "2025-06-18") 0)
+                     (-> base-prompts
+                         (assoc-in ["simple" :title] "Simple Prompt")
+                         (assoc-in ["template" :title] "Template Prompt")
+                         (assoc-in ["optional-args" :title] "Optional Args Prompt"))
+                     base-prompts)]
+
+    with-title))
+
 ;;; Test Environment Creation
 
 (defn- stop-in-memory-server!
@@ -111,21 +160,26 @@
 (defn create-clojure-pair
   "Create Clojure client + Clojure server pair using in-memory transport.
 
+  Options:
+  - :tools - Map of tools to register (defaults to create-test-tools)
+  - :prompts - Map of prompts to register (defaults to none)
+
   Returns a map with:
   - :client - initialized MCP client
   - :server - running MCP server
   - :cleanup-fn - function to cleanly shutdown both"
-  [protocol-version]
-  (let [test-tools (create-test-tools protocol-version)
+  [protocol-version & [{:keys [tools prompts]}]]
+  (let [test-tools (or tools (create-test-tools protocol-version))
         shared-transport (shared/create-shared-transport)
 
         ;; Create server
         mcp-server (server/create-server
-                    {:transport {:type :in-memory
-                                 :shared shared-transport}
-                     :tools test-tools
-                     :server-info {:name "test-server"
-                                   :version "1.0.0"}})
+                    (cond-> {:transport {:type :in-memory
+                                         :shared shared-transport}
+                             :tools test-tools
+                             :server-info {:name "test-server"
+                                           :version "1.0.0"}}
+                      prompts (assoc :prompts prompts)))
 
         ;; Create client
         mcp-client (client/create-client
