@@ -149,6 +149,55 @@
 
     with-title))
 
+(defn create-test-resources
+  "Create test resources with version-appropriate fields.
+
+  Protocol version differences:
+  - 2024-11-05: Base version with name, uri, mimeType, description
+  - 2025-03-26: Adds annotations field (audience, priority)
+  - 2025-06-18: No resource-specific changes"
+  [protocol-version]
+  (let [base-resources
+        {"text-resource"
+         {:name "text-resource"
+          :uri "file:///test/text-resource.txt"
+          :mime-type "text/plain"
+          :description "A simple text resource"
+          :implementation (fn [_uri]
+                            {:contents [{:uri "file:///test/text-resource.txt"
+                                         :text "Hello, world!"}]})}
+
+         "json-resource"
+         {:name "json-resource"
+          :uri "file:///test/data.json"
+          :mime-type "application/json"
+          :description "A JSON data resource"
+          :implementation (fn [_uri]
+                            {:contents [{:uri "file:///test/data.json"
+                                         :text "{\"key\": \"value\"}"}]})}
+
+         "blob-resource"
+         {:name "blob-resource"
+          :uri "file:///test/image.png"
+          :mime-type "image/png"
+          :description "A binary blob resource"
+          :implementation (fn [_uri]
+                            {:contents [{:uri "file:///test/image.png"
+                                         :blob "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}]})}}
+
+        ;; Add annotations for 2025-03-26+
+        with-annotations (if (>= (compare protocol-version "2025-03-26") 0)
+                           (-> base-resources
+                               (assoc-in ["text-resource" :annotations]
+                                         {:audience ["user"]
+                                          :priority 0.8})
+                               (assoc-in ["json-resource" :annotations]
+                                         {:audience ["assistant"]
+                                          :priority 0.5}))
+                           base-resources)]
+
+    with-annotations))
+
 ;;; Test Environment Creation
 
 (defn- stop-in-memory-server!
@@ -168,7 +217,7 @@
   - :client - initialized MCP client
   - :server - running MCP server
   - :cleanup-fn - function to cleanly shutdown both"
-  [protocol-version & [{:keys [tools prompts]}]]
+  [protocol-version & [{:keys [tools prompts resources]}]]
   (let [test-tools (or tools (create-test-tools protocol-version))
         shared-transport (shared/create-shared-transport)
 
@@ -179,7 +228,8 @@
                              :tools test-tools
                              :server-info {:name "test-server"
                                            :version "1.0.0"}}
-                      prompts (assoc :prompts prompts)))
+                      prompts (assoc :prompts prompts)
+                      resources (assoc :resources resources)))
 
         ;; Create client
         mcp-client (client/create-client

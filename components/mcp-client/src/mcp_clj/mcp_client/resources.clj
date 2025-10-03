@@ -98,11 +98,9 @@
                    (do
                      (log/error :client/read-resource-error
                                 {:resource-uri resource-uri
-                                 :content (:content result)})
-                      ;; Return error map instead of throwing
-                     {:isError true
-                      :resource-uri resource-uri
-                      :content (:content result)})
+                                 :contents (:contents result)})
+                      ;; Return the full error result from server
+                     result)
                    (do
                      (log/info :client/read-resource-success
                                {:resource-uri resource-uri})
@@ -219,3 +217,34 @@
         {:uri uri
          :error (.getMessage e)}
         e)))))
+
+(defn subscribe-resources-changed-impl!
+  "Subscribe to resources list changed notifications.
+
+  Returns a CompletableFuture that resolves immediately (no server request needed).
+  The callback-fn will be called when the server sends resources/list_changed notifications."
+  ^CompletableFuture [client callback-fn]
+  (log/info :client/subscribe-resources-changed-start)
+  (try
+    (let [subscription-registry (:subscription-registry client)]
+      (subscriptions/subscribe-resources-changed! subscription-registry callback-fn)
+      (log/info :client/subscribe-resources-changed-success)
+      (CompletableFuture/completedFuture {}))
+    (catch Exception e
+      (log/error :client/subscribe-resources-changed-error {:error (.getMessage e)})
+      (CompletableFuture/failedFuture e))))
+
+(defn unsubscribe-resources-changed-impl!
+  "Unsubscribe from resources list changed notifications.
+
+  Returns a CompletableFuture that resolves immediately."
+  ^CompletableFuture [client callback-fn]
+  (log/info :client/unsubscribe-resources-changed-start)
+  (try
+    (let [subscription-registry (:subscription-registry client)]
+      (subscriptions/unsubscribe-resources-changed! subscription-registry callback-fn)
+      (log/info :client/unsubscribe-resources-changed-success)
+      (CompletableFuture/completedFuture {}))
+    (catch Exception e
+      (log/error :client/unsubscribe-resources-changed-error {:error (.getMessage e)})
+      (CompletableFuture/failedFuture e))))

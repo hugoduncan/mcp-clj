@@ -391,3 +391,23 @@
   Returns a CompletableFuture that resolves immediately."
   [client callback-fn]
   (prompts/unsubscribe-prompts-changed-impl! client callback-fn))
+
+(defn subscribe-resources-changed!
+  "Subscribe to resources list changed notifications.
+
+  Returns a CompletableFuture that resolves immediately (no server request needed).
+  The callback-fn will be called when the server sends resources/list_changed notifications.
+
+  Example:
+    (subscribe-resources-changed! client
+      (fn [notification]
+        (println \"Resources list changed\")))"
+  [client callback-fn]
+  (resources/subscribe-resources-changed-impl! client callback-fn))
+
+(defn unsubscribe-resources-changed!
+  "Unsubscribe from resources list changed notifications.
+
+  Returns a CompletableFuture that resolves immediately."
+  [client callback-fn]
+  (resources/unsubscribe-resources-changed-impl! client callback-fn))

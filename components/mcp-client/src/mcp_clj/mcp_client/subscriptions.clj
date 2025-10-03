@@ -10,11 +10,13 @@
   Returns a map with:
   - :resource-subscriptions - map of URI -> callback fn
   - :tools-subscriptions - set of callback fns
-  - :prompts-subscriptions - set of callback fns"
+  - :prompts-subscriptions - set of callback fns
+  - :resources-subscriptions - set of callback fns"
   []
   {:resource-subscriptions (atom {})
    :tools-subscriptions (atom #{})
-   :prompts-subscriptions (atom #{})})
+   :prompts-subscriptions (atom #{})
+   :resources-subscriptions (atom #{})})
 
 (defn subscribe-resource!
   "Subscribe to resource updates for a specific URI.
@@ -89,6 +91,30 @@
   [registry]
   @(:prompts-subscriptions registry))
 
+(defn subscribe-resources-changed!
+  "Subscribe to resources list changed notifications.
+
+  Multiple callbacks can be registered. Returns the callback function."
+  [registry callback-fn]
+  (swap! (:resources-subscriptions registry) conj callback-fn)
+  callback-fn)
+
+(defn unsubscribe-resources-changed!
+  "Unsubscribe from resources list changed notifications.
+
+  Returns true if the callback was found and removed, false otherwise."
+  [registry callback-fn]
+  (let [old-subs @(:resources-subscriptions registry)]
+    (swap! (:resources-subscriptions registry) disj callback-fn)
+    (contains? old-subs callback-fn)))
+
+(defn get-resources-callbacks
+  "Get all callback functions for resources list changed notifications.
+
+  Returns a set of callback functions."
+  [registry]
+  @(:resources-subscriptions registry))
+
 (defn dispatch-notification!
   "Dispatch an incoming notification to registered callbacks.
 
@@ -120,6 +146,12 @@
 
       "notifications/prompts/list_changed"
       (let [callbacks (get-prompts-callbacks registry)]
+        (doseq [callback callbacks]
+          (callback params))
+        (count callbacks))
+
+      "notifications/resources/list_changed"
+      (let [callbacks (get-resources-callbacks registry)]
         (doseq [callback callbacks]
           (callback params))
         (count callbacks))

@@ -115,22 +115,11 @@
       (do
         (log/info :server/notifying-subscribers
                   {:uri uri :subscriber-count (count subscribers)})
-        ;; For each subscriber, try to send notification
-        ;; SSE and HTTP servers have a notify! function for per-session notifications
-        (doseq [session-id subscribers]
-          (try
-            ;; Try to use server-specific notify! function if available
-            (if-let [notify-fn (or (ns-resolve 'mcp-clj.json-rpc.sse-server 'notify!)
-                                   (ns-resolve 'mcp-clj.json-rpc.http-server 'notify!))]
-              (notify-fn rpc-server session-id "notifications/resources/updated" {:uri uri})
-              ;; Fallback for servers without per-session notifications (like stdio)
-              (log/warn :server/no-per-session-notify
-                        {:server-type (type rpc-server)}))
-            (catch Exception e
-              (log/error :server/notify-failed
-                         {:session-id session-id
-                          :uri uri
-                          :error (.getMessage e)}))))))))
+        ;; Use notify-all! which works for all transport types including in-memory
+        (json-rpc-protocols/notify-all!
+         rpc-server
+         "notifications/resources/updated"
+         {:uri uri})))))
 
 (defn- text-map
   [msg]
