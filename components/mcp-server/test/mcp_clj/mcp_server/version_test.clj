@@ -61,7 +61,7 @@
       (let [context {:capabilities {:tools {:listChanged true}}}
             result (version/handle-version-specific-behavior
                      "2024-11-05" :capabilities context)]
-        (is (= {:tools {}} result))))
+        (is (= (:capabilities context) result))))
 
     (testing "unsupported feature throws exception"
       (is (thrown-with-msg?
@@ -79,17 +79,17 @@
                        "2025-06-18" :capabilities {:capabilities caps})]
           (is (= caps result))))
 
-      (testing "2025-03-26 flattens nested capabilities"
+      (testing "2025-03-26 supports nested capabilities"
         (let [caps {:tools {:listChanged true} :resources {:subscribe false}}
               result (version/handle-version-specific-behavior
                        "2025-03-26" :capabilities {:capabilities caps})]
-          (is (= {:tools {} :resources {}} result))))
+          (is (= caps result))))
 
-      (testing "2024-11-05 flattens nested capabilities"
+      (testing "2024-11-05 supports nested capabilities"
         (let [caps {:tools {:listChanged true} :resources {:subscribe false}}
               result (version/handle-version-specific-behavior
                        "2024-11-05" :capabilities {:capabilities caps})]
-          (is (= {:tools {} :resources {}} result))))))
+          (is (= caps result))))))
 
   (deftest server-info-formatting-test
     (testing "server info formatting per version"
@@ -231,8 +231,8 @@
 
       (testing "supports-nested-capabilities?"
         (is (version/supports-nested-capabilities? "2025-06-18"))
-        (is (not (version/supports-nested-capabilities? "2025-03-26")))
-        (is (not (version/supports-nested-capabilities? "2024-11-05"))))))
+        (is (version/supports-nested-capabilities? "2025-03-26"))
+        (is (version/supports-nested-capabilities? "2024-11-05")))))
 
   (deftest validate-content-types-test
     (testing "content type validation utility"

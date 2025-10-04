@@ -56,7 +56,7 @@
 (defn supports-nested-capabilities?
   "Check if version supports nested capability structure"
   [protocol-version]
-  (version-gte? protocol-version "2025-06-18"))
+  (version-gte? protocol-version "2024-11-05"))
 
 ;; Version-specific behavior dispatch
 
@@ -92,19 +92,13 @@
 
 (defmethod handle-version-specific-behavior ["2025-03-26" :capabilities]
   [_ _ {:keys [capabilities]}]
-  ;; 2025-03-26 uses flat capability structure - remove nested sub-capabilities
-  (update-vals capabilities (fn [cap-map]
-                              (if (map? cap-map)
-                                {}  ; Convert nested capabilities to empty map
-                                cap-map))))
+  ;; 2025-03-26 supports nested sub-capabilities
+  capabilities)
 
 (defmethod handle-version-specific-behavior ["2024-11-05" :capabilities]
   [_ _ {:keys [capabilities]}]
-  ;; 2024-11-05 uses flat capability structure - remove nested sub-capabilities
-  (update-vals capabilities (fn [cap-map]
-                              (if (map? cap-map)
-                                {}  ; Convert nested capabilities to empty map
-                                cap-map))))
+  ;; 2024-11-05 supports nested sub-capabilities
+  capabilities)
 
 ;; Server info handling
 

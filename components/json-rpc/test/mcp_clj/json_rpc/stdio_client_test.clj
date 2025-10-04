@@ -149,8 +149,9 @@
   (testing "JSON-RPC notification handling"
     (testing "notification logging"
       ;; This mainly tests that notifications are logged without error
-      (let [notification {:jsonrpc "2.0" :method "progress" :params {:value 50}}]
-        (is (nil? (stdio-client/handle-notification notification)))))))
+      (let [notification {:jsonrpc "2.0" :method "progress" :params {:value 50}}
+            client {:notification-handler nil}]
+        (is (nil? (stdio-client/handle-notification client notification)))))))
 
 (deftest json-io-wrapper-test
   (testing "JSON I/O wrapper functions"

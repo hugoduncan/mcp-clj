@@ -99,8 +99,8 @@
                       (log/error :client/read-resource-error
                                  {:resource-uri resource-uri
                                   :contents (:contents result)})
-                      ;; Return the full error result from server
-                      result)
+                      ;; Return error result with resource-uri added
+                      (assoc result :resource-uri resource-uri))
                     (do
                       (log/info :client/read-resource-success
                                 {:resource-uri resource-uri})

@@ -98,8 +98,9 @@
 
 (defn create-transport
   "Create stdio transport by launching MCP server process"
-  [{:keys [server-command notification-handler]}]
-  (let [process-info (start-server-process server-command)
+  [{:keys [notification-handler] :as options}]
+  (let [server-command (dissoc options :notification-handler)
+        process-info (start-server-process server-command)
         {:keys [stdin stdout]} process-info
         json-rpc-client (stdio-client/create-json-rpc-client
                           stdout
