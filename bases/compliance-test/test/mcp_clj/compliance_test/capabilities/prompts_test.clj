@@ -9,12 +9,12 @@
   Note: Currently testing only Clojure client + server as cross-implementation
   testing requires additional setup for Java SDK prompt support."
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.compliance-test.test-helpers :as helpers]
-   [mcp-clj.mcp-client.core :as client]
-   [mcp-clj.mcp-server.core :as mcp-server]))
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.compliance-test.test-helpers :as helpers]
+    [mcp-clj.mcp-client.core :as client]
+    [mcp-clj.mcp-server.core :as mcp-server]))
 
-;;; Compliance Tests
+;; Compliance Tests
 
 (deftest ^:integ prompts-list-compliance-test
   ;; Test that prompts/list returns available prompts with correct schema
@@ -138,10 +138,10 @@
               received-notifications (atom [])
               ;; Set up notification handler by subscribing to prompts changes
               _ @(client/subscribe-prompts-changed!
-                  client
-                  (fn [params]
-                    (swap! received-notifications conj
-                           {:method "notifications/prompts/list_changed" :params params})))
+                   client
+                   (fn [params]
+                     (swap! received-notifications conj
+                            {:method "notifications/prompts/list_changed" :params params})))
               ;; Add a new prompt to trigger notification
               new-prompt {:name "new-prompt"
                           :description "A new test prompt"

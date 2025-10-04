@@ -1,8 +1,8 @@
 (ns mcp-clj.mcp-server.prompts
   "MCP prompt endpoints"
   (:require
-   [clojure.string :as str]
-   [mcp-clj.log :as log]))
+    [clojure.string :as str]
+    [mcp-clj.log :as log]))
 
 (defn- validate-argument
   "Validate a prompt argument definition"
@@ -45,10 +45,10 @@
     (update-in message [:content :text]
                (fn [text]
                  (reduce-kv
-                  (fn [t k v]
-                    (str/replace t (str "{{" (name k) "}}") v))
-                  text
-                  arguments)))
+                   (fn [t k v]
+                     (str/replace t (str "{{" (name k) "}}") v))
+                   text
+                   arguments)))
     message))
 
 (defn prompt-definition
@@ -78,17 +78,17 @@
 
 (def ^:private repl-prompt
   (valid-prompt?
-   {:name "repl"
-    :description "Standard REPL prompt for code evaluation"
-    :messages [{:role "system"
-                :content {:type "text"
-                          :text "You are interacting with a Clojure REPL."}}
-               {:role "user"
-                :content {:type "text"
-                          :text "Please evaluate {{code}}"}}]
-    :arguments [{:name "code"
-                 :description "Clojure code to evaluate"
-                 :required true}]}))
+    {:name "repl"
+     :description "Standard REPL prompt for code evaluation"
+     :messages [{:role "system"
+                 :content {:type "text"
+                           :text "You are interacting with a Clojure REPL."}}
+                {:role "user"
+                 :content {:type "text"
+                           :text "Please evaluate {{code}}"}}]
+     :arguments [{:name "code"
+                  :description "Clojure code to evaluate"
+                  :required true}]}))
 
 (def default-prompts
   "Default set of built-in prompts"

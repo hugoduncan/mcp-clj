@@ -1,19 +1,19 @@
 (ns mcp-clj.mcp-server.subscription-test
   "Integration tests for resource subscription functionality"
   (:require
-   [clojure.data.json :as json]
-   [clojure.java.io :as io]
-   [clojure.string :as str]
-   [clojure.test :refer [deftest is testing use-fixtures]]
-   [hato.client :as hato]
-   [mcp-clj.mcp-server.core :as mcp])
+    [clojure.data.json :as json]
+    [clojure.java.io :as io]
+    [clojure.string :as str]
+    [clojure.test :refer [deftest is testing use-fixtures]]
+    [hato.client :as hato]
+    [mcp-clj.mcp-server.core :as mcp])
   (:import
-   (java.io
-    BufferedReader)
-   (java.util.concurrent
-    BlockingQueue
-    LinkedBlockingQueue
-    TimeUnit)))
+    (java.io
+      BufferedReader)
+    (java.util.concurrent
+      BlockingQueue
+      LinkedBlockingQueue
+      TimeUnit)))
 
 (def test-resource
   {:name "test-resource"
@@ -31,8 +31,8 @@
 (defn with-server
   [f]
   (let [server (mcp/create-server
-                {:transport {:type :sse :port 0}
-                 :resources {"test-resource" test-resource}})]
+                 {:transport {:type :sse :port 0}
+                  :resources {"test-resource" test-resource}})]
     (try
       (binding [*server* server]
         (f))
@@ -66,10 +66,10 @@
           (when-let [[k v] (str/split line #":" 2)]
             (let [v (str/trim v)]
               (recur
-               (assoc resp (keyword k)
-                      (if (= "message" (:event resp))
-                        (json/read-str v :key-fn keyword)
-                        v))))))))))
+                (assoc resp (keyword k)
+                       (if (= "message" (:event resp))
+                         (json/read-str v :key-fn keyword)
+                         v))))))))))
 
 (defn send-request
   [url request]
@@ -108,14 +108,14 @@
 
                 (testing "initializes session"
                   (send-request
-                   (str url uri)
-                   {:jsonrpc "2.0"
-                    :method "initialize"
-                    :params {:protocolVersion "2024-11-05"
-                             :capabilities {:roots {:listChanged true}}
-                             :clientInfo {:name "test-client"
-                                          :version "1.0.0"}}
-                    :id 1})
+                    (str url uri)
+                    {:jsonrpc "2.0"
+                     :method "initialize"
+                     :params {:protocolVersion "2024-11-05"
+                              :capabilities {:roots {:listChanged true}}
+                              :clientInfo {:name "test-client"
+                                           :version "1.0.0"}}
+                     :id 1})
 
                   (let [msg (poll queue)]
                     (is msg "Should receive initialize response")
@@ -128,18 +128,18 @@
                           "Server should advertise listChanged capability")))
 
                   (send-request
-                   (str url uri)
-                   {:jsonrpc "2.0"
-                    :method "notifications/initialized"
-                    :params {}})
+                    (str url uri)
+                    {:jsonrpc "2.0"
+                     :method "notifications/initialized"
+                     :params {}})
 
                   (testing "subscribes to resource"
                     (send-request
-                     (str url uri)
-                     {:jsonrpc "2.0"
-                      :method "resources/subscribe"
-                      :params {:uri "file:///test.txt"}
-                      :id 2})
+                      (str url uri)
+                      {:jsonrpc "2.0"
+                       :method "resources/subscribe"
+                       :params {:uri "file:///test.txt"}
+                       :id 2})
 
                     (let [msg (poll queue)]
                       (is msg "Should receive subscribe response")
@@ -160,11 +160,11 @@
 
                     (testing "unsubscribes from resource"
                       (send-request
-                       (str url uri)
-                       {:jsonrpc "2.0"
-                        :method "resources/unsubscribe"
-                        :params {:uri "file:///test.txt"}
-                        :id 3})
+                        (str url uri)
+                        {:jsonrpc "2.0"
+                         :method "resources/unsubscribe"
+                         :params {:uri "file:///test.txt"}
+                         :id 3})
 
                       (let [msg (poll queue)]
                         (is msg "Should receive unsubscribe response")
@@ -182,11 +182,11 @@
 
                   (testing "subscribing to non-existent resource returns error"
                     (send-request
-                     (str url uri)
-                     {:jsonrpc "2.0"
-                      :method "resources/subscribe"
-                      :params {:uri "file:///nonexistent.txt"}
-                      :id 4})
+                      (str url uri)
+                      {:jsonrpc "2.0"
+                       :method "resources/subscribe"
+                       :params {:uri "file:///nonexistent.txt"}
+                       :id 4})
 
                     (let [msg (poll queue)]
                       (is msg "Should receive subscribe error response")
@@ -195,7 +195,7 @@
                         (is (true? (get-in data [:result :isError]))
                             "Should return error for non-existent resource")
                         (is (str/includes?
-                             (get-in data [:result :content 0 :text])
-                             "not found")))))))))
+                              (get-in data [:result :content 0 :text])
+                              "not found")))))))))
 
           (future-cancel f))))))

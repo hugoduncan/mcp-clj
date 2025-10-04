@@ -1,19 +1,19 @@
 (ns mcp-clj.json-rpc.stdio-client-test
   "Tests for JSON-RPC stdio client functionality"
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.json-rpc.executor :as executor]
-   [mcp-clj.json-rpc.stdio-client :as stdio-client])
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.json-rpc.executor :as executor]
+    [mcp-clj.json-rpc.stdio-client :as stdio-client])
   (:import
-   (java.io
-    BufferedReader
-    BufferedWriter
-    StringReader
-    StringWriter)
-   (java.util.concurrent
-    CompletableFuture
-    ConcurrentHashMap
-    TimeUnit)))
+    (java.io
+      BufferedReader
+      BufferedWriter
+      StringReader
+      StringWriter)
+    (java.util.concurrent
+      CompletableFuture
+      ConcurrentHashMap
+      TimeUnit)))
 
 (defn create-test-client
   "Create a test JSONRPClient with string-based streams"
@@ -29,14 +29,14 @@
         output-stream (BufferedWriter. (StringWriter.))
         running (atom true)]
     (mcp_clj.json_rpc.stdio_client.JSONRPClient.
-     (ConcurrentHashMap.)
-     (atom 0)
-     (executor/create-executor 2)
-     input-stream
-     output-stream
-     running
-     nil
-     nil)))
+      (ConcurrentHashMap.)
+      (atom 0)
+      (executor/create-executor 2)
+      input-stream
+      output-stream
+      running
+      nil
+      nil)))
 
 (deftest json-rpc-client-creation-test
   (testing "JSONRPClient record creation and structure"
@@ -76,11 +76,11 @@
       (testing "concurrent ID generation produces unique IDs"
         (let [ids (atom #{})
               futures (doall
-                       (for [_ (range 100)]
-                         (future
-                           (let [id (stdio-client/generate-request-id client)]
-                             (swap! ids conj id)
-                             id))))]
+                        (for [_ (range 100)]
+                          (future
+                            (let [id (stdio-client/generate-request-id client)]
+                              (swap! ids conj id)
+                              id))))]
           ;; Wait for all futures to complete
           (doseq [f futures] @f)
           ;; All IDs should be unique

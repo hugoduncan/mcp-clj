@@ -1,39 +1,39 @@
 (ns mcp-clj.compliance-test.test-helpers
   "Shared test helpers for MCP compliance tests"
   (:require
-   [mcp-clj.client-transport.factory :as client-transport-factory]
-   [mcp-clj.in-memory-transport.shared :as shared]
-   [mcp-clj.java-sdk.interop :as java-sdk]
-   [mcp-clj.mcp-client.core :as client]
-   [mcp-clj.mcp-server.core :as server]
-   [mcp-clj.server-transport.factory :as server-transport-factory]))
+    [mcp-clj.client-transport.factory :as client-transport-factory]
+    [mcp-clj.in-memory-transport.shared :as shared]
+    [mcp-clj.java-sdk.interop :as java-sdk]
+    [mcp-clj.mcp-client.core :as client]
+    [mcp-clj.mcp-server.core :as server]
+    [mcp-clj.server-transport.factory :as server-transport-factory]))
 
-;;; Transport Registration
+;; Transport Registration
 
 (defn ensure-in-memory-transport-registered!
   "Ensure in-memory transport is registered in both client and server factories.
   Can be called multiple times safely - registration is idempotent."
   []
   (client-transport-factory/register-transport!
-   :in-memory
-   (fn [options]
-     (require 'mcp-clj.in-memory-transport.client)
-     (let [create-fn (ns-resolve
-                      'mcp-clj.in-memory-transport.client
-                      'create-transport)]
-       (create-fn options))))
+    :in-memory
+    (fn [options]
+      (require 'mcp-clj.in-memory-transport.client)
+      (let [create-fn (ns-resolve
+                        'mcp-clj.in-memory-transport.client
+                        'create-transport)]
+        (create-fn options))))
   (server-transport-factory/register-transport!
-   :in-memory
-   (fn [options handlers]
-     (require 'mcp-clj.in-memory-transport.server)
-     (let [create-server (ns-resolve
-                          'mcp-clj.in-memory-transport.server
-                          'create-in-memory-server)]
-       (create-server options handlers)))))
+    :in-memory
+    (fn [options handlers]
+      (require 'mcp-clj.in-memory-transport.server)
+      (let [create-server (ns-resolve
+                            'mcp-clj.in-memory-transport.server
+                            'create-in-memory-server)]
+        (create-server options handlers)))))
 
 (ensure-in-memory-transport-registered!)
 
-;;; Test Tools Creation
+;; Test Tools Creation
 
 (defn create-test-tools
   "Create test tools with version-appropriate fields.
@@ -198,7 +198,7 @@
 
     with-annotations))
 
-;;; Test Environment Creation
+;; Test Environment Creation
 
 (defn- stop-in-memory-server!
   "Stop an in-memory server"
@@ -223,21 +223,21 @@
 
         ;; Create server
         mcp-server (server/create-server
-                    (cond-> {:transport {:type :in-memory
-                                         :shared shared-transport}
-                             :tools test-tools
-                             :server-info {:name "test-server"
-                                           :version "1.0.0"}}
-                      prompts (assoc :prompts prompts)
-                      resources (assoc :resources resources)))
+                     (cond-> {:transport {:type :in-memory
+                                          :shared shared-transport}
+                              :tools test-tools
+                              :server-info {:name "test-server"
+                                            :version "1.0.0"}}
+                       prompts (assoc :prompts prompts)
+                       resources (assoc :resources resources)))
 
         ;; Create client
         mcp-client (client/create-client
-                    {:transport {:type :in-memory
-                                 :shared shared-transport}
-                     :client-info {:name "test-client"
-                                   :version "1.0.0"}
-                     :protocol-version protocol-version})]
+                     {:transport {:type :in-memory
+                                  :shared shared-transport}
+                      :client-info {:name "test-client"
+                                    :version "1.0.0"}
+                      :protocol-version protocol-version})]
 
     ;; Wait for client to initialize
     (client/wait-for-ready mcp-client 5000)
@@ -260,9 +260,9 @@
 
         ;; Create Java SDK server
         java-server (java-sdk/create-java-server
-                     {:name "java-test-server"
-                      :version "1.0.0"
-                      :async? true})
+                      {:name "java-test-server"
+                       :version "1.0.0"
+                       :async? true})
 
         ;; Register test tools
         _ (doseq [[_name tool] test-tools]
@@ -273,17 +273,17 @@
 
         ;; Create transport for Clojure client to connect to Java server
         transport (java-sdk/create-stdio-client-transport
-                   {:command "clojure"
-                    :args ["-M:dev:test" "-m"
-                           "mcp-clj.java-sdk.sdk-server-main"]})
+                    {:command "clojure"
+                     :args ["-M:dev:test" "-m"
+                            "mcp-clj.java-sdk.sdk-server-main"]})
 
         ;; Create Clojure client
         mcp-client (client/create-client
-                    {:transport {:type :stdio
-                                 :transport-instance transport}
-                     :client-info {:name "test-client"
-                                   :version "1.0.0"}
-                     :protocol-version protocol-version})]
+                     {:transport {:type :stdio
+                                  :transport-instance transport}
+                      :client-info {:name "test-client"
+                                    :version "1.0.0"}
+                      :protocol-version protocol-version})]
 
     ;; Wait for client to initialize
     (client/wait-for-ready mcp-client 5000)
@@ -306,20 +306,20 @@
 
         ;; Create Clojure server with stdio transport
         mcp-server (server/create-server
-                    {:transport {:type :stdio}
-                     :tools test-tools
-                     :server-info {:name "test-server"
-                                   :version "1.0.0"}})
+                     {:transport {:type :stdio}
+                      :tools test-tools
+                      :server-info {:name "test-server"
+                                    :version "1.0.0"}})
 
         ;; Create Java SDK client
         transport (java-sdk/create-stdio-client-transport
-                   {:command "clojure"
-                    :args ["-M:dev:test" "-m"
-                           "mcp-clj.stdio-server"]})
+                    {:command "clojure"
+                     :args ["-M:dev:test" "-m"
+                            "mcp-clj.stdio-server"]})
 
         java-client (java-sdk/create-java-client
-                     {:transport transport
-                      :async? true})]
+                      {:transport transport
+                       :async? true})]
 
     ;; Initialize client
     (java-sdk/initialize-client java-client)
@@ -330,7 +330,7 @@
                    (java-sdk/close-client java-client)
                    ((:stop mcp-server)))}))
 
-;;; Test Execution Helpers
+;; Test Execution Helpers
 
 (def test-protocol-versions
   "MCP protocol versions to test for compliance"

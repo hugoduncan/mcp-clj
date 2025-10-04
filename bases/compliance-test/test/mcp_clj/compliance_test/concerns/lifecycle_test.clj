@@ -1,7 +1,7 @@
 (ns mcp-clj.compliance-test.concerns.lifecycle-test
   "Compliance tests for MCP lifecycle concern across implementations."
   (:require
-   [clojure.test :refer [deftest is testing]]))
+    [clojure.test :refer [deftest is testing]]))
 
 (deftest initialize-test
   (testing "initialize negotiates protocol version and exchanges capabilities"

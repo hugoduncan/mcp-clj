@@ -24,13 +24,13 @@
   Returns updated subscriptions map."
   [subscriptions session-id]
   (reduce-kv
-   (fn [acc uri subscribers]
-     (let [updated-subscribers (disj subscribers session-id)]
-       (if (empty? updated-subscribers)
-         acc
-         (assoc acc uri updated-subscribers))))
-   {}
-   subscriptions))
+    (fn [acc uri subscribers]
+      (let [updated-subscribers (disj subscribers session-id)]
+        (if (empty? updated-subscribers)
+          acc
+          (assoc acc uri updated-subscribers))))
+    {}
+    subscriptions))
 
 (defn get-subscribers
   "Get set of session-ids subscribed to uri.

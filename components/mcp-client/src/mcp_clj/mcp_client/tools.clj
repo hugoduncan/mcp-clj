@@ -1,14 +1,14 @@
 (ns mcp-clj.mcp-client.tools
   "Tool calling implementation for MCP client"
   (:require
-   [clojure.data.json :as json]
-   [mcp-clj.log :as log]
-   [mcp-clj.mcp-client.session :as session]
-   [mcp-clj.mcp-client.subscriptions :as subscriptions]
-   [mcp-clj.mcp-client.transport :as transport])
+    [clojure.data.json :as json]
+    [mcp-clj.log :as log]
+    [mcp-clj.mcp-client.session :as session]
+    [mcp-clj.mcp-client.subscriptions :as subscriptions]
+    [mcp-clj.mcp-client.transport :as transport])
   (:import
-   (java.util.concurrent
-    CompletableFuture)))
+    (java.util.concurrent
+      CompletableFuture)))
 
 (defn- get-tools-cache
   "Get or create tools cache in client session"
@@ -44,10 +44,10 @@
         (session/capability-not-supported "tools" session {})
         (let [transport (:transport client)
               response (transport/send-request!
-                        transport
-                        "tools/list"
-                        {}
-                        30000)]
+                         transport
+                         "tools/list"
+                         {}
+                         30000)]
           ;; Transform the response future to handle caching and return tools
           (.thenApply response
                       (reify java.util.function.Function
@@ -96,7 +96,7 @@
   [result tool-name]
   (let [is-error (:isError result false)
         parsed-content (parse-tool-content
-                        (:content result))]
+                         (:content result))]
     (if is-error
       (do
         (log/error :client/call-tool-error
@@ -138,21 +138,21 @@
         (let [transport (:transport client)
               params {:name tool-name :arguments (or arguments {})}]
           (transport/send-request!
-           transport
-           "tools/call"
-           params
-           30000))))
+            transport
+            "tools/call"
+            params
+            30000))))
     (catch Exception e
       ;; Return a failed future for immediate exceptions (like transport errors)
       (log/error :client/call-tool-error {:tool-name tool-name
                                           :error (.getMessage e)
                                           :ex e})
       (CompletableFuture/failedFuture
-       (ex-info
-        (str "Tool call failed: " tool-name)
-        {:tool-name tool-name
-         :error (.getMessage e)}
-        e)))))
+        (ex-info
+          (str "Tool call failed: " tool-name)
+          {:tool-name tool-name
+           :error (.getMessage e)}
+          e)))))
 
 (defn available-tools?-impl
   "Check if any tools are available from the server.
@@ -190,10 +190,10 @@
     (catch Exception e
       (log/error :client/subscribe-tools-changed-error {:error (.getMessage e)})
       (CompletableFuture/failedFuture
-       (ex-info
-        "Tools subscription failed"
-        {:error (.getMessage e)}
-        e)))))
+        (ex-info
+          "Tools subscription failed"
+          {:error (.getMessage e)}
+          e)))))
 
 (defn unsubscribe-tools-changed-impl!
   "Unsubscribe from tools list changed notifications.
@@ -208,10 +208,10 @@
     (catch Exception e
       (log/error :client/unsubscribe-tools-changed-error {:error (.getMessage e)})
       (CompletableFuture/failedFuture
-       (ex-info
-        "Tools unsubscription failed"
-        {:error (.getMessage e)}
-        e)))))
+        (ex-info
+          "Tools unsubscription failed"
+          {:error (.getMessage e)}
+          e)))))
 
 (defn setup-cache-invalidation!
   "Set up internal subscription to invalidate tools cache on list changes.

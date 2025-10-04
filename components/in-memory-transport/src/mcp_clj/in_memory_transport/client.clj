@@ -1,20 +1,20 @@
 (ns mcp-clj.in-memory-transport.client
   "In-memory client transport for unit testing MCP communication"
   (:require
-   [mcp-clj.client-transport.protocol :as transport-protocol]
-   [mcp-clj.in-memory-transport.atomic :as atomic]
-   [mcp-clj.in-memory-transport.shared :as shared]
-   [mcp-clj.log :as log])
+    [mcp-clj.client-transport.protocol :as transport-protocol]
+    [mcp-clj.in-memory-transport.atomic :as atomic]
+    [mcp-clj.in-memory-transport.shared :as shared]
+    [mcp-clj.log :as log])
   (:import
-   (java.util.concurrent
-    CompletableFuture
-    Executors
-    TimeUnit)))
+    (java.util.concurrent
+      CompletableFuture
+      Executors
+      TimeUnit)))
 
 (defrecord InMemoryTransport
-           [shared-transport ; SharedTransport instance
-            client-alive? ; AtomicBoolean for client status
-            notification-handler] ; Function to handle notifications
+  [shared-transport ; SharedTransport instance
+   client-alive? ; AtomicBoolean for client status
+   notification-handler] ; Function to handle notifications
 
   transport-protocol/Transport
 
@@ -22,7 +22,7 @@
     [_ method params timeout-ms]
     (if-not (shared/transport-alive? shared-transport)
       (CompletableFuture/failedFuture
-       (ex-info "Transport is closed" {:transport :in-memory}))
+        (ex-info "Transport is closed" {:transport :in-memory}))
       (let [request-id (shared/next-request-id! shared-transport)
             future (CompletableFuture.)
             request {:jsonrpc "2.0"
@@ -39,28 +39,29 @@
           (when (and timeout-ms (pos? timeout-ms))
             (let [executor (Executors/newSingleThreadScheduledExecutor)]
               (.schedule
-               executor
-               ^Runnable
-               (fn []
-                 (when-not (.isDone future)
-                   (shared/remove-pending-request! shared-transport request-id)
-                   (.completeExceptionally
-                    future
-                    (ex-info "Request timeout"
-                             {:request-id request-id
-                              :timeout-ms timeout-ms}))))
-               (long timeout-ms)
-               TimeUnit/MILLISECONDS)))
+                executor
+                ^Runnable
+                (fn []
+                  (when-not (.isDone future)
+                    (shared/remove-pending-request! shared-transport request-id)
+                    (.completeExceptionally
+                      future
+                      (ex-info "Request timeout"
+                               {:request-id request-id
+                                :timeout-ms timeout-ms}))))
+                (long timeout-ms)
+                TimeUnit/MILLISECONDS)))
           future
           (catch Exception e
             (shared/remove-pending-request! shared-transport request-id)
             (CompletableFuture/failedFuture e))))))
 
+
   (send-notification!
     [_ method params]
     (if-not (shared/transport-alive? shared-transport)
       (CompletableFuture/failedFuture
-       (ex-info "Transport is closed" {:transport :in-memory}))
+        (ex-info "Transport is closed" {:transport :in-memory}))
       (let [notification {:jsonrpc "2.0"
                           :method method
                           :params params}]
@@ -71,15 +72,18 @@
           (catch Exception e
             (CompletableFuture/failedFuture e))))))
 
+
   (close!
     [_]
     (atomic/set-boolean! client-alive? false)
     (log/info :in-memory/client-closed {}))
 
+
   (alive?
     [_]
     (and (atomic/get-boolean client-alive?)
          (shared/transport-alive? shared-transport)))
+
 
   (get-json-rpc-client
     [_]
@@ -105,16 +109,16 @@
                          ;; Response to request
                          (:id message)
                          (when-let [future (shared/remove-pending-request!
-                                            shared-transport
-                                            (:id message))]
+                                             shared-transport
+                                             (:id message))]
                            (if (:error message)
                              (.completeExceptionally
-                              future
-                              (ex-info "Server error"
-                                       {:error (:error message)}))
+                               future
+                               (ex-info "Server error"
+                                        {:error (:error message)}))
                              (.complete future (:result message))))
 
-;; Notification from server
+                         ;; Notification from server
                          (and (:method message) (:notification-handler transport))
                          (try
                            ((:notification-handler transport) message)
@@ -124,7 +128,7 @@
                                          :error (.getMessage e)})))))
                      (catch InterruptedException _
                             ;; Thread interrupted, exit
-                       )
+                            )
                      (catch Exception e
                        (log/error :in-memory/client-processor-error {:error (.getMessage e)})))
                    (recur)))))))
@@ -140,9 +144,9 @@
     (throw (ex-info "Missing :shared transport in configuration"
                     {:config {:shared shared}})))
   (let [transport (->InMemoryTransport
-                   shared
-                   (atomic/create-atomic-boolean true)
-                   notification-handler)]
+                    shared
+                    (atomic/create-atomic-boolean true)
+                    notification-handler)]
     ;; Start message processing
     (start-client-message-processor! transport)
     (log/info :in-memory/client-created {})

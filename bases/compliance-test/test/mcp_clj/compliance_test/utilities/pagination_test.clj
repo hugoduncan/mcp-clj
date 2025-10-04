@@ -1,7 +1,7 @@
 (ns mcp-clj.compliance-test.utilities.pagination-test
   "Compliance tests for MCP pagination utility across implementations."
   (:require
-   [clojure.test :refer [deftest is testing]]))
+    [clojure.test :refer [deftest is testing]]))
 
 (deftest cursor-based-pagination-test
   (testing "cursor-based pagination for tools/list"

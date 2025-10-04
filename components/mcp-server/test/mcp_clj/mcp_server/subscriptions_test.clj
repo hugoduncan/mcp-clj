@@ -1,7 +1,7 @@
 (ns mcp-clj.mcp-server.subscriptions-test
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.mcp-server.subscriptions :as subs]))
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.mcp-server.subscriptions :as subs]))
 
 (deftest subscribe-test
   (testing "subscribe!"

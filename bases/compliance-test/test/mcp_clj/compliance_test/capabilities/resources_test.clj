@@ -6,12 +6,12 @@
 
   Version-specific behavior is tested using conditional assertions."
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.compliance-test.test-helpers :as helpers]
-   [mcp-clj.mcp-client.core :as client]
-   [mcp-clj.mcp-server.core :as mcp-server]))
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.compliance-test.test-helpers :as helpers]
+    [mcp-clj.mcp-client.core :as client]
+    [mcp-clj.mcp-server.core :as mcp-server]))
 
-;;; Compliance Tests
+;; Compliance Tests
 
 (deftest ^:integ resources-list-compliance-test
   ;; Test that resources/list returns available resources with correct schema
@@ -128,11 +128,11 @@
               ;; Subscribe to resource updates
               uri "file:///test/text-resource.txt"
               _ @(client/subscribe-resource!
-                  client
-                  uri
-                  (fn [params]
-                    (swap! received-notifications conj
-                           {:method "notifications/resources/updated" :params params})))
+                   client
+                   uri
+                   (fn [params]
+                     (swap! received-notifications conj
+                            {:method "notifications/resources/updated" :params params})))
               ;; Trigger resource update notification
               _ (mcp-server/notify-resource-updated! server uri)
               ;; Wait for notification to be processed
@@ -171,10 +171,10 @@
               received-notifications (atom [])
               ;; Set up notification handler by subscribing to resources changes
               _ @(client/subscribe-resources-changed!
-                  client
-                  (fn [params]
-                    (swap! received-notifications conj
-                           {:method "notifications/resources/list_changed" :params params})))
+                   client
+                   (fn [params]
+                     (swap! received-notifications conj
+                            {:method "notifications/resources/list_changed" :params params})))
               ;; Add a new resource to trigger notification
               new-resource {:name "new-resource"
                             :uri "file:///test/new-resource.txt"

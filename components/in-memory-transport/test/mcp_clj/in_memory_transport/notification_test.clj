@@ -1,14 +1,14 @@
 (ns mcp-clj.in-memory-transport.notification-test
   "Test for notification delivery in in-memory transport"
   (:require
-   [clojure.test :refer [deftest is testing use-fixtures]]
-   [mcp-clj.in-memory-transport.client :as client]
-   [mcp-clj.in-memory-transport.server :as server]
-   [mcp-clj.in-memory-transport.shared :as shared])
+    [clojure.test :refer [deftest is testing use-fixtures]]
+    [mcp-clj.in-memory-transport.client :as client]
+    [mcp-clj.in-memory-transport.server :as server]
+    [mcp-clj.in-memory-transport.shared :as shared])
   (:import
-   (java.util.concurrent
-    CompletableFuture
-    TimeUnit)))
+    (java.util.concurrent
+      CompletableFuture
+      TimeUnit)))
 
 (defn- wait-for
   "Wait for a predicate to become true, with timeout"
@@ -37,11 +37,11 @@
 
           ;; Create server and client
           in-memory-server (server/create-in-memory-server
-                            {:shared shared-transport}
-                            handlers)
+                             {:shared shared-transport}
+                             handlers)
           in-memory-client (client/create-transport
-                            {:shared shared-transport
-                             :notification-handler notification-handler})]
+                             {:shared shared-transport
+                              :notification-handler notification-handler})]
 
       (try
         ;; Give the transport time to initialize

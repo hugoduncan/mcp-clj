@@ -1,7 +1,7 @@
 (ns mcp-clj.mcp-client.subscriptions-test
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.mcp-client.subscriptions :as subs]))
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.mcp-client.subscriptions :as subs]))
 
 (deftest create-registry-test
   ;; Tests creation of subscription registry with proper structure
@@ -133,18 +133,18 @@
             callback-fn (fn [params] (reset! received params))]
         (subs/subscribe-resource! registry "test://uri" callback-fn)
         (let [count (subs/dispatch-notification!
-                     registry
-                     {:method "notifications/resources/updated"
-                      :params {:uri "test://uri" :data "changed"}})]
+                      registry
+                      {:method "notifications/resources/updated"
+                       :params {:uri "test://uri" :data "changed"}})]
           (is (= 1 count))
           (is (= {:uri "test://uri" :data "changed"} @received)))))
 
     (testing "ignores resource notification for unsubscribed URI"
       (let [registry (subs/create-registry)
             count (subs/dispatch-notification!
-                   registry
-                   {:method "notifications/resources/updated"
-                    :params {:uri "test://unsubscribed"}})]
+                    registry
+                    {:method "notifications/resources/updated"
+                     :params {:uri "test://unsubscribed"}})]
         (is (= 0 count))))
 
     (testing "dispatches tools list changed notification"
@@ -155,9 +155,9 @@
         (subs/subscribe-tools-changed! registry callback1)
         (subs/subscribe-tools-changed! registry callback2)
         (let [count (subs/dispatch-notification!
-                     registry
-                     {:method "notifications/tools/list_changed"
-                      :params {}})]
+                      registry
+                      {:method "notifications/tools/list_changed"
+                       :params {}})]
           (is (= 2 count))
           (is (= 2 @call-count)))))
 
@@ -169,16 +169,16 @@
         (subs/subscribe-prompts-changed! registry callback1)
         (subs/subscribe-prompts-changed! registry callback2)
         (let [count (subs/dispatch-notification!
-                     registry
-                     {:method "notifications/prompts/list_changed"
-                      :params {}})]
+                      registry
+                      {:method "notifications/prompts/list_changed"
+                       :params {}})]
           (is (= 2 count))
           (is (= 2 @call-count)))))
 
     (testing "ignores unknown notification types"
       (let [registry (subs/create-registry)
             count (subs/dispatch-notification!
-                   registry
-                   {:method "notifications/unknown/type"
-                    :params {}})]
+                    registry
+                    {:method "notifications/unknown/type"
+                     :params {}})]
         (is (= 0 count))))))
