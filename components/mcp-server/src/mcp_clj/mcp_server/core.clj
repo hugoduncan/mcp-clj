@@ -6,6 +6,7 @@
     [mcp-clj.log :as log]
     [mcp-clj.mcp-server.prompts :as prompts]
     [mcp-clj.mcp-server.resources :as resources]
+    [mcp-clj.mcp-server.subscriptions :as subscriptions]
     [mcp-clj.mcp-server.version :as version]
     [mcp-clj.server-transport.factory :as transport-factory]
     [mcp-clj.tools.core :as tools])
@@ -27,7 +28,8 @@
    session-id->session
    tool-registry
    prompt-registry
-   resource-registry]
+   resource-registry
+   resource-subscriptions]
 
   AutoCloseable
 
@@ -88,14 +90,36 @@
     "notifications/resources/list_changed"
     nil))
 
-(defn- notify-resource-updated!
-  "Notify all sessions that a resource has been updated"
+(defn- notify-resource-updated-all!
+  "Internal: Notify all sessions that a resource has been updated"
   [server uri]
   (log/info :server/notify-resource-updated {:server server :uri uri})
   (json-rpc-protocols/notify-all!
     @(:json-rpc-server server)
     "notifications/resources/updated"
     {:uri uri}))
+
+(defn notify-resource-updated!
+  "Notify subscribed sessions that a resource has been updated.
+  Should be called by resource implementations when content changes.
+
+  Only notifies sessions that have explicitly subscribed to this resource URI."
+  [server uri]
+  (log/info :server/notify-resource-updated {:uri uri})
+  (let [subscribers (subscriptions/get-subscribers
+                      @(:resource-subscriptions server)
+                      uri)
+        rpc-server @(:json-rpc-server server)]
+    (if (empty? subscribers)
+      (log/debug :server/no-subscribers {:uri uri})
+      (do
+        (log/info :server/notifying-subscribers
+                  {:uri uri :subscriber-count (count subscribers)})
+        ;; Use notify-all! which works for all transport types including in-memory
+        (json-rpc-protocols/notify-all!
+          rpc-server
+          "notifications/resources/updated"
+          {:uri uri})))))
 
 (defn- text-map
   [msg]
@@ -138,8 +162,8 @@
         ;; Create base server capabilities
         base-capabilities {;; :logging   {} needs to implement logging/setLevel
                            :tools {:listChanged true}
-                           :resources {:listChanged false
-                                       :subscribe false}
+                           :resources {:listChanged true
+                                       :subscribe true}
                            :prompts {:listChanged true}}
         ;; Apply version-specific capability formatting
         version-capabilities (version/handle-version-specific-behavior
@@ -253,14 +277,27 @@
 (defn- handle-subscribe-resource
   "Handle resources/subscribe request from client"
   [server params]
-  (log/info :server/resources-subscribe)
-  (resources/subscribe-resource (:resource-registry server) params))
+  (log/info :server/resources-subscribe params)
+  (let [{:keys [uri]} params
+        session-id (-> params meta :session-id)]
+    (if (some #(= uri (:uri %)) (vals @(:resource-registry server)))
+      (do
+        (swap! (:resource-subscriptions server)
+               subscriptions/subscribe! session-id uri)
+        {})
+      {:content [{:type "text"
+                  :text (str "Resource not found: " uri)}]
+       :isError true})))
 
 (defn- handle-unsubscribe-resource
   "Handle resources/unsubscribe request from client"
   [server params]
-  (log/info :server/resources-unsubscribe)
-  (resources/unsubscribe-resource (:resource-registry server) params))
+  (log/info :server/resources-unsubscribe params)
+  (let [{:keys [uri]} params
+        session-id (-> params meta :session-id)]
+    (swap! (:resource-subscriptions server)
+           subscriptions/unsubscribe! session-id uri)
+    {}))
 
 (defn- handle-list-prompts
   "Handle prompts/list request from client"
@@ -287,11 +324,13 @@
                         (log/info :server/session-created {:session-id session-id})
                         new-session)))
         protocol-version (:protocol-version session)
+        ;; Add session-id to params metadata for handlers that need it
+        params-with-session (with-meta params {:session-id session-id})
         ;; Use version-aware handler for tool calls if protocol version is available
         actual-handler (if (and protocol-version (= handler handle-call-tool))
                          #(version-aware-handle-call-tool %1 protocol-version %2)
                          handler)
-        response (actual-handler server params)
+        response (actual-handler server params-with-session)
         session-update-fn (-> response meta :session-update)]
     (cond
       ;; Handle responses with session updates (like initialize)
@@ -385,7 +424,9 @@
 
 (defn- on-sse-close
   [server id]
-  (swap! (:session-id->session server) dissoc id))
+  (swap! (:session-id->session server) dissoc id)
+  (swap! (:resource-subscriptions server)
+         subscriptions/unsubscribe-all! id))
 
 (defn- stop!
   [server]
@@ -465,7 +506,8 @@
                  session-id->session
                  tool-registry
                  prompt-registry
-                 resource-registry)
+                 resource-registry
+                 (atom {}))
         ;; Create handlers before creating the JSON-RPC server to avoid race
         ;; conditions
         handlers (create-handlers server)

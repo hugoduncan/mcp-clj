@@ -127,9 +127,12 @@
 
   (notify-all! [server method params]
     (log/debug :in-memory/notify-all {:method method :params params})
-    ;; For in-memory transport, we don't have multiple clients to notify
-    ;; This is a no-op as mentioned in the protocol docs
-    )
+    ;; Send notification to client via shared transport
+    (let [notification {:jsonrpc "2.0"
+                        :method method
+                        :params params}]
+      (shared/offer-to-client! (:shared-transport server) notification)
+      (log/debug :in-memory/notification-sent {:method method})))
 
   (stop! [server]
     (atomic/set-boolean! (:server-alive? server) false)

@@ -2,6 +2,7 @@
  :aliases
  {:dev
   {:extra-paths ["development/src"
+                 "bases/compliance-test/test"
                  "components/http/test"
                  "components/http-client/test"
                  "components/http-server/test"
@@ -13,77 +14,78 @@
                  "components/tools/test"
                  "components/versions/test"]
    :extra-deps
-   {poly/client-transport         {:local/root "components/client-transport"}
-    poly/http                     {:local/root "components/http"}
-    poly/http-client              {:local/root "components/http-client"}
-    poly/http-server              {:local/root "components/http-server"}
-    poly/in-memory-transport      {:local/root "components/in-memory-transport"}
-    poly/interop                  {:local/root "components/interop"}
-    poly/json-rpc                 {:local/root "components/json-rpc"}
-    poly/log                      {:local/root "components/log"}
-    poly/mcp-client               {:local/root "components/mcp-client"}
-    poly/mcp-server               {:local/root "components/mcp-server"}
-    poly/server-transport         {:local/root "components/server-transport"}
-    poly/tools                    {:local/root "components/tools"}
-    poly/versions                 {:local/root "components/versions"}
-    lambdaisland/kaocha           {:mvn/version "1.87.1366"}
+   {poly/client-transport {:local/root "components/client-transport"}
+    poly/http {:local/root "components/http"}
+    poly/http-client {:local/root "components/http-client"}
+    poly/http-server {:local/root "components/http-server"}
+    poly/in-memory-transport {:local/root "components/in-memory-transport"}
+    poly/interop {:local/root "components/interop"}
+    poly/json-rpc {:local/root "components/json-rpc"}
+    poly/log {:local/root "components/log"}
+    poly/mcp-client {:local/root "components/mcp-client"}
+    poly/mcp-server {:local/root "components/mcp-server"}
+    poly/server-transport {:local/root "components/server-transport"}
+    poly/tools {:local/root "components/tools"}
+    poly/versions {:local/root "components/versions"}
+    lambdaisland/kaocha {:mvn/version "1.87.1366"}
     lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}
-    org.clojure/clojure           {:mvn/version "1.12.0"}}
-   :jvm-opts    ["-XX:-OmitStackTraceInFastThrow"
-                 "-Dclojure.main.report=stderr"
+    org.clojure/clojure {:mvn/version "1.12.0"}}
+   :jvm-opts ["-XX:-OmitStackTraceInFastThrow"
+              "-Dclojure.main.report=stderr"
                  ;; Next two for cider to be able to kill processes
-                 "-Djdk.attach.allowAttachSelf"
-                 "-XX:+EnableDynamicAgentLoading"]}
-  :test   {:extra-paths ["components/http/test"
-                         "components/http-client/test"
-                         "components/http-server/test"
-                         "components/in-memory-transport/test"
-                         "components/json-rpc/test"
-                         "components/log/test"
-                         "components/mcp-client/test"
-                         "components/mcp-server/test"
-                         "components/tools/test"
-                         "components/versions/test"]
-           :extra-deps
-           {org.clojure/test.check                         {:mvn/version "1.1.1"}
-            org.clojure/clojure                            {:mvn/version "1.12.0"}
-            poly/client-transport                          {:local/root "components/client-transport"}
-            poly/in-memory-transport                       {:local/root "components/in-memory-transport"}
-            poly/interop                                   {:local/root "components/interop"}
-            poly/server-transport                          {:local/root "components/server-transport"}
-            poly/versions                                  {:local/root "components/versions"}
+              "-Djdk.attach.allowAttachSelf"
+              "-XX:+EnableDynamicAgentLoading"]}
+  :test {:extra-paths ["bases/compliance-test/test"
+                       "components/http/test"
+                       "components/http-client/test"
+                       "components/http-server/test"
+                       "components/in-memory-transport/test"
+                       "components/json-rpc/test"
+                       "components/log/test"
+                       "components/mcp-client/test"
+                       "components/mcp-server/test"
+                       "components/tools/test"
+                       "components/versions/test"]
+         :extra-deps
+         {org.clojure/test.check {:mvn/version "1.1.1"}
+          org.clojure/clojure {:mvn/version "1.12.0"}
+          poly/client-transport {:local/root "components/client-transport"}
+          poly/in-memory-transport {:local/root "components/in-memory-transport"}
+          poly/interop {:local/root "components/interop"}
+          poly/server-transport {:local/root "components/server-transport"}
+          poly/versions {:local/root "components/versions"}
             ;; MCP Java SDK for cross-implementation testing
-            io.modelcontextprotocol.sdk/mcp                {:mvn/version "0.11.2"}
+          io.modelcontextprotocol.sdk/mcp {:mvn/version "0.11.2"}
             ;; MCP Java SDK Spring WebFlux support for HTTP transport
-            io.modelcontextprotocol.sdk/mcp-spring-webflux {:mvn/version "0.11.2"}
+          io.modelcontextprotocol.sdk/mcp-spring-webflux {:mvn/version "0.11.2"}
             ;; SLF4J implementation for Java SDK logging
-            org.slf4j/slf4j-simple                         {:mvn/version "2.0.13"}
-            hato/hato                                      {:mvn/version "1.0.0"}}}
+          org.slf4j/slf4j-simple {:mvn/version "2.0.13"}
+          hato/hato {:mvn/version "1.0.0"}}}
   :kaocha {:extra-deps
-           {lambdaisland/kaocha           {:mvn/version "1.91.1392"}
+           {lambdaisland/kaocha {:mvn/version "1.91.1392"}
             lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}
-            org.clojure/test.check        {:mvn/version "1.1.1"}
-            poly/client-transport         {:local/root "components/client-transport"}
-            poly/in-memory-transport      {:local/root "components/in-memory-transport"}
-            poly/interop                  {:local/root "components/interop"}
-            poly/server-transport         {:local/root "components/server-transport"}
-            poly/versions                 {:local/root "components/versions"}
-            hato/hato                     {:mvn/version "1.0.0"}
-            org.slf4j/slf4j-nop           {:mvn/version "2.0.17"}}
-           :exec-fn   kaocha.runner/exec-fn
+            org.clojure/test.check {:mvn/version "1.1.1"}
+            poly/client-transport {:local/root "components/client-transport"}
+            poly/in-memory-transport {:local/root "components/in-memory-transport"}
+            poly/interop {:local/root "components/interop"}
+            poly/server-transport {:local/root "components/server-transport"}
+            poly/versions {:local/root "components/versions"}
+            hato/hato {:mvn/version "1.0.0"}
+            org.slf4j/slf4j-nop {:mvn/version "2.0.17"}}
+           :exec-fn kaocha.runner/exec-fn
            :exec-args {}
-           :jvm-opts  ["-XX:-OmitStackTraceInFastThrow"
-                       "--enable-native-access=ALL-UNNAMED"
-                       "-Dclojure.main.report=stderr"]
+           :jvm-opts ["-XX:-OmitStackTraceInFastThrow"
+                      "--enable-native-access=ALL-UNNAMED"
+                      "-Dclojure.main.report=stderr"]
            :main-opts ["-m" "kaocha.runner"]}
 
-  :nrepl        {:extra-deps {nrepl/nrepl         {:mvn/version "1.0.0"}
-                              org.clojure/clojure {:mvn/version "1.12.0"}}
-                 :main-opts  ["-m" "nrepl.cmdline"]}
-  :sse-server   {:main-opts ["-m" "mcp-clj.sse-server.main" "--port" "3456"]
-                 :deps      {poly/server {:local/root "projects/server"}}}
+  :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.0.0"}
+                       org.clojure/clojure {:mvn/version "1.12.0"}}
+          :main-opts ["-m" "nrepl.cmdline"]}
+  :sse-server {:main-opts ["-m" "mcp-clj.sse-server.main" "--port" "3456"]
+               :deps {poly/server {:local/root "projects/server"}}}
   :stdio-server {:main-opts ["-m" "mcp-clj.stdio-server.main"]
-                 :exec-fn   mcp-clj.stdio-server.main/start
-                 :deps      {poly/server         {:local/root "projects/server"}
-                             org.clojure/clojure {:mvn/version "1.12.0"}}
-                 :jvm-opts  ["-Djdk.attach.allowAttachSelf"]}}}
+                 :exec-fn mcp-clj.stdio-server.main/start
+                 :deps {poly/server {:local/root "projects/server"}
+                        org.clojure/clojure {:mvn/version "1.12.0"}}
+                 :jvm-opts ["-Djdk.attach.allowAttachSelf"]}}}

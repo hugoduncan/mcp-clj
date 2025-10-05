@@ -3,6 +3,7 @@
   (:require
     [mcp-clj.log :as log]
     [mcp-clj.mcp-client.session :as session]
+    [mcp-clj.mcp-client.subscriptions :as subscriptions]
     [mcp-clj.mcp-client.transport :as transport])
   (:import
     (java.util.concurrent
@@ -97,11 +98,9 @@
                     (do
                       (log/error :client/read-resource-error
                                  {:resource-uri resource-uri
-                                  :content (:content result)})
-                      ;; Return error map instead of throwing
-                      {:isError true
-                       :resource-uri resource-uri
-                       :content (:content result)})
+                                  :contents (:contents result)})
+                      ;; Return error result with resource-uri added
+                      (assoc result :resource-uri resource-uri))
                     (do
                       (log/info :client/read-resource-success
                                 {:resource-uri resource-uri})
@@ -140,3 +139,112 @@
     (catch Exception e
       (log/debug :client/available-resources-error {:error (.getMessage e)})
       false)))
+
+(defn subscribe-resource-impl!
+  "Subscribe to resource updates for a specific URI.
+
+  Returns a CompletableFuture that resolves when the subscription is established.
+  The callback-fn will be called with notification params when the resource changes."
+  ^CompletableFuture [client uri callback-fn]
+  (log/info :client/subscribe-resource-start {:uri uri})
+  (try
+    (let [session @(:session client)]
+      (if-not (session/server-supports-resources? session)
+        (session/capability-not-supported "resources" session {:uri uri})
+        (let [transport (:transport client)
+              subscription-registry (:subscription-registry client)
+              params {:uri uri}]
+          ;; Register callback in subscription registry first
+          (subscriptions/subscribe-resource! subscription-registry uri callback-fn)
+
+          ;; Send subscribe request to server
+          (.thenApply
+            (transport/send-request!
+              transport
+              "resources/subscribe"
+              params
+              30000)
+            (reify java.util.function.Function
+              (apply
+                [_ result]
+                (log/info :client/subscribe-resource-success {:uri uri})
+                result))))))
+    (catch Exception e
+      (log/error :client/subscribe-resource-error {:uri uri
+                                                   :error (.getMessage e)
+                                                   :ex e})
+      (CompletableFuture/failedFuture
+        (ex-info
+          (str "Resource subscription failed: " uri)
+          {:uri uri
+           :error (.getMessage e)}
+          e)))))
+
+(defn unsubscribe-resource-impl!
+  "Unsubscribe from resource updates for a specific URI.
+
+  Returns a CompletableFuture that resolves when the unsubscription is complete."
+  ^CompletableFuture [client uri]
+  (log/info :client/unsubscribe-resource-start {:uri uri})
+  (try
+    (let [session @(:session client)]
+      (if-not (session/server-supports-resources? session)
+        (session/capability-not-supported "resources" session {:uri uri})
+        (let [transport (:transport client)
+              subscription-registry (:subscription-registry client)
+              params {:uri uri}]
+          ;; Send unsubscribe request to server
+          (.thenApply
+            (transport/send-request!
+              transport
+              "resources/unsubscribe"
+              params
+              30000)
+            (reify java.util.function.Function
+              (apply
+                [_ result]
+                ;; Remove callback from subscription registry after successful unsubscribe
+                (subscriptions/unsubscribe-resource! subscription-registry uri)
+                (log/info :client/unsubscribe-resource-success {:uri uri})
+                result))))))
+    (catch Exception e
+      (log/error :client/unsubscribe-resource-error {:uri uri
+                                                     :error (.getMessage e)
+                                                     :ex e})
+      (CompletableFuture/failedFuture
+        (ex-info
+          (str "Resource unsubscription failed: " uri)
+          {:uri uri
+           :error (.getMessage e)}
+          e)))))
+
+(defn subscribe-resources-changed-impl!
+  "Subscribe to resources list changed notifications.
+
+  Returns a CompletableFuture that resolves immediately (no server request needed).
+  The callback-fn will be called when the server sends resources/list_changed notifications."
+  ^CompletableFuture [client callback-fn]
+  (log/info :client/subscribe-resources-changed-start)
+  (try
+    (let [subscription-registry (:subscription-registry client)]
+      (subscriptions/subscribe-resources-changed! subscription-registry callback-fn)
+      (log/info :client/subscribe-resources-changed-success)
+      (CompletableFuture/completedFuture {}))
+    (catch Exception e
+      (log/error :client/subscribe-resources-changed-error {:error (.getMessage e)})
+      (CompletableFuture/failedFuture e))))
+
+(defn unsubscribe-resources-changed-impl!
+  "Unsubscribe from resources list changed notifications.
+
+  Returns a CompletableFuture that resolves immediately."
+  ^CompletableFuture [client callback-fn]
+  (log/info :client/unsubscribe-resources-changed-start)
+  (try
+    (let [subscription-registry (:subscription-registry client)]
+      (subscriptions/unsubscribe-resources-changed! subscription-registry callback-fn)
+      (log/info :client/unsubscribe-resources-changed-success)
+      (CompletableFuture/completedFuture {}))
+    (catch Exception e
+      (log/error :client/unsubscribe-resources-changed-error {:error (.getMessage e)})
+      (CompletableFuture/failedFuture e))))

@@ -54,7 +54,7 @@
 (defn prompt-definition
   "Get the prompt definition without implementation details"
   [prompt]
-  (select-keys prompt [:name :description :arguments]))
+  (select-keys prompt [:name :description :arguments :title]))
 
 (defn list-prompts
   "List available prompts"

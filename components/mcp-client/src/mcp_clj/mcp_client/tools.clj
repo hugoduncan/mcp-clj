@@ -4,6 +4,7 @@
     [clojure.data.json :as json]
     [mcp-clj.log :as log]
     [mcp-clj.mcp-client.session :as session]
+    [mcp-clj.mcp-client.subscriptions :as subscriptions]
     [mcp-clj.mcp-client.transport :as transport])
   (:import
     (java.util.concurrent
@@ -174,3 +175,52 @@
     (catch Exception e
       (log/debug :client/available-tools-error {:error (.getMessage e)})
       false)))
+
+(defn subscribe-tools-changed-impl!
+  "Subscribe to tools list changed notifications.
+
+  Returns a CompletableFuture that resolves immediately (no server request needed).
+  The callback-fn will be called when the server sends tools/list_changed notifications."
+  ^CompletableFuture [client callback-fn]
+  (log/info :client/subscribe-tools-changed)
+  (try
+    (let [subscription-registry (:subscription-registry client)]
+      (subscriptions/subscribe-tools-changed! subscription-registry callback-fn)
+      (CompletableFuture/completedFuture {:subscribed true}))
+    (catch Exception e
+      (log/error :client/subscribe-tools-changed-error {:error (.getMessage e)})
+      (CompletableFuture/failedFuture
+        (ex-info
+          "Tools subscription failed"
+          {:error (.getMessage e)}
+          e)))))
+
+(defn unsubscribe-tools-changed-impl!
+  "Unsubscribe from tools list changed notifications.
+
+  Returns a CompletableFuture that resolves immediately."
+  ^CompletableFuture [client callback-fn]
+  (log/info :client/unsubscribe-tools-changed)
+  (try
+    (let [subscription-registry (:subscription-registry client)
+          removed? (subscriptions/unsubscribe-tools-changed! subscription-registry callback-fn)]
+      (CompletableFuture/completedFuture {:unsubscribed removed?}))
+    (catch Exception e
+      (log/error :client/unsubscribe-tools-changed-error {:error (.getMessage e)})
+      (CompletableFuture/failedFuture
+        (ex-info
+          "Tools unsubscription failed"
+          {:error (.getMessage e)}
+          e)))))
+
+(defn setup-cache-invalidation!
+  "Set up internal subscription to invalidate tools cache on list changes.
+
+  This is called automatically when the client is created."
+  [client]
+  (let [cache-invalidation-callback
+        (fn [_notification-params]
+          (log/debug :client/tools-cache-invalidated)
+          (let [cache (get-tools-cache client)]
+            (reset! cache nil)))]
+    (subscribe-tools-changed-impl! client cache-invalidation-callback)))

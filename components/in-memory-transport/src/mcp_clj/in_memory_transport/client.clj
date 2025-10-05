@@ -121,7 +121,7 @@
                          ;; Notification from server
                          (and (:method message) (:notification-handler transport))
                          (try
-                           ((:notification-handler transport) (:method message) (:params message))
+                           ((:notification-handler transport) message)
                            (catch Exception e
                              (log/error :in-memory/notification-handler-error
                                         {:method (:method message)

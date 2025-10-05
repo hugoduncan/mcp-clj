@@ -48,7 +48,7 @@
   "Process a JSON-RPC request with simplified handler interface"
   [handler {:keys [method params id]}]
   (log/info :rpc/invoke {:method method :params params})
-  (when-let [response (handler method params)]
+  (when-let [response (handler method (or params {}))]
     (log/info :server/handler-response response)
     (when response
       (write-json! *out* (json-protocol/json-rpc-result response id)))))

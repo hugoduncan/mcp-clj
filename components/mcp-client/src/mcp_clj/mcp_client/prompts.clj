@@ -3,6 +3,7 @@
   (:require
     [mcp-clj.log :as log]
     [mcp-clj.mcp-client.session :as session]
+    [mcp-clj.mcp-client.subscriptions :as subscriptions]
     [mcp-clj.mcp-client.transport :as transport])
   (:import
     (java.util.concurrent
@@ -141,3 +142,52 @@
     (catch Exception e
       (log/debug :client/available-prompts-error {:error (.getMessage e)})
       false)))
+
+(defn subscribe-prompts-changed-impl!
+  "Subscribe to prompts list changed notifications.
+
+  Returns a CompletableFuture that resolves immediately (no server request needed).
+  The callback-fn will be called when the server sends prompts/list_changed notifications."
+  ^CompletableFuture [client callback-fn]
+  (log/info :client/subscribe-prompts-changed)
+  (try
+    (let [subscription-registry (:subscription-registry client)]
+      (subscriptions/subscribe-prompts-changed! subscription-registry callback-fn)
+      (CompletableFuture/completedFuture {:subscribed true}))
+    (catch Exception e
+      (log/error :client/subscribe-prompts-changed-error {:error (.getMessage e)})
+      (CompletableFuture/failedFuture
+        (ex-info
+          "Prompts subscription failed"
+          {:error (.getMessage e)}
+          e)))))
+
+(defn unsubscribe-prompts-changed-impl!
+  "Unsubscribe from prompts list changed notifications.
+
+  Returns a CompletableFuture that resolves immediately."
+  ^CompletableFuture [client callback-fn]
+  (log/info :client/unsubscribe-prompts-changed)
+  (try
+    (let [subscription-registry (:subscription-registry client)
+          removed? (subscriptions/unsubscribe-prompts-changed! subscription-registry callback-fn)]
+      (CompletableFuture/completedFuture {:unsubscribed removed?}))
+    (catch Exception e
+      (log/error :client/unsubscribe-prompts-changed-error {:error (.getMessage e)})
+      (CompletableFuture/failedFuture
+        (ex-info
+          "Prompts unsubscription failed"
+          {:error (.getMessage e)}
+          e)))))
+
+(defn setup-cache-invalidation!
+  "Set up internal subscription to invalidate prompts cache on list changes.
+
+  This is called automatically when the client is created."
+  [client]
+  (let [cache-invalidation-callback
+        (fn [_notification-params]
+          (log/debug :client/prompts-cache-invalidated)
+          (let [cache (get-prompts-cache client)]
+            (reset! cache nil)))]
+    (subscribe-prompts-changed-impl! client cache-invalidation-callback)))

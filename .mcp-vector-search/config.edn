@@ -1,0 +1,22 @@
+{:description "Search the MCP specification"
+ :sources
+ [{:name      "changelogs"
+   :path      "spec/mcp-protocol/docs/specification/(?<version>[a-z0-9-]+)/changelog.mdx"}
+
+  {:name      "client capabilities"
+   :path      "spec/mcp-protocol/docs/specification/(?<version>[a-z0-9-]+)/client/(?<capability>[a-z0-9_-]+).mdx"
+   :component "client"}
+
+  {:name      "server capabilities"
+   :path      "spec/mcp-protocol/docs/specification/(?<version>[a-z0-9-]+)/server/(?<capability>[a-z0-9_-]+).mdx"
+   :component "server"}
+
+  {:name      "server utilities"
+   :path      "spec/mcp-protocol/docs/specification/(?<version>[a-z0-9-]+)/server/utilities(?<utility>[a-z0-9_-]+).mdx"
+   :component "server"}
+
+  {:name      "basic"
+   :path      "spec/mcp-protocol/docs/specification/(?<version>[a-z0-9-]+)/basic/(?<concern>[a-z0-9_-]+).mdx"}
+
+  {:name      "transports"
+   :path      "spec/mcp-protocol/docs/specification/(?<version>[a-z0-9-]+)/basic/transports.mdx"}]}

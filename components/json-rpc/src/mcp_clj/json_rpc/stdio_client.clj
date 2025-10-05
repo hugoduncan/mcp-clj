@@ -27,7 +27,8 @@
    input-stream ; BufferedReader for reading responses
    output-stream ; BufferedWriter for sending requests
    running ; atom for controlling message reader loop
-   reader-future] ; future for background message reader
+   reader-future ; future for background message reader
+   notification-handler] ; function to handle notifications
 
   protocols/JSONRPCClient
 
@@ -58,7 +59,7 @@
   "Create a JSON-RPC client for managing requests and responses"
   ([input-stream output-stream]
    (create-json-rpc-client input-stream output-stream {}))
-  ([input-stream output-stream {:keys [num-threads]
+  ([input-stream output-stream {:keys [num-threads notification-handler]
                                 :or {num-threads 2}}]
    (let [running (atom true)
          client (->JSONRPClient
@@ -68,7 +69,8 @@
                   input-stream
                   output-stream
                   running
-                  nil)
+                  nil
+                  notification-handler)
          ;; Start background message reader
          reader-future (executor/submit!
                          (:executor client)
@@ -91,8 +93,10 @@
 
 (defn handle-notification
   "Handle JSON-RPC notification (no response expected)"
-  [notification]
-  (log/info :rpc/notification {:notification notification}))
+  [json-rpc-client notification]
+  (if-let [handler (:notification-handler json-rpc-client)]
+    (handler notification)
+    (log/info :rpc/notification {:notification notification})))
 
 (defn message-reader-loop
   "Background loop to read messages from JSONRPClient's input stream and dispatch to response/notification handlers"
@@ -109,7 +113,7 @@
             (handle-response json-rpc-client message)
 
             :else
-            (handle-notification message))
+            (handle-notification json-rpc-client message))
           (recur))))
     (catch Exception e
       (log/error :rpc/reader-error {:error e}))))
