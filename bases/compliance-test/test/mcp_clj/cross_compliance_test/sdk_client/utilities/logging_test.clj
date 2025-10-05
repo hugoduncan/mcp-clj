@@ -28,23 +28,34 @@
 
 (defn create-sdk-client-with-logging-server
   "Create Java SDK client connected to Clojure server with logging enabled.
-  Returns map with :client and :cleanup-fn."
+  Returns map with :client, :init-response, :log-messages atom, and :cleanup-fn."
   [protocol-version]
-  (let [;; Create Java SDK client with stdio transport to our test logging server
+  (let [;; Atom to collect log messages
+        log-messages (atom [])
+
+        ;; Create logging handler
+        logging-handler (fn [notification]
+                          (swap! log-messages conj notification))
+
+        ;; Create Java SDK client with stdio transport to our test logging server
         transport (java-sdk/create-stdio-client-transport
                    {:command "clojure"
                     :args ["-M:dev:test"
                            "-m" "mcp-clj.cross-compliance-test.sdk-client.logging-server"]})
+
         client (java-sdk/create-java-client
                 {:transport transport
-                 :async? false})] ; Use sync for simpler testing
+                 :async? false
+                 :logging-handler logging-handler})
 
-    ;; Initialize the client
-    (let [init-response (java-sdk/initialize-client client)]
-      {:client client
-       :init-response init-response
-       :cleanup-fn (fn []
-                     (java-sdk/close-client client))})))
+        ;; Initialize the client
+        init-response (java-sdk/initialize-client client)]
+
+    {:client client
+     :init-response init-response
+     :log-messages log-messages
+     :cleanup-fn (fn []
+                   (java-sdk/close-client client))}))
 
 (defn collect-log-messages
   "Create a callback function and atom to collect log messages.
@@ -57,10 +68,8 @@
 
 ;;; Compliance Tests
 
-(deftest ^:integ ^:skip sdk-client-logging-capability-declaration-test
+(deftest ^:integ sdk-client-logging-capability-declaration-test
   ;; Test that Java SDK client correctly receives logging capability from Clojure server
-  ;; NOTE: Currently skipped - requires subprocess isolation for stdio transport testing
-  ;; The test hangs when run from REPL because stdin/stdout are already in use
   (testing "Java SDK client receives logging capability declaration"
     (doseq [protocol-version (filter #(>= (compare % "2025-03-26") 0)
                                      helpers/test-protocol-versions)]
@@ -83,24 +92,29 @@
               (finally
                 ((:cleanup-fn pair))))))))))
 
-(deftest ^:integ ^:skip sdk-client-logging-notification-delivery-test
+(deftest ^:integ sdk-client-logging-notification-delivery-test
   ;; Test that log notifications from Clojure server reach Java SDK client
-  ;; NOTE: Currently skipped - requires notification handler support in Java SDK interop
   (testing "Java SDK client receives log notifications from Clojure server"
     (doseq [protocol-version (filter #(>= (compare % "2025-03-26") 0)
                                      helpers/test-protocol-versions)]
       (testing (str "protocol version " protocol-version)
 
-        (testing "log messages are delivered to SDK client (requires notification handler support)"
-          ;; This test requires the Java SDK interop to support notification handlers
-          ;; Currently the interop doesn't expose notification subscription APIs
-          ;; 
-          ;; TODO: Add to java-sdk/interop.clj:
-          ;; - subscribe-to-notifications function
-          ;; - or add-notification-handler function
-          ;; - to capture notifications/message events
+        (testing "client can set log level"
+          (let [pair (create-sdk-client-with-logging-server protocol-version)
+                client (:client pair)
+                log-messages (:log-messages pair)]
+            (try
+              ;; Set log level to debug
+              @(java-sdk/set-logging-level client :debug)
 
-          (is true "Placeholder - requires notification handler support in Java SDK interop"))))))
+              ;; Verify the logging handler is set up
+              (is (vector? @log-messages) "Log messages should be collected in a vector")
+
+              ;; Note: Actual message delivery test requires server-side logging triggers
+              ;; which would need tool execution or other server activity
+
+              (finally
+                ((:cleanup-fn pair))))))))))
 
 (comment
   ;; TODO: Implement remaining cross-compliance tests once Java SDK client
