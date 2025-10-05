@@ -12,6 +12,8 @@
    (io.modelcontextprotocol.client
     McpAsyncClient
     McpClient
+    McpClient$AsyncSpec
+    McpClient$SyncSpec
     McpSyncClient)
    (io.modelcontextprotocol.client.transport
     ServerParameters
@@ -44,6 +46,7 @@
     McpSchema$ImageContent
     McpSchema$InitializeResult
     McpSchema$ListToolsResult
+    McpSchema$LoggingMessageNotification
     McpSchema$ResourceLink
     McpSchema$ServerCapabilities
     McpSchema$ServerCapabilities$Builder
@@ -65,7 +68,9 @@
     TimeUnit)
    (org.springframework.web.reactive.function.client
     WebClient
-    WebClient$Builder)))
+    WebClient$Builder)
+   (reactor.core.publisher
+    Mono)))
 
 ;; Utility functions
 
@@ -292,23 +297,41 @@
 
         ;; Add logging consumer if provided
         builder (if logging-handler
-                  (.loggingConsumer builder
-                                    (reify java.util.function.Consumer
-                                      (accept [_ notification]
-                                        (try
-                                          (let [params (into {} (.params notification))
-                                                level (get params "level")
-                                                logger (get params "logger")
-                                                data (get params "data")
-                                                clj-notification (cond-> {:level (keyword level)
-                                                                          :data data}
-                                                                   logger (assoc :logger logger))]
-                                            (logging-handler clj-notification))
-                                          (catch Exception e
-                                            (log/error :java-sdk/logging-handler-error {:error e}))))))
+                  (if async?
+                    (.loggingConsumer ^McpClient$AsyncSpec builder
+                                      (reify java.util.function.Function
+                                        (apply [_ ^McpSchema$LoggingMessageNotification notification]
+                                          (try
+                                            (let [params (into {} (.params notification))
+                                                  level (get params "level")
+                                                  logger (get params "logger")
+                                                  data (get params "data")
+                                                  clj-notification (cond-> {:level (keyword level)
+                                                                            :data data}
+                                                                     logger (assoc :logger logger))]
+                                              (logging-handler clj-notification))
+                                            (catch Exception e
+                                              (log/error :java-sdk/logging-handler-error {:error e})))
+                                          (Mono/empty))))
+                    (.loggingConsumer ^McpClient$SyncSpec builder
+                                      (reify java.util.function.Consumer
+                                        (accept [_ ^McpSchema$LoggingMessageNotification notification]
+                                          (try
+                                            (let [params (into {} (.params notification))
+                                                  level (get params "level")
+                                                  logger (get params "logger")
+                                                  data (get params "data")
+                                                  clj-notification (cond-> {:level (keyword level)
+                                                                            :data data}
+                                                                     logger (assoc :logger logger))]
+                                              (logging-handler clj-notification))
+                                            (catch Exception e
+                                              (log/error :java-sdk/logging-handler-error {:error e})))))))
                   builder)
 
-        client (.build builder)]
+        client (if async?
+                 (.build ^McpClient$AsyncSpec builder)
+                 (.build ^McpClient$SyncSpec builder))]
 
     (->JavaSdkClient client transport async? {:logging logging-handler})))
 
@@ -524,28 +547,26 @@
   (let [transport
         (or transport (create-stdio-server-transport))
         server (if async?
-                 (-> ^McpServer$AsyncSpecification
-                  (if (instance? McpServerTransportProvider transport)
-                    (McpServer/async ^McpServerTransportProvider transport)
-                    (McpServer/async
-                     ^WebFluxStreamableServerTransportProvider transport))
-                     (.serverInfo name version)
-                     (.capabilities
-                      (-> (McpSchema$ServerCapabilities$Builder.)
-                          (.tools true)
-                          (.build)))
-                     (.build))
-                 (-> ^McpServer$StreamableSyncSpecification
-                  (if (instance? McpServerTransportProvider transport)
-                    (McpServer/sync ^McpServerTransportProvider transport)
-                    (McpServer/sync
-                     ^WebFluxStreamableServerTransportProvider transport))
-                     (.serverInfo name version)
-                     (.capabilities
-                      (-> (McpSchema$ServerCapabilities$Builder.)
-                          (.tools true)
-                          (.build)))
-                     (.build)))]
+                 (let [builder (if (instance? McpServerTransportProvider transport)
+                                 (McpServer/async ^McpServerTransportProvider transport)
+                                 (McpServer/async ^WebFluxStreamableServerTransportProvider transport))]
+                   (-> ^McpServer$AsyncSpecification builder
+                       (.serverInfo name version)
+                       (.capabilities
+                        (-> (McpSchema$ServerCapabilities$Builder.)
+                            (.tools true)
+                            (.build)))
+                       (.build)))
+                 (let [builder (if (instance? McpServerTransportProvider transport)
+                                 (McpServer/sync ^McpServerTransportProvider transport)
+                                 (McpServer/sync ^WebFluxStreamableServerTransportProvider transport))]
+                   (-> ^McpServer$StreamableSyncSpecification builder
+                       (.serverInfo name version)
+                       (.capabilities
+                        (-> (McpSchema$ServerCapabilities$Builder.)
+                            (.tools true)
+                            (.build)))
+                       (.build))))]
     (->JavaSdkServer server name version async?)))
 
 ;; Process management for stdio transport
