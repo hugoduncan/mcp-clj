@@ -1,35 +1,38 @@
 (ns mcp-clj.mcp-server.core
   "MCP server implementation supporting the Anthropic Model Context Protocol"
   (:require
-    [clojure.set :as set]
-    [mcp-clj.json-rpc.protocols :as json-rpc-protocols]
-    [mcp-clj.log :as log]
-    [mcp-clj.mcp-server.prompts :as prompts]
-    [mcp-clj.mcp-server.resources :as resources]
-    [mcp-clj.mcp-server.subscriptions :as subscriptions]
-    [mcp-clj.mcp-server.version :as version]
-    [mcp-clj.server-transport.factory :as transport-factory]
-    [mcp-clj.tools.core :as tools])
+   [clojure.set :as set]
+   [mcp-clj.json-rpc.protocols :as json-rpc-protocols]
+   [mcp-clj.log :as log]
+   [mcp-clj.mcp-server.logging :as logging]
+   [mcp-clj.mcp-server.prompts :as prompts]
+   [mcp-clj.mcp-server.resources :as resources]
+   [mcp-clj.mcp-server.subscriptions :as subscriptions]
+   [mcp-clj.mcp-server.version :as version]
+   [mcp-clj.server-transport.factory :as transport-factory]
+   [mcp-clj.tools.core :as tools])
   (:import
-    (java.lang
-      AutoCloseable)))
+   (java.lang
+    AutoCloseable)))
 
 (declare stop!)
 
 (defrecord ^:private Session
-  [^String session-id
-   initialized?
-   client-info
-   client-capabilities
-   protocol-version])
+           [^String session-id
+            initialized?
+            client-info
+            client-capabilities
+            protocol-version
+            log-level])
 
 (defrecord ^:private MCPServer
-  [json-rpc-server
-   session-id->session
-   tool-registry
-   prompt-registry
-   resource-registry
-   resource-subscriptions]
+           [json-rpc-server
+            session-id->session
+            tool-registry
+            prompt-registry
+            resource-registry
+            resource-subscriptions
+            capabilities]
 
   AutoCloseable
 
@@ -68,36 +71,36 @@
   [server]
   (log/info :server/notify-tools-changed {:server server})
   (json-rpc-protocols/notify-all!
-    @(:json-rpc-server server)
-    "notifications/tools/list_changed"
-    nil))
+   @(:json-rpc-server server)
+   "notifications/tools/list_changed"
+   nil))
 
 (defn- notify-prompts-changed!
   "Notify all sessions that the prompt list has changed"
   [server]
   (log/info :server/notify-prompts-changed {:server server})
   (json-rpc-protocols/notify-all!
-    @(:json-rpc-server server)
-    "notifications/prompts/list_changed"
-    nil))
+   @(:json-rpc-server server)
+   "notifications/prompts/list_changed"
+   nil))
 
 (defn- notify-resources-changed!
   "Notify all sessions that the resource list has changed"
   [server]
   (log/info :server/notify-resources-changed {:server server})
   (json-rpc-protocols/notify-all!
-    @(:json-rpc-server server)
-    "notifications/resources/list_changed"
-    nil))
+   @(:json-rpc-server server)
+   "notifications/resources/list_changed"
+   nil))
 
 (defn- notify-resource-updated-all!
   "Internal: Notify all sessions that a resource has been updated"
   [server uri]
   (log/info :server/notify-resource-updated {:server server :uri uri})
   (json-rpc-protocols/notify-all!
-    @(:json-rpc-server server)
-    "notifications/resources/updated"
-    {:uri uri}))
+   @(:json-rpc-server server)
+   "notifications/resources/updated"
+   {:uri uri}))
 
 (defn notify-resource-updated!
   "Notify subscribed sessions that a resource has been updated.
@@ -107,8 +110,8 @@
   [server uri]
   (log/info :server/notify-resource-updated {:uri uri})
   (let [subscribers (subscriptions/get-subscribers
-                      @(:resource-subscriptions server)
-                      uri)
+                     @(:resource-subscriptions server)
+                     uri)
         rpc-server @(:json-rpc-server server)]
     (if (empty? subscribers)
       (log/debug :server/no-subscribers {:uri uri})
@@ -117,9 +120,9 @@
                   {:uri uri :subscriber-count (count subscribers)})
         ;; Use notify-all! which works for all transport types including in-memory
         (json-rpc-protocols/notify-all!
-          rpc-server
-          "notifications/resources/updated"
-          {:uri uri})))))
+         rpc-server
+         "notifications/resources/updated"
+         {:uri uri})))))
 
 (defn- text-map
   [msg]
@@ -151,34 +154,37 @@
      :isError false}))
 
 (defn- negotiate-initialization
-  "Negotiate initialization request according to MCP specification"
-  [{:keys [protocolVersion capabilities clientInfo] :as params}]
+  "Negotiate initialization request according to MCP specification.
+  
+  server-capabilities should contain capability configs like {:logging {}}"
+  [server-capabilities {:keys [protocolVersion capabilities clientInfo] :as params}]
   (let [negotiation (version/negotiate-version protocolVersion)
         {:keys [negotiated-version client-was-supported? supported-versions]} negotiation
         warnings (when-not client-was-supported?
                    [(str "Client version " protocolVersion " not supported. "
                          "Using " negotiated-version ". "
                          "Supported versions: " (pr-str supported-versions))])
-        ;; Create base server capabilities
-        base-capabilities {;; :logging   {} needs to implement logging/setLevel
-                           :tools {:listChanged true}
-                           :resources {:listChanged true
-                                       :subscribe true}
-                           :prompts {:listChanged true}}
+        ;; Create base server capabilities, conditionally including logging
+        base-capabilities (cond-> {:tools {:listChanged true}
+                                   :resources {:listChanged true
+                                               :subscribe true}
+                                   :prompts {:listChanged true}}
+                            (contains? server-capabilities :logging)
+                            (assoc :logging {}))
         ;; Apply version-specific capability formatting
         version-capabilities (version/handle-version-specific-behavior
-                               negotiated-version
-                               :capabilities
-                               {:capabilities base-capabilities})
+                              negotiated-version
+                              :capabilities
+                              {:capabilities base-capabilities})
         ;; Create base server info
         base-server-info {:name "mcp-clj"
                           :version "0.1.0"
                           :title "MCP Clojure Server"}
         ;; Apply version-specific server info formatting
         version-server-info (version/handle-version-specific-behavior
-                              negotiated-version
-                              :server-info
-                              {:server-info base-server-info})]
+                             negotiated-version
+                             :server-info
+                             {:server-info base-server-info})]
     (log/info :server/mcp-version
               {:negotiated-version negotiated-version
                :warnings warnings})
@@ -194,7 +200,9 @@
   "Handle initialize request from client"
   [server params]
   (log/info :server/initialize params)
-  (let [{:keys [negotiation client-info response]} (negotiate-initialization params)
+  (let [{:keys [negotiation client-info response]} (negotiate-initialization
+                                                    (:capabilities server)
+                                                    params)
         {:keys [negotiated-version]} negotiation]
     (when-not (:client-was-supported? negotiation)
       (log/warn :server/version-fallback
@@ -235,17 +243,17 @@
   [server {:keys [name arguments] :as _params}]
   (log/info :server/tools-call)
   (if-let [{:keys [implementation inputSchema]} (get
-                                                  @(:tool-registry server)
-                                                  name)]
+                                                 @(:tool-registry server)
+                                                 name)]
     (try
       (let [missing-args (set/difference
-                           (set (mapv keyword (:required inputSchema)))
-                           (set (keys arguments)))]
+                          (set (mapv keyword (:required inputSchema)))
+                          (set (keys arguments)))]
         (if (empty? missing-args)
           (transform-tool-result (implementation arguments))
           {:content [(text-map
-                       (str "Missing args: " (vec missing-args) ", found "
-                            (set (keys arguments))))]
+                      (str "Missing args: " (vec missing-args) ", found "
+                           (set (keys arguments))))]
            :isError true}))
       (catch Throwable e
         {:content [(text-map (str "Error: " (.getMessage e)))]
@@ -258,9 +266,9 @@
   [server protocol-version params]
   (let [base-response (handle-call-tool server params)]
     (version/handle-version-specific-behavior
-      protocol-version
-      :tool-response
-      base-response)))
+     protocol-version
+     :tool-response
+     base-response)))
 
 (defn- handle-list-resources
   "Handle resources/list request from client"
@@ -311,6 +319,25 @@
   (log/info :server/prompts-get)
   (prompts/get-prompt (:prompt-registry server) params))
 
+(defn- handle-logging-set-level
+  "Handle logging/setLevel request from client to set minimum log level"
+  [server request params]
+  (log/info :server/logging-set-level {:params params})
+  (let [session (request-session server request)
+        level-str (:level params)
+        level (keyword level-str)]
+    (if (logging/valid-level? level)
+      (do
+        (swap! (:session-id->session server)
+               assoc-in [(:session-id session) :log-level] level)
+        {})
+      (throw (ex-info "Invalid log level"
+                      {:code -32602
+                       :message "Invalid params"
+                       :data {:level level-str
+                              :valid-levels ["debug" "info" "notice" "warning"
+                                             "error" "critical" "alert" "emergency"]}})))))
+
 (defn- request-handler
   "Wrap a handler to support async responses and session updates"
   [server handler request params]
@@ -352,10 +379,10 @@
             nil)
           (do
             (log/warn
-              :server/error
-              {:msg "missing mcp session"
-               :request request
-               :params params})
+             :server/error
+             {:msg "missing mcp session"
+              :request request
+              :params params})
             (response nil)
             nil)))
 
@@ -365,20 +392,25 @@
 (defn- create-handlers
   "Create request handlers with server reference"
   [server]
-  (update-vals
-    {"initialize" handle-initialize
-     "notifications/initialized" handle-initialized
-     "ping" handle-ping
-     "tools/list" handle-list-tools
-     "tools/call" handle-call-tool
-     "resources/list" handle-list-resources
-     "resources/read" handle-read-resource
-     "resources/subscribe" handle-subscribe-resource
-     "resources/unsubscribe" handle-unsubscribe-resource
-     "prompts/list" handle-list-prompts
-     "prompts/get" handle-get-prompt}
-    (fn [handler]
-      #(request-handler server handler %1 %2))))
+  (let [base-handlers {"initialize" handle-initialize
+                       "notifications/initialized" handle-initialized
+                       "ping" handle-ping
+                       "tools/list" handle-list-tools
+                       "tools/call" handle-call-tool
+                       "resources/list" handle-list-resources
+                       "resources/read" handle-read-resource
+                       "resources/subscribe" handle-subscribe-resource
+                       "resources/unsubscribe" handle-unsubscribe-resource
+                       "prompts/list" handle-list-prompts
+                       "prompts/get" handle-get-prompt}
+        ;; Conditionally add logging handler if capability is enabled
+        handlers (if (contains? (:capabilities server) :logging)
+                   (assoc base-handlers "logging/setLevel" handle-logging-set-level)
+                   base-handlers)]
+    (update-vals
+     handlers
+     (fn [handler]
+       #(request-handler server handler %1 %2)))))
 
 (defn add-tool!
   "Add or update a tool in a running server"
@@ -465,6 +497,7 @@
   - :tools - Map of tool name to tool definition
   - :prompts - Map of prompt name to prompt definition
   - :resources - Map of resource name to resource definition
+  - :capabilities - Map of capability configs (e.g., {:logging {}})
 
   Transport configuration:
   - {:type :stdio :num-threads N} - Standard input/output
@@ -475,12 +508,14 @@
     (create-server {:transport {:type :stdio}
                     :tools {...}})
     (create-server {:transport {:type :http :port 3001}
-                    :prompts {...}})"
+                    :prompts {...}
+                    :capabilities {:logging {}}})"
   ^MCPServer
-  [{:keys [transport tools prompts resources]
+  [{:keys [transport tools prompts resources capabilities]
     :or {tools tools/default-tools
          prompts prompts/default-prompts
-         resources resources/default-resources}
+         resources resources/default-resources
+         capabilities {}}
     :as opts}]
   (when-not transport
     (throw (ex-info "Missing :transport configuration"
@@ -502,12 +537,13 @@
         resource-registry (atom resources)
         rpc-server-prom (promise)
         server (->MCPServer
-                 rpc-server-prom
-                 session-id->session
-                 tool-registry
-                 prompt-registry
-                 resource-registry
-                 (atom {}))
+                rpc-server-prom
+                session-id->session
+                tool-registry
+                prompt-registry
+                resource-registry
+                (atom {})
+                capabilities)
         ;; Create handlers before creating the JSON-RPC server to avoid race
         ;; conditions
         handlers (create-handlers server)
@@ -516,8 +552,8 @@
                                         {:on-sse-connect (partial on-sse-connect server)
                                          :on-sse-close (partial on-sse-close server)})
         json-rpc-server (transport-factory/create-transport
-                          transport-with-callbacks
-                          handlers)
+                         transport-with-callbacks
+                         handlers)
         server (assoc server
                       :stop #(do
                                (log/info :server/stopping {})
