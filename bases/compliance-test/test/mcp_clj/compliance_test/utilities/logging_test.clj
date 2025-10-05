@@ -16,7 +16,8 @@
 ;;; Test Helpers
 
 (defn create-logging-server
-  "Create server with logging capability enabled for given protocol version"
+  "Create server with logging capability enabled for given protocol version.
+  Returns map with :client, :server, :init-response, and :cleanup-fn."
   [protocol-version]
   (let [shared-transport (mcp-clj.in-memory-transport.shared/create-shared-transport)
         test-tools (helpers/create-test-tools protocol-version)
@@ -36,19 +37,21 @@
                                  :shared shared-transport}
                      :client-info {:name "test-client"
                                    :version "1.0.0"}
-                     :protocol-version protocol-version})]
+                     :protocol-version protocol-version})
 
-    ;; Wait for client to initialize
-    (client/wait-for-ready mcp-client 5000)
+        ;; Wait for client to initialize and capture response
+        init-response (client/wait-for-ready mcp-client 5000)]
 
     {:client mcp-client
      :server mcp-server
+     :init-response init-response
      :cleanup-fn (fn []
                    (client/close! mcp-client)
                    ((:stop mcp-server)))}))
 
 (defn create-non-logging-server
-  "Create server WITHOUT logging capability for given protocol version"
+  "Create server WITHOUT logging capability for given protocol version.
+  Returns map with :client, :server, :init-response, and :cleanup-fn."
   [protocol-version]
   (let [shared-transport (mcp-clj.in-memory-transport.shared/create-shared-transport)
         test-tools (helpers/create-test-tools protocol-version)
@@ -67,13 +70,14 @@
                                  :shared shared-transport}
                      :client-info {:name "test-client"
                                    :version "1.0.0"}
-                     :protocol-version protocol-version})]
+                     :protocol-version protocol-version})
 
-    ;; Wait for client to initialize
-    (client/wait-for-ready mcp-client 5000)
+        ;; Wait for client to initialize and capture response
+        init-response (client/wait-for-ready mcp-client 5000)]
 
     {:client mcp-client
      :server mcp-server
+     :init-response init-response
      :cleanup-fn (fn []
                    (client/close! mcp-client)
                    ((:stop mcp-server)))}))
@@ -100,12 +104,11 @@
           (do
             (testing "server with :logging {} declares logging capability"
               (let [pair (create-logging-server protocol-version)
-                    client (:client pair)
-                    session @(:session client)
-                    capabilities (:server-capabilities session)]
+                    init-response (:init-response pair)
+                    capabilities (:capabilities init-response)]
                 (try
                   (is (contains? capabilities :logging)
-                      "Server should declare logging capability")
+                      "Server should declare logging capability in initialize response")
                   (is (map? (:logging capabilities))
                       "Logging capability should be a map")
                   (finally
@@ -113,23 +116,21 @@
 
             (testing "server without :logging does not declare logging capability"
               (let [pair (create-non-logging-server protocol-version)
-                    client (:client pair)
-                    session @(:session client)
-                    capabilities (:server-capabilities session)]
+                    init-response (:init-response pair)
+                    capabilities (:capabilities init-response)]
                 (try
                   (is (not (contains? capabilities :logging))
-                      "Server should not declare logging capability")
+                      "Server should not declare logging capability in initialize response")
                   (finally
                     ((:cleanup-fn pair)))))))
 
           (testing "logging not present in version 2024-11-05"
             (let [pair (create-non-logging-server protocol-version)
-                  client (:client pair)
-                  session @(:session client)
-                  capabilities (:server-capabilities session)]
+                  init-response (:init-response pair)
+                  capabilities (:capabilities init-response)]
               (try
                 (is (not (contains? capabilities :logging))
-                    "Logging capability should not exist in 2024-11-05")
+                    "Logging capability should not exist in 2024-11-05 initialize response")
                 (finally
                   ((:cleanup-fn pair)))))))))))
 

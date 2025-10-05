@@ -216,7 +216,11 @@
 (defn wait-for-ready
   "Wait for client to be ready, with optional timeout (defaults to 30 seconds).
 
-  Returns true when client is ready.
+  Returns the server's initialization response containing:
+  - :protocolVersion - Negotiated protocol version
+  - :capabilities - Server capabilities map
+  - :serverInfo - Server information (name, version, etc.)
+
   Throws exception if client transitions to :error state or times out waiting."
   ([client] (wait-for-ready client 30000))
   ([client timeout-ms]
@@ -224,7 +228,11 @@
      (.get ^CompletableFuture (:initialization-future client)
            timeout-ms
            TimeUnit/MILLISECONDS)
-     true
+     ;; Return the initialization response from the session
+     (let [session @(:session client)]
+       {:protocolVersion (:protocol-version session)
+        :capabilities (:server-capabilities session)
+        :serverInfo (:server-info session)})
      (catch TimeoutException _
        (let [session-state (:state @(:session client))]
          (if (= :error session-state)
