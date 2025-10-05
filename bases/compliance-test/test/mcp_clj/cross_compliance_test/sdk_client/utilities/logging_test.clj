@@ -99,19 +99,81 @@
                                      helpers/test-protocol-versions)]
       (testing (str "protocol version " protocol-version)
 
-        (testing "client can set log level"
+        (testing "client receives log messages triggered by tool execution"
           (let [pair (create-sdk-client-with-logging-server protocol-version)
                 client (:client pair)
                 log-messages (:log-messages pair)]
             (try
-              ;; Set log level to debug
+              ;; Set log level to debug to receive all messages
               @(java-sdk/set-logging-level client :debug)
+              (Thread/sleep 200)
 
-              ;; Verify the logging handler is set up
-              (is (vector? @log-messages) "Log messages should be collected in a vector")
+              ;; Trigger log messages via tool
+              @(java-sdk/call-tool client "trigger-logs"
+                                   {:levels ["error" "warning" "info"]
+                                    :message "test message"})
 
-              ;; Note: Actual message delivery test requires server-side logging triggers
-              ;; which would need tool execution or other server activity
+              (Thread/sleep 300)
+
+              ;; Verify messages were received
+              (let [received @log-messages
+                    levels (set (map :level received))]
+                (is (>= (count received) 3) "Should receive at least 3 log messages")
+                (is (contains? levels :error) "Should receive error level")
+                (is (contains? levels :warning) "Should receive warning level")
+                (is (contains? levels :info) "Should receive info level"))
+
+              (finally
+                ((:cleanup-fn pair))))))
+
+        (testing "client receives messages with logger name"
+          (let [pair (create-sdk-client-with-logging-server protocol-version)
+                client (:client pair)
+                log-messages (:log-messages pair)]
+            (try
+              @(java-sdk/set-logging-level client :debug)
+              (Thread/sleep 200)
+
+              ;; Trigger log with logger name
+              @(java-sdk/call-tool client "trigger-logs"
+                                   {:levels ["error"]
+                                    :message "test with logger"
+                                    :logger "test-logger"})
+
+              (Thread/sleep 300)
+
+              ;; Verify logger name is present
+              (let [received @log-messages
+                    error-msg (first (filter #(= :error (:level %)) received))]
+                (is (some? error-msg) "Should receive error message")
+                (is (= "test-logger" (:logger error-msg)) "Should have correct logger name"))
+
+              (finally
+                ((:cleanup-fn pair))))))
+
+        (testing "log level filtering works correctly"
+          (let [pair (create-sdk-client-with-logging-server protocol-version)
+                client (:client pair)
+                log-messages (:log-messages pair)]
+            (try
+              ;; Set level to warning - should only receive warning and above
+              @(java-sdk/set-logging-level client :warning)
+              (Thread/sleep 200)
+
+              ;; Trigger messages at all levels
+              @(java-sdk/call-tool client "trigger-logs"
+                                   {:levels ["debug" "info" "warning" "error"]
+                                    :message "filtering test"})
+
+              (Thread/sleep 300)
+
+              ;; Should only receive warning and error
+              (let [received @log-messages
+                    levels (set (map :level received))]
+                (is (contains? levels :warning) "Should receive warning")
+                (is (contains? levels :error) "Should receive error")
+                (is (not (contains? levels :debug)) "Should NOT receive debug")
+                (is (not (contains? levels :info)) "Should NOT receive info"))
 
               (finally
                 ((:cleanup-fn pair))))))))))

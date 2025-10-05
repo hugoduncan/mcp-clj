@@ -6,6 +6,7 @@
   (:require
    [mcp-clj.log :as log]
    [mcp-clj.mcp-server.core :as mcp-server]
+   [mcp-clj.mcp-server.logging :as server-logging]
    [mcp-clj.tools.registry :as tools-registry]))
 
 (defn -main
@@ -14,8 +15,11 @@
   (try
     (log/info :test-logging-server {:msg "Starting with logging capability"})
 
-    ;; Create default tools
-    (let [tools (tools-registry/create-registry)]
+    ;; Atom to hold server reference for tools
+    (let [server-atom (atom nil)
+          tools (tools-registry/create-registry)]
+
+      ;; Add test tools
       (tools-registry/add-tool!
        tools
        {:name "clj-eval"
@@ -41,13 +45,54 @@
                             [{:type "text"
                               :text (clojure.string/join "\n" (map #(.getName %) files))}]))})
 
+      ;; Add trigger-logs tool for testing log delivery
+      (tools-registry/add-tool!
+       tools
+       {:name "trigger-logs"
+        :description "Trigger log messages at specified levels for testing"
+        :input-schema {:type "object"
+                       :properties {:levels {:type "array"
+                                             :items {:type "string"
+                                                     :enum ["debug" "info" "notice" "warning"
+                                                            "error" "critical" "alert" "emergency"]}
+                                             :description "Log levels to emit"}
+                                    :message {:type "string"
+                                              :description "Message to log"}
+                                    :logger {:type "string"
+                                             :description "Optional logger name"}}
+                       :required ["levels" "message"]}
+        :implementation (fn [params]
+                          (let [server @server-atom
+                                levels (:levels params)
+                                message (:message params)
+                                logger (:logger params)
+                                log-fn-map {:debug server-logging/debug
+                                            :info server-logging/info
+                                            :notice server-logging/notice
+                                            :warning server-logging/warn
+                                            :error server-logging/error
+                                            :critical server-logging/critical
+                                            :alert server-logging/alert
+                                            :emergency server-logging/emergency}]
+                            (doseq [level levels]
+                              (let [log-fn (get log-fn-map (keyword level))]
+                                (if logger
+                                  (log-fn server {:msg message} :logger logger)
+                                  (log-fn server {:msg message}))))
+                            [{:type "text"
+                              :text (str "Triggered " (count levels) " log message(s)")}]))})
+
       ;; Create server with logging capability
-      (with-open [server (mcp-server/create-server
-                          {:transport {:type :stdio}
-                           :tools tools
-                           :server-info {:name "test-logging-server"
-                                         :version "1.0.0"}
-                           :capabilities {:logging {}}})]
+      (let [server (mcp-server/create-server
+                    {:transport {:type :stdio}
+                     :tools tools
+                     :server-info {:name "test-logging-server"
+                                   :version "1.0.0"}
+                     :capabilities {:logging {}}})]
+
+        ;; Store server reference for tools
+        (reset! server-atom server)
+
         (log/info :test-logging-server {:msg "Started"})
 
         (.addShutdownHook
