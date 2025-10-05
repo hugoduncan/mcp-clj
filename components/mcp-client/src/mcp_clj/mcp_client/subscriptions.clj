@@ -2,7 +2,9 @@
   "Subscription management for MCP client notifications.
 
   Manages tracking of subscriptions to server notifications and dispatches
-  incoming notifications to registered callbacks.")
+  incoming notifications to registered callbacks."
+  (:require
+   [mcp-clj.log :as log]))
 
 (defn create-registry
   "Create a new subscription registry.
@@ -11,12 +13,14 @@
   - :resource-subscriptions - map of URI -> callback fn
   - :tools-subscriptions - set of callback fns
   - :prompts-subscriptions - set of callback fns
-  - :resources-subscriptions - set of callback fns"
+  - :resources-subscriptions - set of callback fns
+  - :log-message-subscriptions - set of callback fns"
   []
   {:resource-subscriptions (atom {})
    :tools-subscriptions (atom #{})
    :prompts-subscriptions (atom #{})
-   :resources-subscriptions (atom #{})})
+   :resources-subscriptions (atom #{})
+   :log-message-subscriptions (atom #{})})
 
 (defn subscribe-resource!
   "Subscribe to resource updates for a specific URI.
@@ -115,6 +119,30 @@
   [registry]
   @(:resources-subscriptions registry))
 
+(defn subscribe-log-messages!
+  "Subscribe to log message notifications.
+
+  Multiple callbacks can be registered. Returns the callback function."
+  [registry callback-fn]
+  (swap! (:log-message-subscriptions registry) conj callback-fn)
+  callback-fn)
+
+(defn unsubscribe-log-messages!
+  "Unsubscribe from log message notifications.
+
+  Returns true if the callback was found and removed, false otherwise."
+  [registry callback-fn]
+  (let [old-subs @(:log-message-subscriptions registry)]
+    (swap! (:log-message-subscriptions registry) disj callback-fn)
+    (contains? old-subs callback-fn)))
+
+(defn get-log-message-callbacks
+  "Get all callback functions for log message notifications.
+
+  Returns a set of callback functions."
+  [registry]
+  @(:log-message-subscriptions registry))
+
 (defn dispatch-notification!
   "Dispatch an incoming notification to registered callbacks.
 
@@ -123,6 +151,8 @@
   - notifications/resources/updated -> calls resource callback for URI
   - notifications/tools/list_changed -> calls all tools callbacks
   - notifications/prompts/list_changed -> calls all prompts callbacks
+  - notifications/resources/list_changed -> calls all resources callbacks
+  - notifications/message -> calls all log message callbacks
 
   Returns the number of callbacks invoked."
   [registry notification]
@@ -154,6 +184,17 @@
       (let [callbacks (get-resources-callbacks registry)]
         (doseq [callback callbacks]
           (callback params))
+        (count callbacks))
+
+      "notifications/message"
+      (let [callbacks (get-log-message-callbacks registry)
+            params-with-kw (update params :level keyword)]
+        (doseq [callback callbacks]
+          (try
+            (callback params-with-kw)
+            (catch Exception e
+              (log/error :client/log-callback-error
+                         {:error e :params params}))))
         (count callbacks))
 
       ;; Unknown notification type

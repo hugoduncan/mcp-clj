@@ -1,34 +1,35 @@
 (ns mcp-clj.mcp-client.core
   "MCP client implementation with initialization support"
   (:require
-    [mcp-clj.client-transport.factory :as transport-factory]
-    [mcp-clj.client-transport.protocol :as transport-protocol]
-    [mcp-clj.log :as log]
-    [mcp-clj.mcp-client.prompts :as prompts]
-    [mcp-clj.mcp-client.resources :as resources]
-    [mcp-clj.mcp-client.session :as session]
-    [mcp-clj.mcp-client.subscriptions :as subscriptions]
-    [mcp-clj.mcp-client.tools :as tools]
-    [mcp-clj.mcp-client.transport :as transport]
-    [mcp-clj.versions :as version])
+   [mcp-clj.client-transport.factory :as transport-factory]
+   [mcp-clj.client-transport.protocol :as transport-protocol]
+   [mcp-clj.log :as log]
+   [mcp-clj.mcp-client.logging :as logging]
+   [mcp-clj.mcp-client.prompts :as prompts]
+   [mcp-clj.mcp-client.resources :as resources]
+   [mcp-clj.mcp-client.session :as session]
+   [mcp-clj.mcp-client.subscriptions :as subscriptions]
+   [mcp-clj.mcp-client.tools :as tools]
+   [mcp-clj.mcp-client.transport :as transport]
+   [mcp-clj.versions :as version])
   (:import
-    (java.lang
-      AutoCloseable)
-    (java.util.concurrent
-      CompletableFuture
-      ExecutionException
-      TimeUnit
-      TimeoutException)))
+   (java.lang
+    AutoCloseable)
+   (java.util.concurrent
+    CompletableFuture
+    ExecutionException
+    TimeUnit
+    TimeoutException)))
 
 ;; Client Record
 
 (declare close!)
 
 (defrecord MCPClient
-  [transport ; Transport implementation (stdio, http, etc)
-   session ; Session state (atom)
-   subscription-registry ; Subscription registry for notifications
-   initialization-future] ; CompletableFuture for initialization process
+           [transport ; Transport implementation (stdio, http, etc)
+            session ; Session state (atom)
+            subscription-registry ; Subscription registry for notifications
+            initialization-future] ; CompletableFuture for initialization process
   AutoCloseable
 
   (close [this] (close! this))) ; Session state (atom)
@@ -47,18 +48,18 @@
             expected-version (:protocol-version current-session)]
         (when (not= protocolVersion expected-version)
           (throw (ex-info
-                   "Protocol version mismatch"
-                   {:expected expected-version
-                    :received protocolVersion
-                    :response response}))))
+                  "Protocol version mismatch"
+                  {:expected expected-version
+                   :received protocolVersion
+                   :response response}))))
 
       ;; Transition to ready state with server info
       (swap! session-atom
              #(session/transition-state!
-                %
-                :ready
-                :server-info serverInfo
-                :server-capabilities capabilities))
+               %
+               :ready
+               :server-info serverInfo
+               :server-capabilities capabilities))
 
       (log/info :client/session-ready
                 {:server-info serverInfo
@@ -68,10 +69,10 @@
       (log/error :client/initialize-error {:error e})
       (swap! session-atom
              #(session/transition-state!
-                %
-                :error
-                :error-info {:type :initialization-failed
-                             :error e})))))
+               %
+               :error
+               :error-info {:type :initialization-failed
+                            :error e})))))
 
 (defn- send-initialized-notification
   "Send initialized notification after successful initialization"
@@ -107,10 +108,10 @@
                            :capabilities (:capabilities session)
                            :clientInfo (:client-info session)}
               response-future (transport/send-request!
-                                transport
-                                "initialize"
-                                init-params
-                                30000)]
+                               transport
+                               "initialize"
+                               init-params
+                               30000)]
 
           (log/debug :mcp/initialize-sent {:params init-params})
 
@@ -167,11 +168,11 @@
         transport-config (assoc-in config [:transport :notification-handler] notification-handler)
         transport (transport-factory/create-transport transport-config)
         session (session/create-session
-                  (cond->
-                    {:client-info client-info
-                     :capabilities capabilities}
-                    protocol-version
-                    (assoc :protocol-version protocol-version)))
+                 (cond->
+                  {:client-info client-info
+                   :capabilities capabilities}
+                   protocol-version
+                   (assoc :protocol-version protocol-version)))
         client (->MCPClient transport (atom session) subscription-registry nil)
         init-future (start-initialization! client)]
     ;; Set up automatic cache invalidation for tools and prompts
@@ -411,3 +412,62 @@
   Returns a CompletableFuture that resolves immediately."
   [client callback-fn]
   (resources/unsubscribe-resources-changed-impl! client callback-fn))
+
+(defn set-log-level!
+  "Set the minimum log level for this client session.
+
+  The server will only send log messages at or above the specified level.
+  This controls server-side filtering - all subscribed callbacks receive
+  the same filtered messages.
+
+  Args:
+    client - MCP client instance
+    level - Log level keyword (:debug :info :notice :warning :error :critical :alert :emergency)
+
+  Returns:
+    CompletableFuture<EmptyObject> that completes when server acknowledges the level change.
+
+  Throws:
+    ExceptionInfo with :invalid-log-level if level is not one of the 8 RFC 5424 levels.
+
+  Logs a warning if server doesn't declare logging capability.
+
+  Example:
+    @(set-log-level! client :warning)
+    ;; Server will only send :warning, :error, :critical, :alert, :emergency"
+  [client level]
+  (logging/set-log-level-impl! client level))
+
+(defn subscribe-log-messages!
+  "Subscribe to log messages from the server.
+
+  The server filters messages based on the level set via set-log-level!.
+  All subscribers receive the same filtered messages.
+
+  Args:
+    client - MCP client instance
+    callback - Function called with log message map: (fn [{:keys [level logger data]}] ...)
+
+  The callback receives:
+    :level - Keyword log level (:error, :warning, etc.)
+    :logger - Optional string component name (may be nil)
+    :data - Message data (map, string, or other value)
+
+  Multiple subscribers are supported. Each will receive all log messages.
+
+  Callback exceptions are caught and logged to avoid crashing the client.
+
+  Returns:
+    CompletableFuture<Function> that resolves to an unsubscribe function.
+    Call the unsubscribe function to stop receiving messages: (unsub)
+
+  Example:
+    (-> (subscribe-log-messages!
+          client
+          (fn [{:keys [level logger data]}]
+            (println level logger data)))
+        (deref)
+        (def unsub))
+    ;; Later: (unsub)"
+  [client callback]
+  (logging/subscribe-log-messages-impl! client callback))
