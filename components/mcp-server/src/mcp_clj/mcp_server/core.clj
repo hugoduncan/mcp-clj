@@ -321,15 +321,15 @@
 
 (defn- handle-logging-set-level
   "Handle logging/setLevel request from client to set minimum log level"
-  [server request params]
+  [server params]
   (log/info :server/logging-set-level {:params params})
-  (let [session (request-session server request)
+  (let [session-id (-> params meta :session-id)
         level-str (:level params)
         level (keyword level-str)]
     (if (logging/valid-level? level)
       (do
         (swap! (:session-id->session server)
-               assoc-in [(:session-id session) :log-level] level)
+               assoc-in [session-id :log-level] level)
         {})
       (throw (ex-info "Invalid log level"
                       {:code -32602
@@ -346,7 +346,7 @@
         ;; Create session on-demand if missing (for in-memory transport)
         session (or session
                     (when session-id
-                      (let [new-session (->Session session-id false nil nil nil)]
+                      (let [new-session (->Session session-id false nil nil nil nil)]
                         (swap! (:session-id->session server) assoc session-id new-session)
                         (log/info :server/session-created {:session-id session-id})
                         new-session)))
