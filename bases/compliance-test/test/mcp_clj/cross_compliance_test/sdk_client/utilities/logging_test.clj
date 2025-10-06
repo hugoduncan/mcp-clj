@@ -11,7 +11,9 @@
    [mcp-clj.compliance-test.test-helpers :as helpers]
    [mcp-clj.java-sdk.interop :as java-sdk])
   (:import
-   [java.util.concurrent CountDownLatch TimeUnit]))
+   (java.util.concurrent
+    CountDownLatch
+    TimeUnit)))
 
 ;; Test Helpers
 
@@ -139,7 +141,8 @@
                 (is (>= (count received) 3) "Should receive at least 3 log messages")
                 (is (contains? levels :error) "Should receive error level")
                 (is (contains? levels :warning) "Should receive warning level")
-                (is (contains? levels :info) "Should receive info level"))
+                (is (contains? levels :info) "Should receive info level")
+                (is (every? #(= "test message" (:data %)) received) "All messages should have correct data"))
 
               (finally
                 (java-sdk/close-client client)))))
@@ -168,13 +171,14 @@
                                     :message "test with logger"
                                     :logger "test-logger"})
 
-              ;; Wait for message with 5 second timeout
+;; Wait for message with 5 second timeout
               (let [completed? (wait-for-messages (:latch handler-setup) 5000)
                     received @(:messages handler-setup)
                     error-msg (first (filter #(= :error (:level %)) received))]
                 (is completed? "Should receive message within timeout")
                 (is (some? error-msg) "Should receive error message")
-                (is (= "test-logger" (:logger error-msg)) "Should have correct logger name"))
+                (is (= "test-logger" (:logger error-msg)) "Should have correct logger name")
+                (is (= "test with logger" (:data error-msg)) "Should have correct message data"))
 
               (finally
                 (java-sdk/close-client client)))))
@@ -203,7 +207,7 @@
                                    {:levels ["debug" "info" "warning" "error"]
                                     :message "filtering test"})
 
-              ;; Wait for messages with 5 second timeout
+;; Wait for messages with 5 second timeout
               (let [completed? (wait-for-messages (:latch handler-setup) 5000)
                     received @(:messages handler-setup)
                     levels (set (map :level received))]
@@ -211,7 +215,8 @@
                 (is (contains? levels :warning) "Should receive warning")
                 (is (contains? levels :error) "Should receive error")
                 (is (not (contains? levels :debug)) "Should NOT receive debug")
-                (is (not (contains? levels :info)) "Should NOT receive info"))
+                (is (not (contains? levels :info)) "Should NOT receive info")
+                (is (every? #(= "filtering test" (:data %)) received) "All messages should have correct data"))
 
               (finally
                 (java-sdk/close-client client)))))))))
