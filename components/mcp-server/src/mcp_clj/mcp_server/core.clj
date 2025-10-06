@@ -466,7 +466,7 @@
 
 (defn- on-sse-connect
   [server id]
-  (let [session (->Session id false nil nil nil)]
+  (let [session (->Session id false nil nil nil nil)]
     (log/info :server/sse-connect {:session-id id})
     (swap! (:session-id->session server) assoc id session)))
 
