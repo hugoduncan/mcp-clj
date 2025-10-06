@@ -1,7 +1,7 @@
 (ns mcp-clj.mcp-server.logging-test
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.mcp-server.logging :as logging]))
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.mcp-server.logging :as logging]))
 
 (deftest valid-level-test
   (testing "valid-level?"
@@ -95,11 +95,11 @@
       (let [mock-server {:session-id->session (atom {})
                          :json-rpc-server (atom nil)}]
         (is (thrown-with-msg?
-             clojure.lang.ExceptionInfo
-             #"Invalid log level"
-             (logging/log-message mock-server :invalid-level {:data "test"})))
+              clojure.lang.ExceptionInfo
+              #"Invalid log level"
+              (logging/log-message mock-server :invalid-level {:data "test"})))
 
         (is (thrown-with-msg?
-             clojure.lang.ExceptionInfo
-             #"Invalid log level"
-             (logging/log-message mock-server :warn {:data "test"})))))))
+              clojure.lang.ExceptionInfo
+              #"Invalid log level"
+              (logging/log-message mock-server :warn {:data "test"})))))))

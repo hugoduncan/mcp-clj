@@ -4,7 +4,7 @@
   Manages tracking of subscriptions to server notifications and dispatches
   incoming notifications to registered callbacks."
   (:require
-   [mcp-clj.log :as log]))
+    [mcp-clj.log :as log]))
 
 (defn create-registry
   "Create a new subscription registry.

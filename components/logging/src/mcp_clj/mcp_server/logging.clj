@@ -7,9 +7,9 @@
   This is separate from the internal mcp-clj.log component which is used for
   debugging the mcp-clj framework itself."
   (:require
-   [mcp-clj.json-rpc.protocols :as json-rpc-protocols]))
+    [mcp-clj.json-rpc.protocols :as json-rpc-protocols]))
 
-;;; Log level constants and utilities
+;; Log level constants and utilities
 
 (def ^:private log-levels
   "RFC 5424 severity levels with numeric ordering.
@@ -40,7 +40,7 @@
   (<= (get log-levels message-level)
       (get log-levels threshold-level)))
 
-;;; Session log level management
+;; Session log level management
 
 (defn get-session-log-level
   "Get the minimum log level for a session.
@@ -54,7 +54,7 @@
   (let [threshold (get-session-log-level session)]
     (level>= message-level threshold)))
 
-;;; Core logging API
+;; Core logging API
 
 (defn log-message
   "Send a log message to connected clients at or above the specified level.
@@ -108,7 +108,7 @@
                          :params params})
       (json-rpc-protocols/notify! rpc-server (:session-id session) "notifications/message" params))))
 
-;;; Convenience functions for each log level
+;; Convenience functions for each log level
 
 (defn debug
   "Send a debug-level log message to clients.

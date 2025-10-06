@@ -203,4 +203,10 @@ clj -M:stdio-server
 
 - use `str/includes?` rather than `.contains`
 - run `cljstyle fix` before committing
-- use semantic commit and PR messages
+- Use semantic commit messages, and semantic pull request titles
+
+- when merging a PR provide a clean commit message using semntic commit
+  message style.  Do no just use the default message or a concatenation
+  of all the commit messages.  The message should reflect the scope and
+  logical content of the PR, not all the interim work used to implement
+  it.

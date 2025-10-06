@@ -4,15 +4,15 @@
   Provides functions for setting log levels and subscribing to log messages
   from MCP servers following the logging utility protocol."
   (:require
-   [mcp-clj.log :as log]
-   [mcp-clj.mcp-client.session :as session]
-   [mcp-clj.mcp-client.subscriptions :as subscriptions]
-   [mcp-clj.mcp-client.transport :as transport])
+    [mcp-clj.log :as log]
+    [mcp-clj.mcp-client.session :as session]
+    [mcp-clj.mcp-client.subscriptions :as subscriptions]
+    [mcp-clj.mcp-client.transport :as transport])
   (:import
-   (java.util.concurrent
-    CompletableFuture)))
+    (java.util.concurrent
+      CompletableFuture)))
 
-;;; Log level constants and validation
+;; Log level constants and validation
 
 (def log-levels
   "RFC 5424 severity levels with numeric ordering.
@@ -49,7 +49,7 @@
   [level-str]
   (keyword level-str))
 
-;;; Core implementation functions
+;; Core implementation functions
 
 (defn set-log-level-impl!
   "Implementation of set-log-level! - sets minimum log level on the server.
@@ -71,10 +71,10 @@
 
   (let [level-str (keyword->string level)]
     (transport/send-request!
-     (:transport client)
-     "logging/setLevel"
-     {:level level-str}
-     30000)))
+      (:transport client)
+      "logging/setLevel"
+      {:level level-str}
+      30000)))
 
 (defn subscribe-log-messages-impl!
   "Implementation of subscribe-log-messages! - subscribes to log message notifications.

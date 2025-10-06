@@ -7,13 +7,13 @@
 
   This complements the Clojure client tests by verifying cross-implementation compatibility."
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.compliance-test.test-helpers :as helpers]
-   [mcp-clj.java-sdk.interop :as java-sdk])
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.compliance-test.test-helpers :as helpers]
+    [mcp-clj.java-sdk.interop :as java-sdk])
   (:import
-   (java.util.concurrent
-    CountDownLatch
-    TimeUnit)))
+    (java.util.concurrent
+      CountDownLatch
+      TimeUnit)))
 
 ;; Test Helpers
 
@@ -30,14 +30,14 @@
 
         ;; Create Java SDK client with stdio transport to our test logging server
         transport (java-sdk/create-stdio-client-transport
-                   {:command "clojure"
-                    :args ["-M:dev:test"
-                           "-m" "mcp-clj.cross-compliance-test.sdk-client.logging-server"]})
+                    {:command "clojure"
+                     :args ["-M:dev:test"
+                            "-m" "mcp-clj.cross-compliance-test.sdk-client.logging-server"]})
 
         client (java-sdk/create-java-client
-                {:transport transport
-                 :async? true
-                 :logging-handler logging-handler})
+                 {:transport transport
+                  :async? true
+                  :logging-handler logging-handler})
 
         ;; Initialize the client
         init-response (java-sdk/initialize-client client)]
@@ -113,14 +113,14 @@
 
                 ;; Create Java SDK client with stdio transport to our test logging server
                 transport (java-sdk/create-stdio-client-transport
-                           {:command "clojure"
-                            :args ["-M:dev:test"
-                                   "-m" "mcp-clj.cross-compliance-test.sdk-client.logging-server"]})
+                            {:command "clojure"
+                             :args ["-M:dev:test"
+                                    "-m" "mcp-clj.cross-compliance-test.sdk-client.logging-server"]})
 
                 client (java-sdk/create-java-client
-                        {:transport transport
-                         :async? true
-                         :logging-handler (:handler handler-setup)})
+                         {:transport transport
+                          :async? true
+                          :logging-handler (:handler handler-setup)})
 
                 ;; Initialize the client
                 init-response (java-sdk/initialize-client client)]
@@ -133,7 +133,7 @@
                                    {:levels ["error" "warning" "info"]
                                     :message "test message"})
 
-;; Wait for messages with 5 second timeout
+              ;; Wait for messages with 5 second timeout
               (let [completed? (wait-for-messages (:latch handler-setup) 5000)
                     received @(:messages handler-setup)
                     levels (set (map :level received))]
@@ -152,14 +152,14 @@
                 handler-setup (create-latch-logging-handler 1)
 
                 transport (java-sdk/create-stdio-client-transport
-                           {:command "clojure"
-                            :args ["-M:dev:test"
-                                   "-m" "mcp-clj.cross-compliance-test.sdk-client.logging-server"]})
+                            {:command "clojure"
+                             :args ["-M:dev:test"
+                                    "-m" "mcp-clj.cross-compliance-test.sdk-client.logging-server"]})
 
                 client (java-sdk/create-java-client
-                        {:transport transport
-                         :async? true
-                         :logging-handler (:handler handler-setup)})
+                         {:transport transport
+                          :async? true
+                          :logging-handler (:handler handler-setup)})
 
                 init-response (java-sdk/initialize-client client)]
             (try
@@ -171,7 +171,7 @@
                                     :message "test with logger"
                                     :logger "test-logger"})
 
-;; Wait for message with 5 second timeout
+              ;; Wait for message with 5 second timeout
               (let [completed? (wait-for-messages (:latch handler-setup) 5000)
                     received @(:messages handler-setup)
                     error-msg (first (filter #(= :error (:level %)) received))]
@@ -188,14 +188,14 @@
                 handler-setup (create-latch-logging-handler 2)
 
                 transport (java-sdk/create-stdio-client-transport
-                           {:command "clojure"
-                            :args ["-M:dev:test"
-                                   "-m" "mcp-clj.cross-compliance-test.sdk-client.logging-server"]})
+                            {:command "clojure"
+                             :args ["-M:dev:test"
+                                    "-m" "mcp-clj.cross-compliance-test.sdk-client.logging-server"]})
 
                 client (java-sdk/create-java-client
-                        {:transport transport
-                         :async? true
-                         :logging-handler (:handler handler-setup)})
+                         {:transport transport
+                          :async? true
+                          :logging-handler (:handler handler-setup)})
 
                 init-response (java-sdk/initialize-client client)]
             (try
@@ -207,7 +207,7 @@
                                    {:levels ["debug" "info" "warning" "error"]
                                     :message "filtering test"})
 
-;; Wait for messages with 5 second timeout
+              ;; Wait for messages with 5 second timeout
               (let [completed? (wait-for-messages (:latch handler-setup) 5000)
                     received @(:messages handler-setup)
                     levels (set (map :level received))]

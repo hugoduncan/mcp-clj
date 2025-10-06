@@ -7,15 +7,17 @@
 
   Version-specific behavior is tested using conditional assertions."
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.compliance-test.test-helpers :as helpers]
-   [mcp-clj.mcp-client.core :as client]
-   [mcp-clj.mcp-server.logging :as server-logging]
-   [mcp-clj.mcp-server.core :as mcp-server])
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.compliance-test.test-helpers :as helpers]
+    [mcp-clj.mcp-client.core :as client]
+    [mcp-clj.mcp-server.core :as mcp-server]
+    [mcp-clj.mcp-server.logging :as server-logging])
   (:import
-   [java.util.concurrent CountDownLatch TimeUnit]))
+    (java.util.concurrent
+      CountDownLatch
+      TimeUnit)))
 
-;;; Test Helpers
+;; Test Helpers
 
 (defn create-logging-server
   "Create server with logging capability enabled for given protocol version.
@@ -27,22 +29,22 @@
 
         ;; Create server with logging capability
         mcp-server (mcp-server/create-server
-                    {:transport {:type :in-memory
-                                 :shared shared-transport}
-                     :tools test-tools
-                     :server-info {:name "test-server"
-                                   :version "1.0.0"}
-                     :capabilities {:logging {}}})
+                     {:transport {:type :in-memory
+                                  :shared shared-transport}
+                      :tools test-tools
+                      :server-info {:name "test-server"
+                                    :version "1.0.0"}
+                      :capabilities {:logging {}}})
 
         _ (reset! server-atom mcp-server)
 
         ;; Create client
         mcp-client (client/create-client
-                    {:transport {:type :in-memory
-                                 :shared shared-transport}
-                     :client-info {:name "test-client"
-                                   :version "1.0.0"}
-                     :protocol-version protocol-version})
+                     {:transport {:type :in-memory
+                                  :shared shared-transport}
+                      :client-info {:name "test-client"
+                                    :version "1.0.0"}
+                      :protocol-version protocol-version})
 
         ;; Wait for client to initialize and capture response
         init-response (client/wait-for-ready mcp-client 5000)]
@@ -63,19 +65,19 @@
 
         ;; Create server WITHOUT logging capability
         mcp-server (mcp-server/create-server
-                    {:transport {:type :in-memory
-                                 :shared shared-transport}
-                     :tools test-tools
-                     :server-info {:name "test-server"
-                                   :version "1.0.0"}})
+                     {:transport {:type :in-memory
+                                  :shared shared-transport}
+                      :tools test-tools
+                      :server-info {:name "test-server"
+                                    :version "1.0.0"}})
 
         ;; Create client
         mcp-client (client/create-client
-                    {:transport {:type :in-memory
-                                 :shared shared-transport}
-                     :client-info {:name "test-client"
-                                   :version "1.0.0"}
-                     :protocol-version protocol-version})
+                     {:transport {:type :in-memory
+                                  :shared shared-transport}
+                      :client-info {:name "test-client"
+                                    :version "1.0.0"}
+                      :protocol-version protocol-version})
 
         ;; Wait for client to initialize and capture response
         init-response (client/wait-for-ready mcp-client 5000)]
@@ -116,7 +118,7 @@
   [latch timeout-ms]
   (.await latch timeout-ms TimeUnit/MILLISECONDS))
 
-;;; Compliance Tests
+;; Compliance Tests
 
 (deftest ^:integ logging-capability-declaration-test
   ;; Test that logging capability is properly declared in initialize response

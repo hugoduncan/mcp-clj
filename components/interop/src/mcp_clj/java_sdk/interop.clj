@@ -4,82 +4,82 @@
   Provides a minimal Clojure API to create and interact with MCP
   clients and servers from the official Java SDK."
   (:require
-   [clojure.string :as str]
-   [mcp-clj.log :as log])
+    [clojure.string :as str]
+    [mcp-clj.log :as log])
   (:import
-   (com.fasterxml.jackson.databind
-    ObjectMapper)
+    (com.fasterxml.jackson.databind
+      ObjectMapper)
     ;; Types
-   (io.modelcontextprotocol.client
-    McpAsyncClient
-    McpClient
-    McpClient$AsyncSpec
-    McpClient$SyncSpec
-    McpSyncClient)
-   (io.modelcontextprotocol.client.transport
-    ServerParameters
-    StdioClientTransport
-    WebClientStreamableHttpTransport
-    WebFluxSseClientTransport)
-   (io.modelcontextprotocol.server
-    McpAsyncServer
-    McpServer
-    McpServer$AsyncSpecification
-    McpServer$SingleSessionSyncSpecification
-    McpServer$StreamableSyncSpecification
-    McpServerFeatures$AsyncToolSpecification$Builder
-    McpServerFeatures$SyncToolSpecification
-    McpServerFeatures$SyncToolSpecification$Builder
-    McpSyncServer)
-   (io.modelcontextprotocol.server.transport
-    StdioServerTransportProvider
-    WebFluxSseServerTransportProvider
-    WebFluxStatelessServerTransport
-    WebFluxStreamableServerTransportProvider)
-   (io.modelcontextprotocol.spec
-    McpSchema
-    McpSchema$AudioContent
-    McpSchema$BlobResourceContents
-    McpSchema$CallToolRequest
-    McpSchema$CallToolResult
-    McpSchema$Content
-    McpSchema$EmbeddedResource
-    McpSchema$ImageContent
-    McpSchema$InitializeResult
-    McpSchema$ListToolsResult
-    McpSchema$LoggingLevel
-    McpSchema$LoggingMessageNotification
-    McpSchema$ResourceLink
-    McpSchema$ServerCapabilities
-    McpSchema$ServerCapabilities$Builder
-    McpSchema$ServerCapabilities$LoggingCapabilities
-    McpSchema$ServerCapabilities$PromptCapabilities
-    McpSchema$ServerCapabilities$ResourceCapabilities
-    McpSchema$ServerCapabilities$ToolCapabilities
-    McpSchema$TextContent
-    McpSchema$TextResourceContents
-    McpSchema$Tool
-    McpServerTransportProvider)
-   (java.lang
-    AutoCloseable)
-   (java.util
-    List
-    Map)
-   (java.util.concurrent
-    CompletableFuture
-    TimeUnit)
-   (org.springframework.web.reactive.function.client
-    WebClient
-    WebClient$Builder)
-   (reactor.core.publisher
-    Mono)))
+    (io.modelcontextprotocol.client
+      McpAsyncClient
+      McpClient
+      McpClient$AsyncSpec
+      McpClient$SyncSpec
+      McpSyncClient)
+    (io.modelcontextprotocol.client.transport
+      ServerParameters
+      StdioClientTransport
+      WebClientStreamableHttpTransport
+      WebFluxSseClientTransport)
+    (io.modelcontextprotocol.server
+      McpAsyncServer
+      McpServer
+      McpServer$AsyncSpecification
+      McpServer$SingleSessionSyncSpecification
+      McpServer$StreamableSyncSpecification
+      McpServerFeatures$AsyncToolSpecification$Builder
+      McpServerFeatures$SyncToolSpecification
+      McpServerFeatures$SyncToolSpecification$Builder
+      McpSyncServer)
+    (io.modelcontextprotocol.server.transport
+      StdioServerTransportProvider
+      WebFluxSseServerTransportProvider
+      WebFluxStatelessServerTransport
+      WebFluxStreamableServerTransportProvider)
+    (io.modelcontextprotocol.spec
+      McpSchema
+      McpSchema$AudioContent
+      McpSchema$BlobResourceContents
+      McpSchema$CallToolRequest
+      McpSchema$CallToolResult
+      McpSchema$Content
+      McpSchema$EmbeddedResource
+      McpSchema$ImageContent
+      McpSchema$InitializeResult
+      McpSchema$ListToolsResult
+      McpSchema$LoggingLevel
+      McpSchema$LoggingMessageNotification
+      McpSchema$ResourceLink
+      McpSchema$ServerCapabilities
+      McpSchema$ServerCapabilities$Builder
+      McpSchema$ServerCapabilities$LoggingCapabilities
+      McpSchema$ServerCapabilities$PromptCapabilities
+      McpSchema$ServerCapabilities$ResourceCapabilities
+      McpSchema$ServerCapabilities$ToolCapabilities
+      McpSchema$TextContent
+      McpSchema$TextResourceContents
+      McpSchema$Tool
+      McpServerTransportProvider)
+    (java.lang
+      AutoCloseable)
+    (java.util
+      List
+      Map)
+    (java.util.concurrent
+      CompletableFuture
+      TimeUnit)
+    (org.springframework.web.reactive.function.client
+      WebClient
+      WebClient$Builder)
+    (reactor.core.publisher
+      Mono)))
 
 ;; Utility functions
 
 ;; Records for Java SDK client and server wrappers
 
 (defrecord JavaSdkClient
-           [^McpClient client transport async? notification-handlers]
+  [^McpClient client transport async? notification-handlers]
 
   AutoCloseable
 
@@ -95,7 +95,7 @@
         (log/warn :java-sdk/close-error {:error e})))))
 
 (defrecord JavaSdkServer
-           [^McpServer server name version async?]
+  [^McpServer server name version async?]
 
   AutoCloseable
 
@@ -115,10 +115,10 @@
   (cond
     (map? m)
     (java.util.HashMap.
-     ^Map (into {} (map (fn [[k v]]
-                          [(if (keyword? k) (name k) k)
-                           (clj->java-map v)])
-                        m)))
+      ^Map (into {} (map (fn [[k v]]
+                           [(if (keyword? k) (name k) k)
+                            (clj->java-map v)])
+                         m)))
 
     (sequential? m)
     (java.util.ArrayList. ^java.util.Collection (map clj->java-map m))
@@ -163,47 +163,47 @@
   [^McpSchema$Content content]
   (let [m (.meta content)]
     (cond->
-     (condp = (.type content)
-       "text"
-       (let [^McpSchema$TextContent text-content content]
-         {:type "text"
-          :text (.text text-content)})
+      (condp = (.type content)
+        "text"
+        (let [^McpSchema$TextContent text-content content]
+          {:type "text"
+           :text (.text text-content)})
 
-       "image"
-       (let [^McpSchema$ImageContent image-content content]
-         {:data (.data image-content)
-          :mime-type (.mimeType image-content)})
+        "image"
+        (let [^McpSchema$ImageContent image-content content]
+          {:data (.data image-content)
+           :mime-type (.mimeType image-content)})
 
-       "audio"
-       (let [^McpSchema$AudioContent audio-content content]
-         {:data (.data audio-content)
-          :mime-type (.mimeType audio-content)})
+        "audio"
+        (let [^McpSchema$AudioContent audio-content content]
+          {:data (.data audio-content)
+           :mime-type (.mimeType audio-content)})
 
-       "resource"
-       (let [^McpSchema$EmbeddedResource embedded-resource content
-             resource (.resource embedded-resource)
-             base {:uri (.uri resource)
-                   :mime-type (.mimeType resource)
-                   :meta (into {} (.meta resource))}]
-         (cond
-           (instance? McpSchema$TextResourceContents resource)
-           (assoc base
-                  :text (.text ^McpSchema$TextResourceContents resource))
-           (instance? McpSchema$BlobResourceContents resource)
-           (assoc base
-                  :blob (.blob ^McpSchema$BlobResourceContents resource))))
+        "resource"
+        (let [^McpSchema$EmbeddedResource embedded-resource content
+              resource (.resource embedded-resource)
+              base {:uri (.uri resource)
+                    :mime-type (.mimeType resource)
+                    :meta (into {} (.meta resource))}]
+          (cond
+            (instance? McpSchema$TextResourceContents resource)
+            (assoc base
+                   :text (.text ^McpSchema$TextResourceContents resource))
+            (instance? McpSchema$BlobResourceContents resource)
+            (assoc base
+                   :blob (.blob ^McpSchema$BlobResourceContents resource))))
 
-       "resource_link"
-       (let [^McpSchema$ResourceLink link content]
-         {:name (.name link)
-          :title (.title link)
-          :uri (.uri link)
-          :descritpion (.description link)
-          :mime-type (.mimeType link)
-          :size (.size link)})
+        "resource_link"
+        (let [^McpSchema$ResourceLink link content]
+          {:name (.name link)
+           :title (.title link)
+           :uri (.uri link)
+           :descritpion (.description link)
+           :mime-type (.mimeType link)
+           :size (.size link)})
 
-       {:type "text"
-        :text (str content)})
+        {:type "text"
+         :text (str content)})
       (and m (seq m))
       (assoc :meta m))))
 
@@ -301,56 +301,56 @@
         builder (if logging-handler
                   (if async?
                     (.loggingConsumer
-                     ^McpClient$AsyncSpec builder
-                     (reify java.util.function.Function
-                       (apply
-                         [_ notification]
-                         (Mono/fromRunnable
-                          (reify java.lang.Runnable
-                            (run
-                              [_]
-                              (try
-                                (let [^McpSchema$LoggingMessageNotification
-                                      notification notification
-                                      level (.level notification)
-                                      logger (.logger notification)
-                                      data (.data notification)
-                                      clj-notification
-                                      (cond-> {:level (-> level .name str/lower-case keyword)
-                                               :data data}
-                                        logger (assoc :logger logger))]
-                                  (logging-handler clj-notification))
-                                (catch Exception e
-                                  (log/error :java-sdk/logging-handler-error
-                                             {:error e
-                                              :message (.getMessage e)
-                                              :stack-trace (with-out-str (.printStackTrace e))})))))))))
+                      ^McpClient$AsyncSpec builder
+                      (reify java.util.function.Function
+                        (apply
+                          [_ notification]
+                          (Mono/fromRunnable
+                            (reify java.lang.Runnable
+                              (run
+                                [_]
+                                (try
+                                  (let [^McpSchema$LoggingMessageNotification
+                                        notification notification
+                                        level (.level notification)
+                                        logger (.logger notification)
+                                        data (.data notification)
+                                        clj-notification
+                                        (cond-> {:level (-> level .name str/lower-case keyword)
+                                                 :data data}
+                                          logger (assoc :logger logger))]
+                                    (logging-handler clj-notification))
+                                  (catch Exception e
+                                    (log/error :java-sdk/logging-handler-error
+                                               {:error e
+                                                :message (.getMessage e)
+                                                :stack-trace (with-out-str (.printStackTrace e))})))))))))
                     (.loggingConsumer
-                     ^McpClient$SyncSpec builder
-                     (reify java.util.function.Consumer
-                       (accept
-                         [_ notification]
-                         (log/info :java-sdk/logging-notification-received
-                                   {:notification-type (type notification)})
-                         (try
-                           (let [^McpSchema$LoggingMessageNotification
-                                 notification notification
-                                 level (-> notification .level .name str/lower-case keyword)
-                                 logger (.logger notification)
-                                 data (.data notification)
-                                 clj-notification
-                                 (cond->
-                                  {:level level
-                                   :data data}
-                                   logger (assoc :logger logger))]
-                             (log/info :java-sdk/calling-handler
-                                       {:notification clj-notification})
-                             (logging-handler clj-notification))
-                           (catch Exception e
-                             (log/error :java-sdk/logging-handler-error
-                                        {:error e
-                                         :message (.getMessage e)
-                                         :stack-trace (with-out-str (.printStackTrace e))})))))))
+                      ^McpClient$SyncSpec builder
+                      (reify java.util.function.Consumer
+                        (accept
+                          [_ notification]
+                          (log/info :java-sdk/logging-notification-received
+                                    {:notification-type (type notification)})
+                          (try
+                            (let [^McpSchema$LoggingMessageNotification
+                                  notification notification
+                                  level (-> notification .level .name str/lower-case keyword)
+                                  logger (.logger notification)
+                                  data (.data notification)
+                                  clj-notification
+                                  (cond->
+                                    {:level level
+                                     :data data}
+                                    logger (assoc :logger logger))]
+                              (log/info :java-sdk/calling-handler
+                                        {:notification clj-notification})
+                              (logging-handler clj-notification))
+                            (catch Exception e
+                              (log/error :java-sdk/logging-handler-error
+                                         {:error e
+                                          :message (.getMessage e)
+                                          :stack-trace (with-out-str (.printStackTrace e))})))))))
                   builder)
 
         client (if async?
@@ -376,16 +376,16 @@
 
                      :else
                      (throw
-                      (ex-info
-                       "Invalid command spec"
-                       {:command-spec command-spec})))
+                       (ex-info
+                         "Invalid command spec"
+                         {:command-spec command-spec})))
 
         ;; Build ServerParameters using the builder pattern
         builder (ServerParameters/builder cmd)
         server-params (if args
                         (-> builder
                             (.args
-                             ^"[Ljava.lang.String;" (into-array String args))
+                              ^"[Ljava.lang.String;" (into-array String args))
                             (.build))
                         (.build builder))]
 
@@ -483,11 +483,11 @@
                           (java-tools-result->clj result))))))
     ;; For sync client, wrap the synchronous call in a CompletableFuture
     (CompletableFuture/supplyAsync
-     (reify java.util.function.Supplier
-       (get
-         [_]
-         (let [result (.listTools ^McpSyncClient (:client client-record))]
-           (java-tools-result->clj result)))))))
+      (reify java.util.function.Supplier
+        (get
+          [_]
+          (let [result (.listTools ^McpSyncClient (:client client-record))]
+            (java-tools-result->clj result)))))))
 
 (defn call-tool
   "Call a tool through the Java SDK client.
@@ -518,12 +518,12 @@
                             (java-tool-result->clj result))))))
       ;; For sync client, wrap the synchronous call in a CompletableFuture
       (CompletableFuture/supplyAsync
-       (reify java.util.function.Supplier
-         (get
-           [_]
-           (let [^McpSyncClient client (:client client-record)
-                 result (.callTool client request)]
-             (java-tool-result->clj result))))))))
+        (reify java.util.function.Supplier
+          (get
+            [_]
+            (let [^McpSyncClient client (:client client-record)
+                  result (.callTool client request)]
+              (java-tool-result->clj result))))))))
 
 (defn close-client
   "Close the Java SDK client."
@@ -547,14 +547,14 @@
             mono (.setLoggingLevel client java-level)]
         (.toFuture mono))
       (CompletableFuture/supplyAsync
-       (reify java.util.function.Supplier
-         (get
-           [_]
-           (let [^McpSyncClient client (:client client-record)]
-             (.setLoggingLevel
-              client
-              (McpSchema$LoggingLevel/valueOf (str/upper-case level-str)))
-             nil)))))))
+        (reify java.util.function.Supplier
+          (get
+            [_]
+            (let [^McpSyncClient client (:client client-record)]
+              (.setLoggingLevel
+                client
+                (McpSchema$LoggingLevel/valueOf (str/upper-case level-str)))
+              nil)))))))
 
 ;; Server API (placeholder - not fully implemented yet)
 
@@ -581,9 +581,9 @@
                    (-> ^McpServer$AsyncSpecification builder
                        (.serverInfo name version)
                        (.capabilities
-                        (-> (McpSchema$ServerCapabilities$Builder.)
-                            (.tools true)
-                            (.build)))
+                         (-> (McpSchema$ServerCapabilities$Builder.)
+                             (.tools true)
+                             (.build)))
                        (.build)))
                  (let [builder (if (instance? McpServerTransportProvider transport)
                                  (McpServer/sync ^McpServerTransportProvider transport)
@@ -591,9 +591,9 @@
                    (-> ^McpServer$StreamableSyncSpecification builder
                        (.serverInfo name version)
                        (.capabilities
-                        (-> (McpSchema$ServerCapabilities$Builder.)
-                            (.tools true)
-                            (.build)))
+                         (-> (McpSchema$ServerCapabilities$Builder.)
+                             (.tools true)
+                             (.build)))
                        (.build))))]
     (->JavaSdkServer server name version async?)))
 
@@ -638,8 +638,8 @@
   (let [^String schema-json (if (string? input-schema)
                               input-schema
                               (.writeValueAsString
-                               (ObjectMapper.)
-                               input-schema))
+                                (ObjectMapper.)
+                                input-schema))
         tool (-> (McpSchema$Tool/builder)
                  (.name name)
                  (.description description)
@@ -714,14 +714,14 @@
     :stdio-client (let [command (:command options)]
                     (when-not command
                       (throw
-                       (ex-info
-                        "Command required for stdio client transport"
-                        {:options options})))
+                        (ex-info
+                          "Command required for stdio client transport"
+                          {:options options})))
                     (create-stdio-client-transport command))
     :stdio-server (create-stdio-server-transport)
     :http-client (create-http-client-transport options)
     :http-server (create-http-server-transport options)
     (throw
-     (ex-info
-      "Unknown transport type"
-      {:transport-type transport-type}))))
+      (ex-info
+        "Unknown transport type"
+        {:transport-type transport-type}))))

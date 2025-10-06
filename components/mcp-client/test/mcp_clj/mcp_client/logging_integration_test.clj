@@ -1,35 +1,35 @@
 (ns ^:integ mcp-clj.mcp-client.logging-integration-test
   "Integration tests for logging functionality using full client-server setup"
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.client-transport.factory :as client-transport-factory]
-   [mcp-clj.in-memory-transport.shared :as shared]
-   [mcp-clj.mcp-client.core :as client]
-   [mcp-clj.server-transport.factory :as server-transport-factory])
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.client-transport.factory :as client-transport-factory]
+    [mcp-clj.in-memory-transport.shared :as shared]
+    [mcp-clj.mcp-client.core :as client]
+    [mcp-clj.server-transport.factory :as server-transport-factory])
   (:import
-   (java.util.concurrent
-    CompletableFuture
-    TimeUnit)))
+    (java.util.concurrent
+      CompletableFuture
+      TimeUnit)))
 
 (defn ensure-in-memory-transport-registered!
   "Ensure in-memory transport is registered in both client and server factories."
   []
   (client-transport-factory/register-transport!
-   :in-memory
-   (fn [options]
-     (require 'mcp-clj.in-memory-transport.client)
-     (let [create-fn (ns-resolve
-                      'mcp-clj.in-memory-transport.client
-                      'create-transport)]
-       (create-fn options))))
+    :in-memory
+    (fn [options]
+      (require 'mcp-clj.in-memory-transport.client)
+      (let [create-fn (ns-resolve
+                        'mcp-clj.in-memory-transport.client
+                        'create-transport)]
+        (create-fn options))))
   (server-transport-factory/register-transport!
-   :in-memory
-   (fn [options handlers]
-     (require 'mcp-clj.in-memory-transport.server)
-     (let [create-server (ns-resolve
-                          'mcp-clj.in-memory-transport.server
-                          'create-in-memory-server)]
-       (create-server options handlers)))))
+    :in-memory
+    (fn [options handlers]
+      (require 'mcp-clj.in-memory-transport.server)
+      (let [create-server (ns-resolve
+                            'mcp-clj.in-memory-transport.server
+                            'create-in-memory-server)]
+        (create-server options handlers)))))
 
 (ensure-in-memory-transport-registered!)
 
@@ -55,8 +55,8 @@
         create-server-fn (do
                            (require 'mcp-clj.in-memory-transport.server)
                            (ns-resolve
-                            'mcp-clj.in-memory-transport.server
-                            'create-in-memory-server))]
+                             'mcp-clj.in-memory-transport.server
+                             'create-in-memory-server))]
     {:server (create-server-fn {:shared shared-transport} handlers)
      :log-level current-log-level}))
 
@@ -65,8 +65,8 @@
   [server level logger data]
   (require 'mcp-clj.json-rpc.protocols)
   (let [notify-all! (ns-resolve
-                     'mcp-clj.json-rpc.protocols
-                     'notify-all!)]
+                      'mcp-clj.json-rpc.protocols
+                      'notify-all!)]
     (notify-all! server "notifications/message"
                  (cond-> {:level level :data data}
                    logger (assoc :logger logger)))))
@@ -124,8 +124,8 @@
 
         (testing "receives log messages with all fields"
           (let [unsub-future (client/subscribe-log-messages!
-                              test-client
-                              (fn [msg] (swap! received-messages conj msg)))
+                               test-client
+                               (fn [msg] (swap! received-messages conj msg)))
                 unsub (.get ^CompletableFuture unsub-future 5 TimeUnit/SECONDS)]
 
             (send-log-message! server "error" "db" {:msg "Connection failed"})
@@ -141,8 +141,8 @@
         (testing "receives log messages without logger field"
           (reset! received-messages [])
           (let [unsub-future (client/subscribe-log-messages!
-                              test-client
-                              (fn [msg] (swap! received-messages conj msg)))
+                               test-client
+                               (fn [msg] (swap! received-messages conj msg)))
                 unsub (.get ^CompletableFuture unsub-future 5 TimeUnit/SECONDS)]
 
             (send-log-message! server "info" nil "Server started")
@@ -159,11 +159,11 @@
           (reset! received-messages [])
           (let [received2 (atom [])
                 unsub1-future (client/subscribe-log-messages!
-                               test-client
-                               (fn [msg] (swap! received-messages conj msg)))
+                                test-client
+                                (fn [msg] (swap! received-messages conj msg)))
                 unsub2-future (client/subscribe-log-messages!
-                               test-client
-                               (fn [msg] (swap! received2 conj msg)))
+                                test-client
+                                (fn [msg] (swap! received2 conj msg)))
                 unsub1 (.get ^CompletableFuture unsub1-future 5 TimeUnit/SECONDS)
                 unsub2 (.get ^CompletableFuture unsub2-future 5 TimeUnit/SECONDS)]
 
@@ -181,8 +181,8 @@
         (testing "unsubscribe stops receiving messages"
           (reset! received-messages [])
           (let [unsub-future (client/subscribe-log-messages!
-                              test-client
-                              (fn [msg] (swap! received-messages conj msg)))
+                               test-client
+                               (fn [msg] (swap! received-messages conj msg)))
                 unsub (.get ^CompletableFuture unsub-future 5 TimeUnit/SECONDS)]
 
             (send-log-message! server "error" nil "Before unsub")
@@ -216,14 +216,14 @@
 
         (testing "throws for invalid log level"
           (is (thrown-with-msg?
-               clojure.lang.ExceptionInfo
-               #"Invalid log level"
-               (client/set-log-level! test-client :invalid)))
+                clojure.lang.ExceptionInfo
+                #"Invalid log level"
+                (client/set-log-level! test-client :invalid)))
 
           (is (thrown-with-msg?
-               clojure.lang.ExceptionInfo
-               #"Invalid log level"
-               (client/set-log-level! test-client :trace))))
+                clojure.lang.ExceptionInfo
+                #"Invalid log level"
+                (client/set-log-level! test-client :trace))))
 
         (finally
           (client/close! test-client)

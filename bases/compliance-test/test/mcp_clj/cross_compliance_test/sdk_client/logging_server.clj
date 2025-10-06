@@ -4,9 +4,9 @@
   This server enables the logging capability for testing with Java SDK client."
   (:gen-class)
   (:require
-   [mcp-clj.log :as log]
-   [mcp-clj.mcp-server.core :as mcp-server]
-   [mcp-clj.mcp-server.logging :as server-logging]))
+    [mcp-clj.log :as log]
+    [mcp-clj.mcp-server.core :as mcp-server]
+    [mcp-clj.mcp-server.logging :as server-logging]))
 
 (defn trigger-logs
   [server-atom params]
@@ -64,11 +64,11 @@
 
           ;; Create server with logging capability
           server (mcp-server/create-server
-                  {:transport {:type :stdio}
-                   :tools tools
-                   :server-info {:name "test-logging-server"
-                                 :version "1.0.0"}
-                   :capabilities {:logging {}}})]
+                   {:transport {:type :stdio}
+                    :tools tools
+                    :server-info {:name "test-logging-server"
+                                  :version "1.0.0"}
+                    :capabilities {:logging {}}})]
 
       ;; Store server reference for trigger-logs tool
       (reset! server-atom server)
@@ -76,10 +76,10 @@
       (log/info :test-logging-server {:msg "Started"})
 
       (.addShutdownHook
-       (Runtime/getRuntime)
-       (Thread. #(do
-                   (log/info :shutting-down-test-logging-server)
-                   ((:stop server)))))
+        (Runtime/getRuntime)
+        (Thread. #(do
+                    (log/info :shutting-down-test-logging-server)
+                    ((:stop server)))))
 
       ;; Keep the main thread alive
       @(promise))

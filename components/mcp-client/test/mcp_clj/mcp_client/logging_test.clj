@@ -1,11 +1,11 @@
 (ns mcp-clj.mcp-client.logging-test
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.mcp-client.logging :as logging]
-   [mcp-clj.mcp-client.subscriptions :as subs])
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.mcp-client.logging :as logging]
+    [mcp-clj.mcp-client.subscriptions :as subs])
   (:import
-   (java.util.concurrent
-    CompletableFuture)))
+    (java.util.concurrent
+      CompletableFuture)))
 
 (deftest log-level-validation-test
   ;; Tests validation of RFC 5424 log levels
@@ -93,11 +93,11 @@
         (subs/subscribe-log-messages! registry callback1)
         (subs/subscribe-log-messages! registry callback2)
         (let [count (subs/dispatch-notification!
-                     registry
-                     {:method "notifications/message"
-                      :params {:level "error"
-                               :logger "test"
-                               :data {:msg "fail"}}})]
+                      registry
+                      {:method "notifications/message"
+                       :params {:level "error"
+                                :logger "test"
+                                :data {:msg "fail"}}})]
           (is (= 2 count))
           (is (= {:level :error :logger "test" :data {:msg "fail"}} @received1))
           (is (= {:level :error :logger "test" :data {:msg "fail"}} @received2)))))
@@ -108,9 +108,9 @@
             callback (fn [params] (reset! received params))]
         (subs/subscribe-log-messages! registry callback)
         (subs/dispatch-notification!
-         registry
-         {:method "notifications/message"
-          :params {:level "warning" :data "msg"}})
+          registry
+          {:method "notifications/message"
+           :params {:level "warning" :data "msg"}})
         (is (= :warning (:level @received)))))
 
     (testing "handles optional logger field"
@@ -119,9 +119,9 @@
             callback (fn [params] (reset! received params))]
         (subs/subscribe-log-messages! registry callback)
         (subs/dispatch-notification!
-         registry
-         {:method "notifications/message"
-          :params {:level "info" :data "msg"}})
+          registry
+          {:method "notifications/message"
+           :params {:level "info" :data "msg"}})
         (is (nil? (:logger @received)))
         (is (= :info (:level @received)))))
 
@@ -135,9 +135,9 @@
                                                  (swap! call-count inc)
                                                  (success-callback _)))
         (let [count (subs/dispatch-notification!
-                     registry
-                     {:method "notifications/message"
-                      :params {:level "error" :data "msg"}})]
+                      registry
+                      {:method "notifications/message"
+                       :params {:level "error" :data "msg"}})]
           (is (= 2 count))
           (is (= 1 @call-count)))))))
 
@@ -148,13 +148,13 @@
       (let [client {:session (atom {:state :ready
                                     :server-info {:capabilities {:logging {}}}})}]
         (is (thrown-with-msg?
-             clojure.lang.ExceptionInfo
-             #"Invalid log level"
-             (logging/set-log-level-impl! client :invalid)))
+              clojure.lang.ExceptionInfo
+              #"Invalid log level"
+              (logging/set-log-level-impl! client :invalid)))
         (is (thrown-with-msg?
-             clojure.lang.ExceptionInfo
-             #"Invalid log level"
-             (logging/set-log-level-impl! client :trace)))))))
+              clojure.lang.ExceptionInfo
+              #"Invalid log level"
+              (logging/set-log-level-impl! client :trace)))))))
 
 (deftest subscribe-log-messages-impl-test
   ;; Tests subscribe-log-messages-impl! function
