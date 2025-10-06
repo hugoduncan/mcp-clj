@@ -7,9 +7,11 @@
 
   This complements the Clojure client tests by verifying cross-implementation compatibility."
   (:require
-    [clojure.test :refer [deftest is testing]]
-    [mcp-clj.compliance-test.test-helpers :as helpers]
-    [mcp-clj.java-sdk.interop :as java-sdk]))
+   [clojure.test :refer [deftest is testing]]
+   [mcp-clj.compliance-test.test-helpers :as helpers]
+   [mcp-clj.java-sdk.interop :as java-sdk])
+  (:import
+   [java.util.concurrent CountDownLatch TimeUnit]))
 
 ;; Test Helpers
 
@@ -26,14 +28,14 @@
 
         ;; Create Java SDK client with stdio transport to our test logging server
         transport (java-sdk/create-stdio-client-transport
-                    {:command "clojure"
-                     :args ["-M:dev:test"
-                            "-m" "mcp-clj.cross-compliance-test.sdk-client.logging-server"]})
+                   {:command "clojure"
+                    :args ["-M:dev:test"
+                           "-m" "mcp-clj.cross-compliance-test.sdk-client.logging-server"]})
 
         client (java-sdk/create-java-client
-                 {:transport transport
-                  :async? true
-                  :logging-handler logging-handler})
+                {:transport transport
+                 :async? true
+                 :logging-handler logging-handler})
 
         ;; Initialize the client
         init-response (java-sdk/initialize-client client)]
@@ -43,6 +45,23 @@
      :log-messages log-messages
      :cleanup-fn (fn []
                    (java-sdk/close-client client))}))
+
+(defn create-latch-logging-handler
+  "Create a logging handler that counts down a latch for each message received.
+  Returns map with :handler (callback fn), :messages (atom), and :latch."
+  [expected-count]
+  (let [latch (CountDownLatch. expected-count)
+        messages (atom [])]
+    {:handler (fn [notification]
+                (swap! messages conj notification)
+                (.countDown latch))
+     :messages messages
+     :latch latch}))
+
+(defn wait-for-messages
+  "Wait for latch to count down with timeout. Returns true if completed, false if timeout."
+  [latch timeout-ms]
+  (.await latch timeout-ms TimeUnit/MILLISECONDS))
 
 (defn collect-log-messages
   "Create a callback function and atom to collect log messages.
@@ -87,39 +106,61 @@
       (testing (str "protocol version " protocol-version)
 
         (testing "client receives log messages triggered by tool execution"
-          (let [pair (create-sdk-client-with-logging-server protocol-version)
-                client (:client pair)
-                log-messages (:log-messages pair)]
+          (let [;; Create handler with latch expecting 3 messages
+                handler-setup (create-latch-logging-handler 3)
+
+                ;; Create Java SDK client with stdio transport to our test logging server
+                transport (java-sdk/create-stdio-client-transport
+                           {:command "clojure"
+                            :args ["-M:dev:test"
+                                   "-m" "mcp-clj.cross-compliance-test.sdk-client.logging-server"]})
+
+                client (java-sdk/create-java-client
+                        {:transport transport
+                         :async? true
+                         :logging-handler (:handler handler-setup)})
+
+                ;; Initialize the client
+                init-response (java-sdk/initialize-client client)]
             (try
               ;; Set log level to debug to receive all messages
               @(java-sdk/set-logging-level client :debug)
-              (Thread/sleep 200)
 
               ;; Trigger log messages via tool
               @(java-sdk/call-tool client "trigger-logs"
                                    {:levels ["error" "warning" "info"]
                                     :message "test message"})
 
-              (Thread/sleep 300)
-
-              ;; Verify messages were received
-              (let [received @log-messages
+;; Wait for messages with 5 second timeout
+              (let [completed? (wait-for-messages (:latch handler-setup) 5000)
+                    received @(:messages handler-setup)
                     levels (set (map :level received))]
+                (is completed? "Should receive all expected messages within timeout")
                 (is (>= (count received) 3) "Should receive at least 3 log messages")
                 (is (contains? levels :error) "Should receive error level")
                 (is (contains? levels :warning) "Should receive warning level")
                 (is (contains? levels :info) "Should receive info level"))
 
               (finally
-                ((:cleanup-fn pair))))))
+                (java-sdk/close-client client)))))
 
         (testing "client receives messages with logger name"
-          (let [pair (create-sdk-client-with-logging-server protocol-version)
-                client (:client pair)
-                log-messages (:log-messages pair)]
+          (let [;; Create handler expecting 1 message
+                handler-setup (create-latch-logging-handler 1)
+
+                transport (java-sdk/create-stdio-client-transport
+                           {:command "clojure"
+                            :args ["-M:dev:test"
+                                   "-m" "mcp-clj.cross-compliance-test.sdk-client.logging-server"]})
+
+                client (java-sdk/create-java-client
+                        {:transport transport
+                         :async? true
+                         :logging-handler (:handler handler-setup)})
+
+                init-response (java-sdk/initialize-client client)]
             (try
               @(java-sdk/set-logging-level client :debug)
-              (Thread/sleep 200)
 
               ;; Trigger log with logger name
               @(java-sdk/call-tool client "trigger-logs"
@@ -127,43 +168,53 @@
                                     :message "test with logger"
                                     :logger "test-logger"})
 
-              (Thread/sleep 300)
-
-              ;; Verify logger name is present
-              (let [received @log-messages
+              ;; Wait for message with 5 second timeout
+              (let [completed? (wait-for-messages (:latch handler-setup) 5000)
+                    received @(:messages handler-setup)
                     error-msg (first (filter #(= :error (:level %)) received))]
+                (is completed? "Should receive message within timeout")
                 (is (some? error-msg) "Should receive error message")
                 (is (= "test-logger" (:logger error-msg)) "Should have correct logger name"))
 
               (finally
-                ((:cleanup-fn pair))))))
+                (java-sdk/close-client client)))))
 
         (testing "log level filtering works correctly"
-          (let [pair (create-sdk-client-with-logging-server protocol-version)
-                client (:client pair)
-                log-messages (:log-messages pair)]
+          (let [;; Create handler expecting 2 messages (warning and error only)
+                handler-setup (create-latch-logging-handler 2)
+
+                transport (java-sdk/create-stdio-client-transport
+                           {:command "clojure"
+                            :args ["-M:dev:test"
+                                   "-m" "mcp-clj.cross-compliance-test.sdk-client.logging-server"]})
+
+                client (java-sdk/create-java-client
+                        {:transport transport
+                         :async? true
+                         :logging-handler (:handler handler-setup)})
+
+                init-response (java-sdk/initialize-client client)]
             (try
               ;; Set level to warning - should only receive warning and above
               @(java-sdk/set-logging-level client :warning)
-              (Thread/sleep 200)
 
               ;; Trigger messages at all levels
               @(java-sdk/call-tool client "trigger-logs"
                                    {:levels ["debug" "info" "warning" "error"]
                                     :message "filtering test"})
 
-              (Thread/sleep 300)
-
-              ;; Should only receive warning and error
-              (let [received @log-messages
+              ;; Wait for messages with 5 second timeout
+              (let [completed? (wait-for-messages (:latch handler-setup) 5000)
+                    received @(:messages handler-setup)
                     levels (set (map :level received))]
+                (is completed? "Should receive expected messages within timeout")
                 (is (contains? levels :warning) "Should receive warning")
                 (is (contains? levels :error) "Should receive error")
                 (is (not (contains? levels :debug)) "Should NOT receive debug")
                 (is (not (contains? levels :info)) "Should NOT receive info"))
 
               (finally
-                ((:cleanup-fn pair))))))))))
+                (java-sdk/close-client client)))))))))
 
 (comment
   ;; TODO: Implement remaining cross-compliance tests once Java SDK client

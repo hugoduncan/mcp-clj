@@ -11,7 +11,9 @@
    [mcp-clj.compliance-test.test-helpers :as helpers]
    [mcp-clj.mcp-client.core :as client]
    [mcp-clj.mcp-server.logging :as server-logging]
-   [mcp-clj.mcp-server.core :as mcp-server]))
+   [mcp-clj.mcp-server.core :as mcp-server])
+  (:import
+   [java.util.concurrent CountDownLatch TimeUnit]))
 
 ;;; Test Helpers
 
@@ -93,6 +95,26 @@
     {:atom received
      :callback (fn [params]
                  (swap! received conj params))}))
+
+(defn create-latch-log-collector
+  "Create a log message collector with CountDownLatch for synchronization.
+  Returns map with :callback (fn to pass to subscribe), :messages (atom), and :latch."
+  [expected-count]
+  (let [latch (CountDownLatch. expected-count)
+        messages (atom [])
+        call-count (atom 0)]
+    {:callback (fn [params]
+                 (let [count (swap! call-count inc)]
+                   (swap! messages conj params)
+                   (.countDown latch)))
+     :messages messages
+     :latch latch
+     :call-count call-count}))
+
+(defn wait-for-log-messages
+  "Wait for latch to count down with timeout. Returns true if completed, false if timeout."
+  [latch timeout-ms]
+  (.await latch timeout-ms TimeUnit/MILLISECONDS))
 
 ;;; Compliance Tests
 
@@ -257,58 +279,61 @@
                                      helpers/test-protocol-versions)]
       (testing (str "protocol version " protocol-version)
         (let [pair (create-logging-server protocol-version)
-              client (:client pair)
-              collector (collect-log-messages)
-              _ @(client/subscribe-log-messages! client (:callback collector))]
+              client (:client pair)]
           (try
             @(client/set-log-level! client :debug)
-            (Thread/sleep 100)
 
             (testing "message format with logger"
-              (reset! (:atom collector) [])
-              @(client/call-tool client "trigger-logs"
-                                 {:levels ["error"]
-                                  :message "test message"
-                                  :logger "database"})
-              (Thread/sleep 200)
+              (let [collector (create-latch-log-collector 1)
+                    _ @(client/subscribe-log-messages! client (:callback collector))]
+                @(client/call-tool client "trigger-logs"
+                                   {:levels ["error"]
+                                    :message "test message"
+                                    :logger "database"})
 
-              (let [msg (first @(:atom collector))
-                    level (if (keyword? (:level msg)) (name (:level msg)) (:level msg))]
-                (is (= "error" level) "Level should be error")
-                (is (= "database" (:logger msg)) "Logger should be present")
-                (is (= {:msg "test message"} (:data msg)) "Data should match")))
+                (let [completed? (wait-for-log-messages (:latch collector) 2000)
+                      msg (first @(:messages collector))
+                      level (if (keyword? (:level msg)) (name (:level msg)) (:level msg))]
+                  (is completed? "Should receive message within timeout")
+                  (is (= "error" level) "Level should be error")
+                  (is (= "database" (:logger msg)) "Logger should be present")
+                  (is (= {:msg "test message"} (:data msg)) "Data should match"))))
 
             (testing "message format without logger"
-              (reset! (:atom collector) [])
-              @(client/call-tool client "trigger-logs"
-                                 {:levels ["info"]
-                                  :message "status ok"})
-              (Thread/sleep 200)
+              (let [collector (create-latch-log-collector 1)
+                    _ @(client/subscribe-log-messages! client (:callback collector))]
+                @(client/call-tool client "trigger-logs"
+                                   {:levels ["info"]
+                                    :message "status ok"})
 
-              (let [msg (first @(:atom collector))
-                    level (if (keyword? (:level msg)) (name (:level msg)) (:level msg))]
-                (is (= "info" level) "Level should be info")
-                (is (nil? (:logger msg)) "Logger should be nil")
-                (is (= {:msg "status ok"} (:data msg)) "Data should match")))
+                (let [completed? (wait-for-log-messages (:latch collector) 2000)
+                      msg (first @(:messages collector))
+                      level (if (keyword? (:level msg)) (name (:level msg)) (:level msg))]
+                  (is completed? "Should receive message within timeout")
+                  (is (= "info" level) "Level should be info")
+                  (is (nil? (:logger msg)) "Logger should be nil")
+                  (is (= {:msg "status ok"} (:data msg)) "Data should match"))))
 
             (testing "multiple log levels"
-              (reset! (:atom collector) [])
-              @(client/call-tool client "trigger-logs"
-                                 {:levels ["warning" "notice" "error"]
-                                  :message "multi-level test"})
-              (Thread/sleep 200)
+              (let [collector (create-latch-log-collector 3)
+                    _ @(client/subscribe-log-messages! client (:callback collector))]
+                @(client/call-tool client "trigger-logs"
+                                   {:levels ["warning" "notice" "error"]
+                                    :message "multi-level test"})
 
-              (let [messages @(:atom collector)
-                    levels (set (map #(if (keyword? (:level %))
-                                        (name (:level %))
-                                        (:level %))
-                                     messages))]
-                (is (= 3 (count messages)) "Should receive 3 messages")
-                (is (contains? levels "warning") "Should have warning level")
-                (is (contains? levels "notice") "Should have notice level")
-                (is (contains? levels "error") "Should have error level")
-                (is (every? #(= {:msg "multi-level test"} (:data %)) messages)
-                    "All messages should have same data")))
+                (let [completed? (wait-for-log-messages (:latch collector) 2000)
+                      messages @(:messages collector)
+                      levels (set (map #(if (keyword? (:level %))
+                                          (name (:level %))
+                                          (:level %))
+                                       messages))]
+                  (is completed? "Should receive all messages within timeout")
+                  (is (= 3 (count messages)) "Should receive 3 messages")
+                  (is (contains? levels "warning") "Should have warning level")
+                  (is (contains? levels "notice") "Should have notice level")
+                  (is (contains? levels "error") "Should have error level")
+                  (is (every? #(= {:msg "multi-level test"} (:data %)) messages)
+                      "All messages should have same data"))))
 
             (finally
               ((:cleanup-fn pair)))))))))
