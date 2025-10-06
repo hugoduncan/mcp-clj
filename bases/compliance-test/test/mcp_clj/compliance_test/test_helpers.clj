@@ -52,7 +52,7 @@
                         :properties {:message {:type "string"
                                                :description "Message to echo"}}
                         :required ["message"]}
-          :implementation (fn [_server {:keys [message]}]
+          :implementation (fn [_context {:keys [message]}]
                             {:content [{:type "text"
                                         :text (str "Echo: " message)}]
                              :isError false})}
@@ -66,7 +66,7 @@
                                      :b {:type "number"
                                          :description "Second number"}}
                         :required ["a" "b"]}
-          :implementation (fn [_server {:keys [a b]}]
+          :implementation (fn [_context {:keys [a b]}]
                             {:content [{:type "text"
                                         :text (str (+ a b))}]
                              :isError false})}
@@ -78,7 +78,7 @@
                         :properties {:message {:type "string"
                                                :description "Error message"}}
                         :required ["message"]}
-          :implementation (fn [_server {:keys [message]}]
+          :implementation (fn [_context {:keys [message]}]
                             (throw (ex-info message {:type :test-error})))}}
 
         ;; Add trigger-logs tool if server-atom is provided
@@ -100,7 +100,7 @@
                                                       :description "Optional logger name"}}
                                 :required ["levels" "message"]}
                   :implementation
-                  (fn [server {:keys [levels message logger]}]
+                  (fn [context {:keys [levels message logger]}]
                     (let [log-fn-map {:debug server-logging/debug
                                       :info server-logging/info
                                       :notice server-logging/notice
@@ -112,8 +112,8 @@
                       (doseq [level levels]
                         (let [log-fn (get log-fn-map (keyword level))]
                           (if logger
-                            (log-fn server {:msg message} :logger logger)
-                            (log-fn server {:msg message}))))
+                            (log-fn context {:msg message} :logger logger)
+                            (log-fn context {:msg message}))))
                       {:content [{:type "text"
                                   :text (str "Triggered " (count levels) " log message(s)")}]
                        :isError false}))})
@@ -202,7 +202,7 @@
           :uri "file:///test/text-resource.txt"
           :mime-type "text/plain"
           :description "A simple text resource"
-          :implementation (fn [_server _uri]
+          :implementation (fn [_context _uri]
                             {:contents [{:uri "file:///test/text-resource.txt"
                                          :text "Hello, world!"}]})}
 
@@ -211,7 +211,7 @@
           :uri "file:///test/data.json"
           :mime-type "application/json"
           :description "A JSON data resource"
-          :implementation (fn [_server _uri]
+          :implementation (fn [_context _uri]
                             {:contents [{:uri "file:///test/data.json"
                                          :text "{\"key\": \"value\"}"}]})}
 
@@ -220,7 +220,7 @@
           :uri "file:///test/image.png"
           :mime-type "image/png"
           :description "A binary blob resource"
-          :implementation (fn [_server _uri]
+          :implementation (fn [_context _uri]
                             {:contents [{:uri "file:///test/image.png"
                                          :blob "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}]})}}
 

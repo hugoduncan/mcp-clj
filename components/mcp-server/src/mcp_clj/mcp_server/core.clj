@@ -246,26 +246,28 @@
 
 (defn- handle-call-tool
   "Handle tools/call request from client"
-  [server {:keys [name arguments] :as _params}]
+  [server {:keys [name arguments] :as params}]
   (log/info :server/tools-call)
-  (if-let [{:keys [implementation inputSchema]} (get
-                                                 @(:tool-registry server)
-                                                 name)]
-    (try
-      (let [missing-args (set/difference
-                          (set (mapv keyword (:required inputSchema)))
-                          (set (keys arguments)))]
-        (if (empty? missing-args)
-          (transform-tool-result (implementation server arguments))
-          {:content [(text-map
-                      (str "Missing args: " (vec missing-args) ", found "
-                           (set (keys arguments))))]
+  (let [session-id (-> params meta :session-id)]
+    (if-let [{:keys [implementation inputSchema]} (get
+                                                   @(:tool-registry server)
+                                                   name)]
+      (try
+        (let [missing-args (set/difference
+                            (set (mapv keyword (:required inputSchema)))
+                            (set (keys arguments)))]
+          (if (empty? missing-args)
+            (let [context {:server server :session-id session-id}]
+              (transform-tool-result (implementation context arguments)))
+            {:content [(text-map
+                        (str "Missing args: " (vec missing-args) ", found "
+                             (set (keys arguments))))]
+             :isError true}))
+        (catch Throwable e
+          {:content [(text-map (str "Error: " (.getMessage e)))]
            :isError true}))
-      (catch Throwable e
-        {:content [(text-map (str "Error: " (.getMessage e)))]
-         :isError true}))
-    {:content [(text-map (str "Tool not found: " name))]
-     :isError true}))
+      {:content [(text-map (str "Tool not found: " name))]
+       :isError true})))
 
 (defn- version-aware-handle-call-tool
   "Version-aware wrapper for handle-call-tool"
@@ -286,7 +288,9 @@
   "Handle resources/read request from client"
   [server params]
   (log/info :server/resources-read)
-  (resources/read-resource server (:resource-registry server) params))
+  (let [session-id (-> params meta :session-id)
+        context {:server server :session-id session-id}]
+    (resources/read-resource context (:resource-registry server) params)))
 
 (defn- handle-subscribe-resource
   "Handle resources/subscribe request from client"

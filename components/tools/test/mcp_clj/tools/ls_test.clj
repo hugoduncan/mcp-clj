@@ -1,10 +1,10 @@
 (ns mcp-clj.tools.ls-test
   (:require
-    [clojure.data.json :as json]
-    [clojure.java.io :as io]
-    [clojure.string :as str]
-    [clojure.test :refer [deftest is testing]]
-    [mcp-clj.tools.ls :as ls]))
+   [clojure.data.json :as json]
+   [clojure.java.io :as io]
+   [clojure.string :as str]
+   [clojure.test :refer [deftest is testing]]
+   [mcp-clj.tools.ls :as ls]))
 
 (defn create-test-directory-structure
   "Create a temporary directory structure for testing"
@@ -55,7 +55,7 @@
     (try
       (testing "basic directory listing"
         (let [{:keys [implementation]} ls/ls-tool
-              result (implementation {:path temp-dir})
+              result (implementation nil {:path temp-dir})
               response-text (-> result :content first :text)
               data (json/read-str response-text :key-fn keyword)]
 
@@ -69,7 +69,7 @@
           (let [file-names (map #(.getName (io/file %)) (:files data))]
             (is (some #{"file1.txt" "file2.clj" ".hidden-file"} file-names))
             (is (not
-                  (some #{"DS_Store" "test.log" "temp-file.txt"} file-names))))))
+                 (some #{"DS_Store" "test.log" "temp-file.txt"} file-names))))))
 
       (finally
         (cleanup-test-directory temp-dir)))))
@@ -79,12 +79,11 @@
     (try
       (testing "depth limit enforcement"
         (let [{:keys [implementation]} ls/ls-tool
-              result (implementation
-                       {:path temp-dir :max-depth 3})
+              result (implementation nil {:path temp-dir :max-depth 3})
               response-text (-> result :content first :text)
               data (json/read-str
-                     response-text
-                     :key-fn keyword)]
+                    response-text
+                    :key-fn keyword)]
 
           (is (false? (:isError result)))
 
@@ -92,8 +91,8 @@
           (let [file-paths (:files data)]
             (is (not (some #(str/includes? % "deeper") file-paths)))
             (is (some
-                  #(str/includes? % "subdir2/deep/file5.txt")
-                  file-paths)))))
+                 #(str/includes? % "subdir2/deep/file5.txt")
+                 file-paths)))))
 
       (finally
         (cleanup-test-directory temp-dir)))))
@@ -103,7 +102,7 @@
     (try
       (testing "file count limit enforcement"
         (let [{:keys [implementation]} ls/ls-tool
-              result (implementation {:path temp-dir :max-files 2})
+              result (implementation nil {:path temp-dir :max-files 2})
               response-text (-> result :content first :text)
               data (json/read-str response-text :key-fn keyword)]
 
@@ -119,7 +118,7 @@
   (testing "single file handling"
     (let [test-file "components/tools/test-resources/ls-test/single-test-file.txt"
           {:keys [implementation]} ls/ls-tool
-          result (implementation {:path test-file})
+          result (implementation nil {:path test-file})
           response-text (-> result :content first :text)
           data (json/read-str response-text :key-fn keyword)]
 
@@ -134,7 +133,7 @@
     (try
       (testing "gitignore filtering"
         (let [{:keys [implementation]} ls/ls-tool
-              result (implementation {:path temp-dir})
+              result (implementation nil {:path temp-dir})
               response-text (-> result :content first :text)
               data (json/read-str response-text :key-fn keyword)
               file-names (map #(.getName (io/file %)) (:files data))]
@@ -153,32 +152,32 @@
 (deftest ls-tool-error-handling-test
   (testing "non-existent path"
     (let [{:keys [implementation]} ls/ls-tool
-          result (implementation {:path "./this/path/does/not/exist"})]
+          result (implementation nil {:path "./this/path/does/not/exist"})]
 
       (is (true? (:isError result)))
       (is (str/includes?
-            (-> result :content first :text)
-            "does not exist"))))
+           (-> result :content first :text)
+           "does not exist"))))
 
   (testing "path traversal prevention"
     (let [{:keys [implementation]} ls/ls-tool
-          result (implementation {:path "../../../etc"})]
+          result (implementation nil {:path "../../../etc"})]
 
       (is (true? (:isError result)))
       (is (str/includes?
-            (-> result :content first :text)
-            "outside allowed directories"))))
+           (-> result :content first :text)
+           "outside allowed directories"))))
 
   (testing "current directory access allowed"
     (let [{:keys [implementation]} ls/ls-tool
-          result (implementation {:path "."})]
+          result (implementation nil {:path "."})]
 
       (is (false? (:isError result)))))
 
   (testing "user.dir access allowed"
     (let [{:keys [implementation]} ls/ls-tool
           user-dir (System/getProperty "user.dir")
-          result (implementation {:path user-dir})]
+          result (implementation nil {:path user-dir})]
 
       (is (false? (:isError result))))))
 
