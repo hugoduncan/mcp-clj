@@ -1,10 +1,10 @@
 (ns mcp-clj.mcp-server.resources
   "MCP resource endpoints"
   (:require
-    [mcp-clj.log :as log]))
+   [mcp-clj.log :as log]))
 
 (defrecord ResourceDefinition
-  [name uri mime-type description annotations implementation])
+           [name uri mime-type description annotations implementation])
 
 (defn- valid-string?
   [x]
@@ -91,9 +91,9 @@
 
 (defn- read-resource-impl
   "Default implementation for reading a resource"
-  [{:keys [implementation] :as resource} uri]
+  [server {:keys [implementation] :as resource} uri]
   (if implementation
-    (implementation uri)
+    (implementation server uri)
     {:contents [{:uri uri
                  :text "Resource not implemented"}]
      :isError true}))
@@ -101,10 +101,10 @@
 (defn read-resource
   "Read a resource by URI.
    Returns contents of the resource."
-  [registry {:keys [uri] :as params}]
+  [server registry {:keys [uri] :as params}]
   (log/info :resources/read {:params params})
   (if-let [resource (some #(when (= uri (:uri %)) %) (vals @registry))]
-    (read-resource-impl resource uri)
+    (read-resource-impl server resource uri)
     {:contents [{:uri uri
                  :text "Resource not found"}]
      :isError true}))

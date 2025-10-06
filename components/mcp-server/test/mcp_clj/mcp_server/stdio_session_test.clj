@@ -5,15 +5,15 @@
   particularly for the initialized notification which arrives early in
   the lifecycle before any other requests."
   (:require
-    [clojure.data.json :as json]
-    [clojure.java.io :as io]
-    [clojure.string :as str]
-    [clojure.test :refer [deftest is testing]]
-    [mcp-clj.mcp-server.core :as mcp])
+   [clojure.data.json :as json]
+   [clojure.java.io :as io]
+   [clojure.string :as str]
+   [clojure.test :refer [deftest is testing]]
+   [mcp-clj.mcp-server.core :as mcp])
   (:import
-    (java.io
-      BufferedReader
-      StringReader)))
+   (java.io
+    BufferedReader
+    StringReader)))
 
 (deftest stdio-session-creation-test
   ;; Test that STDIO transport creates a default session on server creation
@@ -70,7 +70,7 @@
                      :inputSchema {:type "object"
                                    :properties {}
                                    :required []}
-                     :implementation (fn [params]
+                     :implementation (fn [_server params]
                                        ;; This will be called by the handler
                                        [{:type "text" :text "ok"}])}
           server (mcp/create-server {:transport {:type :stdio}
