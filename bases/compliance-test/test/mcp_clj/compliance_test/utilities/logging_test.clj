@@ -20,7 +20,8 @@
   Returns map with :client, :server, :init-response, and :cleanup-fn."
   [protocol-version]
   (let [shared-transport (mcp-clj.in-memory-transport.shared/create-shared-transport)
-        test-tools (helpers/create-test-tools protocol-version)
+        server-atom (atom nil)
+        test-tools (helpers/create-test-tools protocol-version :server-atom server-atom)
 
         ;; Create server with logging capability
         mcp-server (mcp-server/create-server
@@ -30,6 +31,8 @@
                      :server-info {:name "test-server"
                                    :version "1.0.0"}
                      :capabilities {:logging {}}})
+
+        _ (reset! server-atom mcp-server)
 
         ;; Create client
         mcp-client (client/create-client
@@ -247,14 +250,14 @@
               ((:cleanup-fn pair)))))))))
 
 (deftest ^:integ logging-notification-delivery-test
-  ;; Test notifications/message delivery format and content
+  ;; Test notifications/message delivery format and content by invoking a tool
+  ;; that generates log messages at different levels
   (testing "notifications/message delivery"
     (doseq [protocol-version (filter #(>= (compare % "2025-03-26") 0)
                                      helpers/test-protocol-versions)]
       (testing (str "protocol version " protocol-version)
         (let [pair (create-logging-server protocol-version)
               client (:client pair)
-              server (:server pair)
               collector (collect-log-messages)
               _ @(client/subscribe-log-messages! client (:callback collector))]
           (try
@@ -263,38 +266,49 @@
 
             (testing "message format with logger"
               (reset! (:atom collector) [])
-              (server-logging/error server {:error "test"} :logger "database")
+              @(client/call-tool client "trigger-logs"
+                                 {:levels ["error"]
+                                  :message "test message"
+                                  :logger "database"})
               (Thread/sleep 200)
 
               (let [msg (first @(:atom collector))
                     level (if (keyword? (:level msg)) (name (:level msg)) (:level msg))]
                 (is (= "error" level) "Level should be error")
                 (is (= "database" (:logger msg)) "Logger should be present")
-                (is (= {:error "test"} (:data msg)) "Data should match")))
+                (is (= {:msg "test message"} (:data msg)) "Data should match")))
 
             (testing "message format without logger"
               (reset! (:atom collector) [])
-              (server-logging/info server {:status "ok"})
+              @(client/call-tool client "trigger-logs"
+                                 {:levels ["info"]
+                                  :message "status ok"})
               (Thread/sleep 200)
 
               (let [msg (first @(:atom collector))
                     level (if (keyword? (:level msg)) (name (:level msg)) (:level msg))]
                 (is (= "info" level) "Level should be info")
                 (is (nil? (:logger msg)) "Logger should be nil")
-                (is (= {:status "ok"} (:data msg)) "Data should match")))
+                (is (= {:msg "status ok"} (:data msg)) "Data should match")))
 
-            (testing "various data types"
+            (testing "multiple log levels"
               (reset! (:atom collector) [])
-              (server-logging/warn server "string message")
-              (server-logging/notice server {:map "data"})
-              (server-logging/error server ["vector" "data"])
+              @(client/call-tool client "trigger-logs"
+                                 {:levels ["warning" "notice" "error"]
+                                  :message "multi-level test"})
               (Thread/sleep 200)
 
-              (let [messages @(:atom collector)]
+              (let [messages @(:atom collector)
+                    levels (set (map #(if (keyword? (:level %))
+                                        (name (:level %))
+                                        (:level %))
+                                     messages))]
                 (is (= 3 (count messages)) "Should receive 3 messages")
-                (is (= "string message" (:data (nth messages 0))) "String data")
-                (is (= {:map "data"} (:data (nth messages 1))) "Map data")
-                (is (= ["vector" "data"] (:data (nth messages 2))) "Vector data")))
+                (is (contains? levels "warning") "Should have warning level")
+                (is (contains? levels "notice") "Should have notice level")
+                (is (contains? levels "error") "Should have error level")
+                (is (every? #(= {:msg "multi-level test"} (:data %)) messages)
+                    "All messages should have same data")))
 
             (finally
               ((:cleanup-fn pair)))))))))

@@ -1,8 +1,8 @@
 (ns mcp-clj.json-rpc.protocols
   "Protocols for JSON-RPC client and server operations"
   (:import
-    (java.util.concurrent
-      CompletableFuture)))
+   (java.util.concurrent
+    CompletableFuture)))
 
 (defprotocol JSONRPCClient
   "Protocol for JSON-RPC client implementations that handle MCP communication"
@@ -34,6 +34,11 @@
     [server handlers]
     "Set the handler map for the server.
     Handlers should be a map of method name strings to handler functions.")
+
+  (notify!
+    [server session-id method params]
+    "Send a notification to a specific session/connection.
+    For servers without session concept (like STDIO), this sends to the single connection.")
 
   (notify-all!
     [server method params]

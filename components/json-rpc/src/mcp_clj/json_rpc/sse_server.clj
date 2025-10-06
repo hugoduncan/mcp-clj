@@ -1,17 +1,17 @@
 (ns mcp-clj.json-rpc.sse-server
   "JSON-RPC 2.0 server with Server-Sent Events (SSE) support"
   (:require
-    [clojure.data.json :as json]
-    [mcp-clj.http :as http]
-    [mcp-clj.http-server.adapter :as http-server]
-    [mcp-clj.json-rpc.executor :as executor]
-    [mcp-clj.json-rpc.json-protocol :as json-protocol]
-    [mcp-clj.json-rpc.protocols :as protocols]
-    [mcp-clj.log :as log]
-    [mcp-clj.sse :as sse])
+   [clojure.data.json :as json]
+   [mcp-clj.http :as http]
+   [mcp-clj.http-server.adapter :as http-server]
+   [mcp-clj.json-rpc.executor :as executor]
+   [mcp-clj.json-rpc.json-protocol :as json-protocol]
+   [mcp-clj.json-rpc.protocols :as protocols]
+   [mcp-clj.log :as log]
+   [mcp-clj.sse :as sse])
   (:import
-    (java.util.concurrent
-      RejectedExecutionException)))
+   (java.util.concurrent
+    RejectedExecutionException)))
 
 ;; Executor Service
 
@@ -22,9 +22,9 @@
 (def ^:private request-timeout-ms 30000)
 
 (defrecord Session
-  [^String session-id
-   reply!-fn
-   close!-fn])
+           [^String session-id
+            reply!-fn
+            close!-fn])
 
 ;; Response Format
 
@@ -45,9 +45,9 @@
 (defn- dispatch-rpc-call
   [executor handler rpc-call request reply!-fn]
   (executor/submit-with-timeout!
-    executor
-    #(handle-json-rpc handler rpc-call request reply!-fn)
-    request-timeout-ms))
+   executor
+   #(handle-json-rpc handler rpc-call request reply!-fn)
+   request-timeout-ms))
 
 (defn- handle-request
   "Handle a JSON-RPC request"
@@ -62,33 +62,33 @@
                  :session-id session-id})
       (if-let [validation-error (json-protocol/validate-request rpc-call)]
         (http/json-response
-          (json-protocol/json-rpc-error
-            (:code (:error validation-error))
-            (:message (:error validation-error)))
-          http/BadRequest)
+         (json-protocol/json-rpc-error
+          (:code (:error validation-error))
+          (:message (:error validation-error)))
+         http/BadRequest)
         (if-let [handler (get handlers (:method rpc-call))]
           (do
             (dispatch-rpc-call executor handler rpc-call request reply!-fn)
             (http/text-response "Accepted" http/Accepted))
           (http/json-response
-            (json-protocol/json-rpc-error
-              :method-not-found
-              (str "Method not found: " (:method rpc-call))
-              (:id rpc-call))
-            http/BadRequest))))
+           (json-protocol/json-rpc-error
+            :method-not-found
+            (str "Method not found: " (:method rpc-call))
+            (:id rpc-call))
+           http/BadRequest))))
     (catch RejectedExecutionException _
       (log/warn :rpc/overload-rejection)
       (http/json-response
-        (json-protocol/json-rpc-error :overloaded "Server overloaded")
-        http/Unavailable))
+       (json-protocol/json-rpc-error :overloaded "Server overloaded")
+       http/Unavailable))
     (catch Exception e
       (.printStackTrace e)
       (log/error :rpc/error {:e e})
       (http/json-response
-        (json-protocol/json-rpc-error
-          :internal-error
-          (.getMessage e))
-        http/InternalServerError))))
+       (json-protocol/json-rpc-error
+        :internal-error
+        (.getMessage e))
+       http/InternalServerError))))
 
 (defn data->str
   [v]
@@ -123,15 +123,15 @@
                     [:post "/messages"]
                     (if (nil? @handlers)
                       (http/json-response
-                        (json-protocol/json-rpc-error
-                          :internal-error
-                          "Server not ready - handlers not initialized")
-                        http/Unavailable)
+                       (json-protocol/json-rpc-error
+                        :internal-error
+                        "Server not ready - handlers not initialized")
+                       http/Unavailable)
                       (handle-request
-                        executor
-                        @session-id->session
-                        @handlers
-                        request))
+                       executor
+                       @session-id->session
+                       @handlers
+                       request))
 
                     [:get "/sse"]
                     (let [id (uuid->hex (random-uuid))
@@ -139,14 +139,14 @@
                           {:keys [reply! close! response]}
                           (sse/handler request)
                           session (->Session
-                                    id
-                                    (fn [rpc-response]
-                                      (reply!
-                                        (sse/message
-                                          (data->str rpc-response))))
-                                    (fn []
-                                      (on-sse-close id)
-                                      (close!)))]
+                                   id
+                                   (fn [rpc-response]
+                                     (reply!
+                                      (sse/message
+                                       (data->str rpc-response))))
+                                   (fn []
+                                     (on-sse-close id)
+                                     (close!)))]
                       (swap! session-id->session assoc id session)
                       (log/info :rpc/sse-connect {:id id})
                       (update response
@@ -156,7 +156,7 @@
                                   (log/info :rpc/on-sse-connect {})
                                   (apply f args)
                                   (reply!
-                                    {:event "endpoint" :data uri})
+                                   {:event "endpoint" :data uri})
                                   (on-sse-connect id)))))
                     (do
                       (log/warn :rpc/invalid {:method request-method :uri uri})
@@ -211,6 +211,11 @@
       (throw (ex-info "Handlers must be a map"
                       {:handlers handlers})))
     (swap! (:handlers server) (constantly handlers)))
+
+  (notify! [server id method params]
+    (log/info :rpc/notify! {:id id :method method :params params})
+    (when-let [{:keys [reply!-fn]} (@(:session-id->session server) id)]
+      (reply!-fn (json-protocol/json-rpc-notification method params))))
 
   (notify-all! [server method params]
     (log/info :rpc/notify-all! {:method method :params params})

@@ -332,10 +332,20 @@
   (let [session-id (-> params meta :session-id)
         level-str (:level params)
         level (keyword level-str)]
+    (log/info :server/logging-set-level-details
+              {:session-id session-id
+               :level level
+               :level-str level-str
+               :valid? (logging/valid-level? level)})
     (if (logging/valid-level? level)
       (do
         (swap! (:session-id->session server)
                assoc-in [session-id :log-level] level)
+        (log/info :server/logging-level-updated
+                  {:session-id session-id
+                   :level level
+                   :sessions (keys @(:session-id->session server))
+                   :updated-session (get @(:session-id->session server) session-id)})
         {})
       (throw (ex-info "Invalid log level"
                       {:code -32602

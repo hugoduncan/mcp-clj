@@ -67,9 +67,8 @@
   Options:
     :logger - Optional string identifying the logger/component name
   
-  Note: Currently sends to all sessions via notify-all!. Per-session filtering
-  is done by checking if any session should receive the message. Future enhancement
-  could add per-session notification support to the protocol layer.
+  Sends notifications per-session based on each session's configured log level.
+  Only sessions that have requested this log level or higher will receive the message.
   
   Security: Do NOT include sensitive data (credentials, PII, internal system
   details) in log messages. Server authors are responsible for sanitization.
@@ -86,17 +85,28 @@
 
   (let [sessions (vals @(:session-id->session server))
         initialized-sessions (filter :initialized? sessions)
-        ;; Check if any session should receive this message
-        should-send? (some #(should-send-to-session? % level) initialized-sessions)]
-    (when should-send?
-      (let [rpc-server @(:json-rpc-server server)
-            params (cond-> {:level (name level)
-                            :data data}
-                     logger (assoc :logger logger))]
-        (json-rpc-protocols/notify-all!
-         rpc-server
-         "notifications/message"
-         params)))))
+
+        _ (mcp-clj.log/info :logging/log-message-check
+                            {:level level
+                             :data data
+                             :logger logger
+                             :total-sessions (count sessions)
+                             :initialized-sessions (count initialized-sessions)
+                             :session-details (map #(select-keys % [:session-id :initialized? :log-level]) sessions)})
+
+        rpc-server @(:json-rpc-server server)
+        params (cond-> {:level (name level)
+                        :data data}
+                 logger (assoc :logger logger))]
+
+    ;; Send notification to each session that should receive this level
+    (doseq [session initialized-sessions
+            :when (should-send-to-session? session level)]
+      (mcp-clj.log/info :logging/sending-notification
+                        {:session-id (:session-id session)
+                         :level level
+                         :params params})
+      (json-rpc-protocols/notify! rpc-server (:session-id session) "notifications/message" params))))
 
 ;;; Convenience functions for each log level
 

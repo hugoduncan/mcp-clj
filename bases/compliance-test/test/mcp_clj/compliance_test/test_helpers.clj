@@ -1,12 +1,13 @@
 (ns mcp-clj.compliance-test.test-helpers
   "Shared test helpers for MCP compliance tests"
   (:require
-    [mcp-clj.client-transport.factory :as client-transport-factory]
-    [mcp-clj.in-memory-transport.shared :as shared]
-    [mcp-clj.java-sdk.interop :as java-sdk]
-    [mcp-clj.mcp-client.core :as client]
-    [mcp-clj.mcp-server.core :as server]
-    [mcp-clj.server-transport.factory :as server-transport-factory]))
+   [mcp-clj.client-transport.factory :as client-transport-factory]
+   [mcp-clj.in-memory-transport.shared :as shared]
+   [mcp-clj.java-sdk.interop :as java-sdk]
+   [mcp-clj.mcp-client.core :as client]
+   [mcp-clj.mcp-server.core :as server]
+   [mcp-clj.mcp-server.logging :as server-logging]
+   [mcp-clj.server-transport.factory :as server-transport-factory]))
 
 ;; Transport Registration
 
@@ -15,21 +16,21 @@
   Can be called multiple times safely - registration is idempotent."
   []
   (client-transport-factory/register-transport!
-    :in-memory
-    (fn [options]
-      (require 'mcp-clj.in-memory-transport.client)
-      (let [create-fn (ns-resolve
-                        'mcp-clj.in-memory-transport.client
-                        'create-transport)]
-        (create-fn options))))
+   :in-memory
+   (fn [options]
+     (require 'mcp-clj.in-memory-transport.client)
+     (let [create-fn (ns-resolve
+                      'mcp-clj.in-memory-transport.client
+                      'create-transport)]
+       (create-fn options))))
   (server-transport-factory/register-transport!
-    :in-memory
-    (fn [options handlers]
-      (require 'mcp-clj.in-memory-transport.server)
-      (let [create-server (ns-resolve
-                            'mcp-clj.in-memory-transport.server
-                            'create-in-memory-server)]
-        (create-server options handlers)))))
+   :in-memory
+   (fn [options handlers]
+     (require 'mcp-clj.in-memory-transport.server)
+     (let [create-server (ns-resolve
+                          'mcp-clj.in-memory-transport.server
+                          'create-in-memory-server)]
+       (create-server options handlers)))))
 
 (ensure-in-memory-transport-registered!)
 
@@ -42,7 +43,7 @@
   - 2024-11-05: Base version with name, description, inputSchema
   - 2025-03-26: Adds annotations field
   - 2025-06-18: Adds title and outputSchema fields"
-  [protocol-version]
+  [protocol-version & {:keys [server-atom]}]
   (let [base-tools
         {"echo"
          {:name "echo"
@@ -80,12 +81,51 @@
           :implementation (fn [{:keys [message]}]
                             (throw (ex-info message {:type :test-error})))}}
 
+        ;; Add trigger-logs tool if server-atom is provided
+        with-trigger-logs
+        (if server-atom
+          (assoc base-tools
+                 "trigger-logs"
+                 {:name "trigger-logs"
+                  :description "Trigger log messages at specified levels for testing"
+                  :inputSchema {:type "object"
+                                :properties {:levels {:type "array"
+                                                      :items {:type "string"
+                                                              :enum ["debug" "info" "notice" "warning"
+                                                                     "error" "critical" "alert" "emergency"]}
+                                                      :description "Log levels to emit"}
+                                             :message {:type "string"
+                                                       :description "Message to log"}
+                                             :logger {:type "string"
+                                                      :description "Optional logger name"}}
+                                :required ["levels" "message"]}
+                  :implementation
+                  (fn [{:keys [levels message logger]}]
+                    (let [server @server-atom
+                          log-fn-map {:debug server-logging/debug
+                                      :info server-logging/info
+                                      :notice server-logging/notice
+                                      :warning server-logging/warn
+                                      :error server-logging/error
+                                      :critical server-logging/critical
+                                      :alert server-logging/alert
+                                      :emergency server-logging/emergency}]
+                      (doseq [level levels]
+                        (let [log-fn (get log-fn-map (keyword level))]
+                          (if logger
+                            (log-fn server {:msg message} :logger logger)
+                            (log-fn server {:msg message}))))
+                      {:content [{:type "text"
+                                  :text (str "Triggered " (count levels) " log message(s)")}]
+                       :isError false}))})
+          base-tools)
+
         ;; Add annotations for 2025-03-26+
         with-annotations (if (>= (compare protocol-version "2025-03-26") 0)
-                           (-> base-tools
+                           (-> with-trigger-logs
                                (assoc-in ["echo" :annotations] {:category "utility"})
                                (assoc-in ["add" :annotations] {:category "math"}))
-                           base-tools)
+                           with-trigger-logs)
 
         ;; Add title and outputSchema for 2025-06-18+
         with-extended (if (>= (compare protocol-version "2025-06-18") 0)
@@ -223,21 +263,21 @@
 
         ;; Create server
         mcp-server (server/create-server
-                     (cond-> {:transport {:type :in-memory
-                                          :shared shared-transport}
-                              :tools test-tools
-                              :server-info {:name "test-server"
-                                            :version "1.0.0"}}
-                       prompts (assoc :prompts prompts)
-                       resources (assoc :resources resources)))
+                    (cond-> {:transport {:type :in-memory
+                                         :shared shared-transport}
+                             :tools test-tools
+                             :server-info {:name "test-server"
+                                           :version "1.0.0"}}
+                      prompts (assoc :prompts prompts)
+                      resources (assoc :resources resources)))
 
         ;; Create client
         mcp-client (client/create-client
-                     {:transport {:type :in-memory
-                                  :shared shared-transport}
-                      :client-info {:name "test-client"
-                                    :version "1.0.0"}
-                      :protocol-version protocol-version})]
+                    {:transport {:type :in-memory
+                                 :shared shared-transport}
+                     :client-info {:name "test-client"
+                                   :version "1.0.0"}
+                     :protocol-version protocol-version})]
 
     ;; Wait for client to initialize
     (client/wait-for-ready mcp-client 5000)
@@ -260,9 +300,9 @@
 
         ;; Create Java SDK server
         java-server (java-sdk/create-java-server
-                      {:name "java-test-server"
-                       :version "1.0.0"
-                       :async? true})
+                     {:name "java-test-server"
+                      :version "1.0.0"
+                      :async? true})
 
         ;; Register test tools
         _ (doseq [[_name tool] test-tools]
@@ -273,17 +313,17 @@
 
         ;; Create transport for Clojure client to connect to Java server
         transport (java-sdk/create-stdio-client-transport
-                    {:command "clojure"
-                     :args ["-M:dev:test" "-m"
-                            "mcp-clj.java-sdk.sdk-server-main"]})
+                   {:command "clojure"
+                    :args ["-M:dev:test" "-m"
+                           "mcp-clj.java-sdk.sdk-server-main"]})
 
         ;; Create Clojure client
         mcp-client (client/create-client
-                     {:transport {:type :stdio
-                                  :transport-instance transport}
-                      :client-info {:name "test-client"
-                                    :version "1.0.0"}
-                      :protocol-version protocol-version})]
+                    {:transport {:type :stdio
+                                 :transport-instance transport}
+                     :client-info {:name "test-client"
+                                   :version "1.0.0"}
+                     :protocol-version protocol-version})]
 
     ;; Wait for client to initialize
     (client/wait-for-ready mcp-client 5000)
@@ -306,20 +346,20 @@
 
         ;; Create Clojure server with stdio transport
         mcp-server (server/create-server
-                     {:transport {:type :stdio}
-                      :tools test-tools
-                      :server-info {:name "test-server"
-                                    :version "1.0.0"}})
+                    {:transport {:type :stdio}
+                     :tools test-tools
+                     :server-info {:name "test-server"
+                                   :version "1.0.0"}})
 
         ;; Create Java SDK client
         transport (java-sdk/create-stdio-client-transport
-                    {:command "clojure"
-                     :args ["-M:dev:test" "-m"
-                            "mcp-clj.stdio-server"]})
+                   {:command "clojure"
+                    :args ["-M:dev:test" "-m"
+                           "mcp-clj.stdio-server"]})
 
         java-client (java-sdk/create-java-client
-                      {:transport transport
-                       :async? true})]
+                     {:transport transport
+                      :async? true})]
 
     ;; Initialize client
     (java-sdk/initialize-client java-client)
