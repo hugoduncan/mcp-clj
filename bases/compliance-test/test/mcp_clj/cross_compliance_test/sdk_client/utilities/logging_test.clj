@@ -7,24 +7,11 @@
 
   This complements the Clojure client tests by verifying cross-implementation compatibility."
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.compliance-test.test-helpers :as helpers]
-   [mcp-clj.java-sdk.interop :as java-sdk]
-   [mcp-clj.mcp-server.core :as mcp-server]
-   [mcp-clj.mcp-server.logging :as server-logging])
-  (:import
-   (java.lang AutoCloseable)
-   (java.util.concurrent CountDownLatch TimeUnit)))
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.compliance-test.test-helpers :as helpers]
+    [mcp-clj.java-sdk.interop :as java-sdk]))
 
-;;; Test Helpers
-
-(comment
-  ;; Removed - not needed with current stdio approach
-  (defn create-logging-server-process
-    "Create a Clojure MCP server subprocess with logging capability enabled.
-    Returns a process map with :process and :server keys."
-    [protocol-version]
-    nil))
+;; Test Helpers
 
 (defn create-sdk-client-with-logging-server
   "Create Java SDK client connected to Clojure server with logging enabled.
@@ -39,14 +26,14 @@
 
         ;; Create Java SDK client with stdio transport to our test logging server
         transport (java-sdk/create-stdio-client-transport
-                   {:command "clojure"
-                    :args ["-M:dev:test"
-                           "-m" "mcp-clj.cross-compliance-test.sdk-client.logging-server"]})
+                    {:command "clojure"
+                     :args ["-M:dev:test"
+                            "-m" "mcp-clj.cross-compliance-test.sdk-client.logging-server"]})
 
         client (java-sdk/create-java-client
-                {:transport transport
-                 :async? false
-                 :logging-handler logging-handler})
+                 {:transport transport
+                  :async? true
+                  :logging-handler logging-handler})
 
         ;; Initialize the client
         init-response (java-sdk/initialize-client client)]
@@ -66,7 +53,7 @@
      :callback (fn [params]
                  (swap! received conj params))}))
 
-;;; Compliance Tests
+;; Compliance Tests
 
 (deftest ^:integ sdk-client-logging-capability-declaration-test
   ;; Test that Java SDK client correctly receives logging capability from Clojure server

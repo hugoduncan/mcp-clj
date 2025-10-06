@@ -4,6 +4,7 @@
   Provides a minimal Clojure API to create and interact with MCP
   clients and servers from the official Java SDK."
   (:require
+   [clojure.string :as str]
    [mcp-clj.log :as log])
   (:import
    (com.fasterxml.jackson.databind
@@ -46,6 +47,7 @@
     McpSchema$ImageContent
     McpSchema$InitializeResult
     McpSchema$ListToolsResult
+    McpSchema$LoggingLevel
     McpSchema$LoggingMessageNotification
     McpSchema$ResourceLink
     McpSchema$ServerCapabilities
@@ -226,7 +228,7 @@
                      :description (.description tool)
                      :input-schema (when-let [schema (.inputSchema tool)]
                                      (try
-                                        ;; Convert JsonSchema to string then parse back to avoid type issues
+                                       ;; Convert JsonSchema to string then parse back to avoid type issues
                                        (-> schema .toString)
                                        (catch Exception e
                                          (str schema))))
@@ -298,35 +300,57 @@
         ;; Add logging consumer if provided
         builder (if logging-handler
                   (if async?
-                    (.loggingConsumer ^McpClient$AsyncSpec builder
-                                      (reify java.util.function.Function
-                                        (apply [_ ^McpSchema$LoggingMessageNotification notification]
-                                          (try
-                                            (let [params (into {} (.params notification))
-                                                  level (get params "level")
-                                                  logger (get params "logger")
-                                                  data (get params "data")
-                                                  clj-notification (cond-> {:level (keyword level)
-                                                                            :data data}
-                                                                     logger (assoc :logger logger))]
-                                              (logging-handler clj-notification))
-                                            (catch Exception e
-                                              (log/error :java-sdk/logging-handler-error {:error e})))
-                                          (Mono/empty))))
-                    (.loggingConsumer ^McpClient$SyncSpec builder
-                                      (reify java.util.function.Consumer
-                                        (accept [_ ^McpSchema$LoggingMessageNotification notification]
-                                          (try
-                                            (let [params (into {} (.params notification))
-                                                  level (get params "level")
-                                                  logger (get params "logger")
-                                                  data (get params "data")
-                                                  clj-notification (cond-> {:level (keyword level)
-                                                                            :data data}
-                                                                     logger (assoc :logger logger))]
-                                              (logging-handler clj-notification))
-                                            (catch Exception e
-                                              (log/error :java-sdk/logging-handler-error {:error e})))))))
+                    (.loggingConsumer
+                     ^McpClient$AsyncSpec builder
+                     (reify java.util.function.Function
+                       (apply
+                         [_ notification]
+                         (Mono/fromRunnable
+                          (reify java.lang.Runnable
+                            (run
+                              [_]
+                              (try
+                                (let [^McpSchema$LoggingMessageNotification
+                                      notification notification
+                                      level (.level notification)
+                                      logger (.logger notification)
+                                      data (.data notification)
+                                      clj-notification
+                                      (cond-> {:level (-> level .name str/lower-case keyword)
+                                               :data data}
+                                        logger (assoc :logger logger))]
+                                  (logging-handler clj-notification))
+                                (catch Exception e
+                                  (log/error :java-sdk/logging-handler-error
+                                             {:error e
+                                              :message (.getMessage e)
+                                              :stack-trace (with-out-str (.printStackTrace e))})))))))))
+                    (.loggingConsumer
+                     ^McpClient$SyncSpec builder
+                     (reify java.util.function.Consumer
+                       (accept
+                         [_ notification]
+                         (log/info :java-sdk/logging-notification-received
+                                   {:notification-type (type notification)})
+                         (try
+                           (let [^McpSchema$LoggingMessageNotification
+                                 notification notification
+                                 level (-> notification .level .name str/lower-case keyword)
+                                 logger (.logger notification)
+                                 data (.data notification)
+                                 clj-notification
+                                 (cond->
+                                  {:level level
+                                   :data data}
+                                   logger (assoc :logger logger))]
+                             (log/info :java-sdk/calling-handler
+                                       {:notification clj-notification})
+                             (logging-handler clj-notification))
+                           (catch Exception e
+                             (log/error :java-sdk/logging-handler-error
+                                        {:error e
+                                         :message (.getMessage e)
+                                         :stack-trace (with-out-str (.printStackTrace e))})))))))
                   builder)
 
         client (if async?
@@ -508,24 +532,28 @@
 
 (defn set-logging-level
   "Set the logging level on the server via the Java SDK client.
-  
+
   Parameters:
   - client-record - JavaSdkClient record
   - level - Log level keyword (:debug, :info, :notice, :warning, :error, :critical, :alert, :emergency)
-  
+
   Returns a CompletableFuture that completes when the level is set."
   [^JavaSdkClient client-record level]
   (log/info :java-sdk/setting-log-level {:level level})
-  (let [level-str (name level)]
+  (let [level-str (name level)
+        java-level (McpSchema$LoggingLevel/valueOf (str/upper-case level-str))]
     (if (:async? client-record)
       (let [^McpAsyncClient client (:client client-record)
-            mono (.setLoggingLevel client level-str)]
+            mono (.setLoggingLevel client java-level)]
         (.toFuture mono))
       (CompletableFuture/supplyAsync
        (reify java.util.function.Supplier
-         (get [_]
+         (get
+           [_]
            (let [^McpSyncClient client (:client client-record)]
-             (.setLoggingLevel client level-str)
+             (.setLoggingLevel
+              client
+              (McpSchema$LoggingLevel/valueOf (str/upper-case level-str)))
              nil)))))))
 
 ;; Server API (placeholder - not fully implemented yet)

@@ -40,7 +40,11 @@
 
 (defn- request-session-id
   [request]
-  (get (:query-params request) "session_id"))
+  (cond
+    ;; For HTTP/SSE transports: request is a map with :query-params
+    (map? request) (get (:query-params request) "session_id")
+    ;; For STDIO transport: request is just the method string
+    :else "stdio"))
 
 (defn- request-session
   [server request]
@@ -222,9 +226,11 @@
   [server _params]
   (log/info :server/initialized)
   (fn [session]
+    (log/info :server/marking-session-initialized {:session-id (:session-id session)})
     (swap! (:session-id->session server)
            update (:session-id session)
-           assoc :initialized? true)))
+           assoc :initialized? true)
+    (log/info :server/session-marked-initialized {:session-id (:session-id session)})))
 
 (defn- handle-ping
   "Handle ping request"
@@ -564,5 +570,12 @@
     ;; race window
     (json-rpc-protocols/set-handlers! json-rpc-server handlers)
     (deliver rpc-server-prom json-rpc-server)
+
+    ;; For STDIO transport, create a default session since there's no session_id in requests
+    (when (= (:type transport) :stdio)
+      (let [default-session (->Session "stdio" false nil nil nil nil)]
+        (swap! session-id->session assoc "stdio" default-session)
+        (log/info :server/stdio-session-created {:session-id "stdio"})))
+
     (log/info :server/started {})
     server))
