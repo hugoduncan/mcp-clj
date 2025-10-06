@@ -538,6 +538,12 @@
     (when-not (prompts/valid-prompt? prompt)
       (throw (ex-info "Invalid prompt in constructor" {:prompt prompt}))))
   (let [session-id->session (atom {})
+        ;; For STDIO transport, create a default session BEFORE creating handlers
+        ;; to avoid race condition where initialized notification arrives before session exists
+        _ (when (= (:type transport) :stdio)
+            (let [default-session (->Session "stdio" false nil nil nil nil)]
+              (swap! session-id->session assoc "stdio" default-session)
+              (log/info :server/stdio-session-created {:session-id "stdio"})))
         tool-registry (atom tools)
         prompt-registry (atom prompts)
         resource-registry (atom resources)
@@ -570,12 +576,6 @@
     ;; race window
     (json-rpc-protocols/set-handlers! json-rpc-server handlers)
     (deliver rpc-server-prom json-rpc-server)
-
-    ;; For STDIO transport, create a default session since there's no session_id in requests
-    (when (= (:type transport) :stdio)
-      (let [default-session (->Session "stdio" false nil nil nil nil)]
-        (swap! session-id->session assoc "stdio" default-session)
-        (log/info :server/stdio-session-created {:session-id "stdio"})))
 
     (log/info :server/started {})
     server))
