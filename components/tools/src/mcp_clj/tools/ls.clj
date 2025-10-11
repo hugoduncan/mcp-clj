@@ -1,13 +1,13 @@
 (ns mcp-clj.tools.ls
   "File listing tool for MCP servers"
   (:require
-   [clojure.data.json :as json]
-   [clojure.java.io :as io]
-   [clojure.string :as str]
-   [mcp-clj.log :as log])
+    [clojure.data.json :as json]
+    [clojure.java.io :as io]
+    [clojure.string :as str]
+    [mcp-clj.log :as log])
   (:import
-   (java.io
-    File)))
+    (java.io
+      File)))
 
 (def ^:private allowed-roots
   "Allowed directory roots for security"

@@ -9,16 +9,16 @@
   - End-to-end integration via subprocess
   - Error handling and edge cases"
   (:require
-   [clojure.test :refer [deftest is testing use-fixtures]]
-   [mcp-clj.java-sdk.interop :as java-sdk]
-   [mcp-clj.log :as log])
+    [clojure.test :refer [deftest is testing use-fixtures]]
+    [mcp-clj.java-sdk.interop :as java-sdk]
+    [mcp-clj.log :as log])
   (:import
-   (io.modelcontextprotocol.client.transport
-    StdioClientTransport)
-   (java.util.concurrent
-    TimeUnit)
-   (java.util.function
-    Consumer)))
+    (io.modelcontextprotocol.client.transport
+      StdioClientTransport)
+    (java.util.concurrent
+      TimeUnit)
+    (java.util.function
+      Consumer)))
 
 ;; Test Infrastructure
 
@@ -55,10 +55,10 @@
   []
   (log/info :test/starting-server-process)
   (let [pb (ProcessBuilder.
-            ^"[Ljava.lang.String;"
-            (into-array String
-                        ["clojure" "-M:dev:test" "-m"
-                         "mcp-clj.java-sdk.sdk-server-main"]))
+             ^"[Ljava.lang.String;"
+             (into-array String
+                         ["clojure" "-M:dev:test" "-m"
+                          "mcp-clj.java-sdk.sdk-server-main"]))
         _ (.redirectErrorStream pb true)
         process (.start pb)]
 
@@ -83,22 +83,22 @@
   [async?]
   (let [^StdioClientTransport transport
         (java-sdk/create-stdio-client-transport
-         {:command "clojure"
-          :args ["-M:dev:test" "-m"
-                 "mcp-clj.java-sdk.sdk-server-main"]})
+          {:command "clojure"
+           :args ["-M:dev:test" "-m"
+                  "mcp-clj.java-sdk.sdk-server-main"]})
         _ (Thread/sleep 500)
         client (java-sdk/create-java-client
-                {:transport transport
-                 :async? async?})]
+                 {:transport transport
+                  :async? async?})]
     (Thread/sleep 500)
     (.setExceptionHandler
-     transport
-     (reify Consumer
-       (accept
-         [_ e]
-         (binding [*out* *err*]
-           (prn "Transport error: " e)
-           (.printStackTrace ^Throwable e)))))
+      transport
+      (reify Consumer
+        (accept
+          [_ e]
+          (binding [*out* *err*]
+            (prn "Transport error: " e)
+            (.printStackTrace ^Throwable e)))))
     client))
 
 (defn with-clients
@@ -126,7 +126,7 @@
 
   (testing "stdio client transport with command and args map"
     (let [transport (java-sdk/create-stdio-client-transport
-                     {:command "clojure" :args ["-version"]})]
+                      {:command "clojure" :args ["-version"]})]
       (is (some? transport))))
 
   (testing "stdio server transport"
@@ -135,28 +135,28 @@
 
   (testing "HTTP client transport creation"
     (let [transport (java-sdk/create-http-client-transport
-                     {:url "http://localhost:8080"})]
+                      {:url "http://localhost:8080"})]
       (is (some? transport)))
 
     (let [transport (java-sdk/create-http-client-transport
-                     {:url "http://localhost:8080"
-                      :open-connection-on-startup true
-                      :resumable-streams true})]
+                      {:url "http://localhost:8080"
+                       :open-connection-on-startup true
+                       :resumable-streams true})]
       (is (some? transport)))
 
     (let [transport (java-sdk/create-http-client-transport
-                     {:url "http://localhost:8080"
-                      :use-sse true})]
+                      {:url "http://localhost:8080"
+                       :use-sse true})]
       (is (some? transport))))
 
   (testing "HTTP server transport creation"
     (let [transport (java-sdk/create-http-server-transport
-                     {:port 8080})]
+                      {:port 8080})]
       (is (some? transport)))
 
     (let [transport (java-sdk/create-http-server-transport
-                     {:port 8081
-                      :use-sse true})]
+                      {:port 8081
+                       :use-sse true})]
       (is (some? transport))))
 
   (testing "transport creation via create-transport function"
@@ -170,16 +170,16 @@
 
   (testing "transport creation error handling"
     (is (thrown? Exception
-                 (java-sdk/create-stdio-client-transport nil)))
+          (java-sdk/create-stdio-client-transport nil)))
 
     (is (thrown? Exception
-                 (java-sdk/create-stdio-client-transport {})))
+          (java-sdk/create-stdio-client-transport {})))
 
     (is (thrown? Exception
-                 (java-sdk/create-http-client-transport {})))
+          (java-sdk/create-http-client-transport {})))
 
     (is (thrown? Exception
-                 (java-sdk/create-http-client-transport {:use-sse true})))))
+          (java-sdk/create-http-client-transport {:use-sse true})))))
 
 ;; Client Operations Tests
 
@@ -240,9 +240,9 @@
   (testing "simple string arguments"
     (java-sdk/initialize-client *sync-client*)
     (let [result @(java-sdk/call-tool
-                   *sync-client*
-                   "echo"
-                   {:message "Hello World"})]
+                    *sync-client*
+                    "echo"
+                    {:message "Hello World"})]
       (is (map? result))
       (is (contains? result :content))
       (let [content (first (:content result))]
@@ -281,8 +281,8 @@
     (java-sdk/initialize-client *sync-client*)
     (let [results (doall (for [i (range 3)]
                            @(java-sdk/call-tool
-                             *sync-client* "echo"
-                             {:message (str "Message " i)})))]
+                              *sync-client* "echo"
+                              {:message (str "Message " i)})))]
       (is (= 3 (count results)))
       (doseq [[i result] (map-indexed vector results)]
         (let [content (first (:content result))]
@@ -293,9 +293,9 @@
 
     ;; Call echo
     (let [echo-result @(java-sdk/call-tool
-                        *sync-client*
-                        "echo"
-                        {:message "test"})]
+                         *sync-client*
+                         "echo"
+                         {:message "test"})]
       (is (some? echo-result))
       (is (= "Echo: test" (-> echo-result :content first :text))))
 
@@ -312,9 +312,9 @@
   (testing "async tool execution"
     (java-sdk/initialize-client *async-client*)
     (let [result @(java-sdk/call-tool
-                   *async-client*
-                   "echo"
-                   {:message "async test"})]
+                    *async-client*
+                    "echo"
+                    {:message "async test"})]
       (is (map? result))
       (is (= "Echo: async test" (-> result :content first :text))))))
 
@@ -362,8 +362,8 @@
   (testing "tool call with nil tool name"
     (java-sdk/initialize-client *sync-client*)
     (is (thrown?
-         Exception
-         @(java-sdk/call-tool *sync-client* nil {:message "test"})))))
+          Exception
+          @(java-sdk/call-tool *sync-client* nil {:message "test"})))))
 
 ;; Server Wrapper Tests
 
@@ -379,7 +379,7 @@
 
   (testing "server creation with custom config"
     (let [server-map (java-sdk/create-java-server
-                      {:name "test-server" :version "2.0.0" :async? false})]
+                       {:name "test-server" :version "2.0.0" :async? false})]
       (is (some? server-map))
       (is (= "test-server" (:name server-map)))
       (is (= "2.0.0" (:version server-map)))
@@ -427,9 +427,9 @@
     ;; Test that HTTP client transports can be created with correct
     ;; configuration
     (let [http-transport (java-sdk/create-http-client-transport
-                          {:url "http://localhost:8080/"})
+                           {:url "http://localhost:8080/"})
           sse-transport (java-sdk/create-http-client-transport
-                         {:url "http://localhost:8080" :use-sse true})]
+                          {:url "http://localhost:8080" :use-sse true})]
 
       (is (some? http-transport))
       (is (some? sse-transport))
@@ -447,11 +447,11 @@
   (testing "HTTP server transport object creation"
     ;; Test that HTTP server transports can be created
     (let [http-server-transport (java-sdk/create-http-server-transport
-                                 {:port 8080 :endpoint "/api"})
+                                  {:port 8080 :endpoint "/api"})
           sse-server-transport (java-sdk/create-http-server-transport
-                                {:port 8081
-                                 :use-sse true
-                                 :endpoint "/events"})]
+                                 {:port 8081
+                                  :use-sse true
+                                  :endpoint "/events"})]
 
       (is (some? http-server-transport))
       (is (some? sse-server-transport))
@@ -470,19 +470,19 @@
     ;; Test that transports can be passed to client/server constructors without
     ;; errors
     (let [client-transport (java-sdk/create-http-client-transport
-                            {:url "http://example.com/"})
+                             {:url "http://example.com/"})
           server-transport (java-sdk/create-http-server-transport
-                            {:port 9999 :endpoint "/test"})
+                             {:port 9999 :endpoint "/test"})
 
           ;; Create client with HTTP transport
           client (java-sdk/create-java-client
-                  {:transport client-transport :async? false})
+                   {:transport client-transport :async? false})
 
           ;; Create server with HTTP transport
           server (java-sdk/create-java-server
-                  {:name "http-test-server"
-                   :version "1.0.0"
-                   :transport server-transport})]
+                   {:name "http-test-server"
+                    :version "1.0.0"
+                    :transport server-transport})]
 
       ;; Verify objects were created successfully
       (is (some? client))

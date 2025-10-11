@@ -1,10 +1,10 @@
 (ns mcp-clj.mcp-server.resources
   "MCP resource endpoints"
   (:require
-   [mcp-clj.log :as log]))
+    [mcp-clj.log :as log]))
 
 (defrecord ResourceDefinition
-           [name uri mime-type description annotations implementation])
+  [name uri mime-type description annotations implementation])
 
 (defn- valid-string?
   [x]

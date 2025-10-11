@@ -1,12 +1,12 @@
 (ns mcp-clj.mcp-client.unit-test
   "Unit tests for MCP client using in-memory transport for speed"
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.client-transport.factory :as client-transport-factory]
-   [mcp-clj.in-memory-transport.shared :as shared]
-   [mcp-clj.mcp-client.core :as client]
-   [mcp-clj.mcp-server.core :as server]
-   [mcp-clj.server-transport.factory :as server-transport-factory]))
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.client-transport.factory :as client-transport-factory]
+    [mcp-clj.in-memory-transport.shared :as shared]
+    [mcp-clj.mcp-client.core :as client]
+    [mcp-clj.mcp-server.core :as server]
+    [mcp-clj.server-transport.factory :as server-transport-factory]))
 
 ;; Transport registration function for robust test isolation
 (defn ensure-in-memory-transport-registered!
@@ -68,12 +68,12 @@
   (ensure-in-memory-transport-registered!)
   (let [shared-transport (shared/create-shared-transport)
         test-server (server/create-server
-                     {:transport {:type :in-memory :shared shared-transport}
-                      :tools tools})
+                      {:transport {:type :in-memory :shared shared-transport}
+                       :tools tools})
         test-client (client/create-client
-                     {:transport {:type :in-memory :shared shared-transport}
-                      :client-info client-info
-                      :capabilities capabilities})]
+                      {:transport {:type :in-memory :shared shared-transport}
+                       :client-info client-info
+                       :capabilities capabilities})]
     {:client test-client
      :server test-server
      :shared-transport shared-transport}))
@@ -137,9 +137,9 @@
           ;; Test calling echo tool
           (testing "can call tools"
             (let [echo-result @(client/call-tool
-                                client
-                                "echo"
-                                {:message "hello world"})]
+                                 client
+                                 "echo"
+                                 {:message "hello world"})]
               (is (some? echo-result))
               (is (= {:content [{:text "Echo: hello world", :type "text"}]
                       :isError false}
@@ -172,14 +172,14 @@
 
           ;; Launch multiple operations concurrently
           (let [echo-futures (mapv
-                              #(client/call-tool
-                                client
-                                "echo"
-                                {:message (str "message-" %)})
-                              (range 5))
+                               #(client/call-tool
+                                  client
+                                  "echo"
+                                  {:message (str "message-" %)})
+                               (range 5))
                 add-futures (mapv
-                             #(client/call-tool client "add" {:a % :b (inc %)})
-                             (range 3))]
+                              #(client/call-tool client "add" {:a % :b (inc %)})
+                              (range 3))]
 
             ;; Wait for all to complete
             (let [echo-results (mapv #(deref % 2000 :timeout) echo-futures)
@@ -226,7 +226,7 @@
 
           ;; New operations should fail
           (is (thrown? Exception
-                       @(client/call-tool client "echo" {:message "test"}))))
+                @(client/call-tool client "echo" {:message "test"}))))
 
         (finally
           (cleanup-test-env test-env))))))
@@ -238,19 +238,19 @@
     (ensure-in-memory-transport-registered!)
     (let [shared-transport (shared/create-shared-transport)
           test-server (server/create-server
-                       {:transport {:type :in-memory
-                                    :shared shared-transport}
-                        :tools test-tools})
+                        {:transport {:type :in-memory
+                                     :shared shared-transport}
+                         :tools test-tools})
           client1 (client/create-client
-                   {:transport {:type :in-memory
-                                :shared shared-transport}
-                    :client-info {:name "client-1" :version "1.0.0"}
-                    :capabilities {}})
+                    {:transport {:type :in-memory
+                                 :shared shared-transport}
+                     :client-info {:name "client-1" :version "1.0.0"}
+                     :capabilities {}})
           client2 (client/create-client
-                   {:transport {:type :in-memory
-                                :shared shared-transport}
-                    :client-info {:name "client-2" :version "1.0.0"}
-                    :capabilities {}})]
+                    {:transport {:type :in-memory
+                                 :shared shared-transport}
+                     :client-info {:name "client-2" :version "1.0.0"}
+                     :capabilities {}})]
 
       (try
         ;; Both clients should initialize successfully
@@ -269,13 +269,13 @@
 
         ;; Both should be able to call tools
         (let [result1 (client/call-tool
-                       client1
-                       "echo"
-                       {:message "from client 1"})
+                        client1
+                        "echo"
+                        {:message "from client 1"})
               result2 (client/call-tool
-                       client2
-                       "echo"
-                       {:message "from client 2"})]
+                        client2
+                        "echo"
+                        {:message "from client 2"})]
           (is (= "Echo: from client 1" (-> @result1 :content first :text)))
           (is (= "Echo: from client 2" (-> @result2 :content first :text))))
 

@@ -1,10 +1,10 @@
 (ns mcp-clj.tools.ls-test
   (:require
-   [clojure.data.json :as json]
-   [clojure.java.io :as io]
-   [clojure.string :as str]
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.tools.ls :as ls]))
+    [clojure.data.json :as json]
+    [clojure.java.io :as io]
+    [clojure.string :as str]
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.tools.ls :as ls]))
 
 (defn create-test-directory-structure
   "Create a temporary directory structure for testing"
@@ -69,7 +69,7 @@
           (let [file-names (map #(.getName (io/file %)) (:files data))]
             (is (some #{"file1.txt" "file2.clj" ".hidden-file"} file-names))
             (is (not
-                 (some #{"DS_Store" "test.log" "temp-file.txt"} file-names))))))
+                  (some #{"DS_Store" "test.log" "temp-file.txt"} file-names))))))
 
       (finally
         (cleanup-test-directory temp-dir)))))
@@ -82,8 +82,8 @@
               result (implementation nil {:path temp-dir :max-depth 3})
               response-text (-> result :content first :text)
               data (json/read-str
-                    response-text
-                    :key-fn keyword)]
+                     response-text
+                     :key-fn keyword)]
 
           (is (false? (:isError result)))
 
@@ -91,8 +91,8 @@
           (let [file-paths (:files data)]
             (is (not (some #(str/includes? % "deeper") file-paths)))
             (is (some
-                 #(str/includes? % "subdir2/deep/file5.txt")
-                 file-paths)))))
+                  #(str/includes? % "subdir2/deep/file5.txt")
+                  file-paths)))))
 
       (finally
         (cleanup-test-directory temp-dir)))))
@@ -156,8 +156,8 @@
 
       (is (true? (:isError result)))
       (is (str/includes?
-           (-> result :content first :text)
-           "does not exist"))))
+            (-> result :content first :text)
+            "does not exist"))))
 
   (testing "path traversal prevention"
     (let [{:keys [implementation]} ls/ls-tool
@@ -165,8 +165,8 @@
 
       (is (true? (:isError result)))
       (is (str/includes?
-           (-> result :content first :text)
-           "outside allowed directories"))))
+            (-> result :content first :text)
+            "outside allowed directories"))))
 
   (testing "current directory access allowed"
     (let [{:keys [implementation]} ls/ls-tool
