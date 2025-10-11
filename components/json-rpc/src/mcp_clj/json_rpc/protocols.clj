@@ -35,6 +35,11 @@
     "Set the handler map for the server.
     Handlers should be a map of method name strings to handler functions.")
 
+  (notify!
+    [server session-id method params]
+    "Send a notification to a specific session/connection.
+    For servers without session concept (like STDIO), this sends to the single connection.")
+
   (notify-all!
     [server method params]
     "Send a notification to all active sessions/connections.

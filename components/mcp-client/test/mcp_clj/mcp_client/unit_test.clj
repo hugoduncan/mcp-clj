@@ -30,31 +30,31 @@
 ;; Test Tools
 
 (def test-tools
-  {"echo" {:name           "echo"
-           :description    "Echo back the input"
-           :inputSchema    {:type       "object"
-                            :properties {:message {:type "string"}}}
-           :implementation (fn [args]
+  {"echo" {:name "echo"
+           :description "Echo back the input"
+           :inputSchema {:type "object"
+                         :properties {:message {:type "string"}}}
+           :implementation (fn [_context args]
                              {:content
                               [{:type "text"
                                 :text (str "Echo: " (:message args))}]
                               :isError false})}
 
-   "add" {:name           "add"
-          :description    "Add two numbers"
-          :inputSchema    {:type       "object"
-                           :properties {:a {:type "number"}
-                                        :b {:type "number"}}}
-          :implementation (fn [{:keys [a b]}]
+   "add" {:name "add"
+          :description "Add two numbers"
+          :inputSchema {:type "object"
+                        :properties {:a {:type "number"}
+                                     :b {:type "number"}}}
+          :implementation (fn [_context {:keys [a b]}]
                             {:content
                              [{:type "text"
                                :text (str (+ a b))}]
                              :isError false})}
 
-   "error-tool" {:name           "error-tool"
-                 :description    "Tool that throws an error"
-                 :inputSchema    {:type "object"}
-                 :implementation (fn [_] (throw (ex-info "Test error" {})))}})
+   "error-tool" {:name "error-tool"
+                 :description "Tool that throws an error"
+                 :inputSchema {:type "object"}
+                 :implementation (fn [_context _] (throw (ex-info "Test error" {})))}})
 
 ;; Helper Functions
 

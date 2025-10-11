@@ -134,7 +134,7 @@
                         :inputSchema {:type "object"
                                       :properties {:value {:type "string"}}
                                       :required ["value"]}
-                        :implementation (fn [{:keys [value]}]
+                        :implementation (fn [_context {:keys [value]}]
                                           {:content [{:type "text" :text (str "New: " value)}]
                                            :isError false})}
               _ (mcp-server/add-tool! server new-tool)

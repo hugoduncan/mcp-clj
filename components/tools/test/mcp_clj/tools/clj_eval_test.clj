@@ -9,13 +9,13 @@
     (let [{:keys [implementation]} clj-eval/clj-eval-tool]
 
       (testing "successful evaluation"
-        (let [result (implementation {:code "(+ 1 2)"})]
+        (let [result (implementation nil {:code "(+ 1 2)"})]
           (is (= {:content [{:type "text" :text "3"}]
                   :isError false}
                  result))))
 
       (testing "divide by zero error"
-        (let [result (implementation {:code "(/ 1 0)"})]
+        (let [result (implementation nil {:code "(/ 1 0)"})]
           (is (:isError result))
           (is (= "text" (-> result :content first :type)))
           (is (str/includes?
@@ -23,7 +23,7 @@
                 "Divide by zero"))))
 
       (testing "invalid syntax"
-        (let [result (implementation {:code "(/ 1 0"})]
+        (let [result (implementation nil {:code "(/ 1 0"})]
           (is (:isError result))
           (is (= "text" (-> result :content first :type)))
           (is (str/includes?

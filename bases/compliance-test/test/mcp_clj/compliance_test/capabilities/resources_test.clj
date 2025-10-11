@@ -180,7 +180,7 @@
                             :uri "file:///test/new-resource.txt"
                             :mime-type "text/plain"
                             :description "A new test resource"
-                            :implementation (fn [_uri]
+                            :implementation (fn [_context _uri]
                                               {:contents [{:uri "file:///test/new-resource.txt"
                                                            :text "New resource content"}]})}
               _ (mcp-server/add-resource! server new-resource)

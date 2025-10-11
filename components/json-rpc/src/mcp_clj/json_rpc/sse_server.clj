@@ -212,6 +212,11 @@
                       {:handlers handlers})))
     (swap! (:handlers server) (constantly handlers)))
 
+  (notify! [server id method params]
+    (log/info :rpc/notify! {:id id :method method :params params})
+    (when-let [{:keys [reply!-fn]} (@(:session-id->session server) id)]
+      (reply!-fn (json-protocol/json-rpc-notification method params))))
+
   (notify-all! [server method params]
     (log/info :rpc/notify-all! {:method method :params params})
     (doseq [{:keys [reply!-fn] :as session} (vals @(:session-id->session server))]

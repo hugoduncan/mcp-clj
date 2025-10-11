@@ -91,9 +91,9 @@
 
 (defn- read-resource-impl
   "Default implementation for reading a resource"
-  [{:keys [implementation] :as resource} uri]
+  [context {:keys [implementation] :as resource} uri]
   (if implementation
-    (implementation uri)
+    (implementation context uri)
     {:contents [{:uri uri
                  :text "Resource not implemented"}]
      :isError true}))
@@ -101,10 +101,10 @@
 (defn read-resource
   "Read a resource by URI.
    Returns contents of the resource."
-  [registry {:keys [uri] :as params}]
+  [context registry {:keys [uri] :as params}]
   (log/info :resources/read {:params params})
   (if-let [resource (some #(when (= uri (:uri %)) %) (vals @registry))]
-    (read-resource-impl resource uri)
+    (read-resource-impl context resource uri)
     {:contents [{:uri uri
                  :text "Resource not found"}]
      :isError true}))

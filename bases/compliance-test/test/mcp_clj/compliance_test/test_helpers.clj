@@ -6,6 +6,7 @@
     [mcp-clj.java-sdk.interop :as java-sdk]
     [mcp-clj.mcp-client.core :as client]
     [mcp-clj.mcp-server.core :as server]
+    [mcp-clj.mcp-server.logging :as server-logging]
     [mcp-clj.server-transport.factory :as server-transport-factory]))
 
 ;; Transport Registration
@@ -42,7 +43,7 @@
   - 2024-11-05: Base version with name, description, inputSchema
   - 2025-03-26: Adds annotations field
   - 2025-06-18: Adds title and outputSchema fields"
-  [protocol-version]
+  [protocol-version & {:keys [server-atom]}]
   (let [base-tools
         {"echo"
          {:name "echo"
@@ -51,7 +52,7 @@
                         :properties {:message {:type "string"
                                                :description "Message to echo"}}
                         :required ["message"]}
-          :implementation (fn [{:keys [message]}]
+          :implementation (fn [_context {:keys [message]}]
                             {:content [{:type "text"
                                         :text (str "Echo: " message)}]
                              :isError false})}
@@ -65,7 +66,7 @@
                                      :b {:type "number"
                                          :description "Second number"}}
                         :required ["a" "b"]}
-          :implementation (fn [{:keys [a b]}]
+          :implementation (fn [_context {:keys [a b]}]
                             {:content [{:type "text"
                                         :text (str (+ a b))}]
                              :isError false})}
@@ -77,15 +78,53 @@
                         :properties {:message {:type "string"
                                                :description "Error message"}}
                         :required ["message"]}
-          :implementation (fn [{:keys [message]}]
+          :implementation (fn [_context {:keys [message]}]
                             (throw (ex-info message {:type :test-error})))}}
+
+        ;; Add trigger-logs tool if server-atom is provided
+        with-trigger-logs
+        (if server-atom
+          (assoc base-tools
+                 "trigger-logs"
+                 {:name "trigger-logs"
+                  :description "Trigger log messages at specified levels for testing"
+                  :inputSchema {:type "object"
+                                :properties {:levels {:type "array"
+                                                      :items {:type "string"
+                                                              :enum ["debug" "info" "notice" "warning"
+                                                                     "error" "critical" "alert" "emergency"]}
+                                                      :description "Log levels to emit"}
+                                             :message {:type "string"
+                                                       :description "Message to log"}
+                                             :logger {:type "string"
+                                                      :description "Optional logger name"}}
+                                :required ["levels" "message"]}
+                  :implementation
+                  (fn [context {:keys [levels message logger]}]
+                    (let [log-fn-map {:debug server-logging/debug
+                                      :info server-logging/info
+                                      :notice server-logging/notice
+                                      :warning server-logging/warn
+                                      :error server-logging/error
+                                      :critical server-logging/critical
+                                      :alert server-logging/alert
+                                      :emergency server-logging/emergency}]
+                      (doseq [level levels]
+                        (let [log-fn (get log-fn-map (keyword level))]
+                          (if logger
+                            (log-fn context {:msg message} :logger logger)
+                            (log-fn context {:msg message}))))
+                      {:content [{:type "text"
+                                  :text (str "Triggered " (count levels) " log message(s)")}]
+                       :isError false}))})
+          base-tools)
 
         ;; Add annotations for 2025-03-26+
         with-annotations (if (>= (compare protocol-version "2025-03-26") 0)
-                           (-> base-tools
+                           (-> with-trigger-logs
                                (assoc-in ["echo" :annotations] {:category "utility"})
                                (assoc-in ["add" :annotations] {:category "math"}))
-                           base-tools)
+                           with-trigger-logs)
 
         ;; Add title and outputSchema for 2025-06-18+
         with-extended (if (>= (compare protocol-version "2025-06-18") 0)
@@ -163,7 +202,7 @@
           :uri "file:///test/text-resource.txt"
           :mime-type "text/plain"
           :description "A simple text resource"
-          :implementation (fn [_uri]
+          :implementation (fn [_context _uri]
                             {:contents [{:uri "file:///test/text-resource.txt"
                                          :text "Hello, world!"}]})}
 
@@ -172,7 +211,7 @@
           :uri "file:///test/data.json"
           :mime-type "application/json"
           :description "A JSON data resource"
-          :implementation (fn [_uri]
+          :implementation (fn [_context _uri]
                             {:contents [{:uri "file:///test/data.json"
                                          :text "{\"key\": \"value\"}"}]})}
 
@@ -181,7 +220,7 @@
           :uri "file:///test/image.png"
           :mime-type "image/png"
           :description "A binary blob resource"
-          :implementation (fn [_uri]
+          :implementation (fn [_context _uri]
                             {:contents [{:uri "file:///test/image.png"
                                          :blob "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}]})}}
 

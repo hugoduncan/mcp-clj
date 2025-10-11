@@ -25,7 +25,7 @@
                  :properties {:a {:type "number"}
                               :b {:type "number"}}
                  :required [:a :b]}
-   :implementation (fn [_tool params]
+   :implementation (fn [_server params]
                      {:content [{:type "text"
                                  :text (str "Result: " (+ (:a params) (:b params)))}]})})
 
