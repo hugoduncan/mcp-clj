@@ -3,4 +3,5 @@
   poly/mcp-server {:local/root "../../components/mcp-server"}
   poly/interop {:local/root "../../components/interop"}
   poly/in-memory-transport {:local/root "../../components/in-memory-transport"}
-  poly/log {:local/root "../../components/log"}}}
+  poly/log {:local/root "../../components/log"}
+  poly/logging {:local/root "../../components/logging"}}}
