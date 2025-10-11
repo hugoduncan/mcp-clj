@@ -85,13 +85,13 @@ This project uses a two-tier testing strategy to optimize development speed:
 
 ```bash
 # Run only fast unit tests (default)
-clj -M:kaocha:dev:test
+clj -M:kaocha:dev:test --reporter kaocha.report/dots
 
 # Run only integration tests (slower)
 clj -M:kaocha:dev:test --focus :integration
 
 # Run all tests (unit + integration)
-clj -M:kaocha:dev:test --focus :unit :integration
+clj -M:kaocha:dev:test --focus :unit :integration --reporter kaocha.report/dots
 
 # Run specific namespace
 clj -M:kaocha:dev:test --focus mcp-clj.mcp-client.tools-test
