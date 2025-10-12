@@ -1,0 +1,192 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (skip tagging and deployment)'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for git-cliff and version calculation
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: 21
+
+    - name: Install Clojure tools
+      uses: DeLaGuardo/setup-clojure@12.5
+      with:
+        cli: 1.11.1.1429
+
+    - name: Cache Clojure dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.m2/repository
+          ~/.gitlibs
+          ~/.clojure
+        key: ${{ runner.os }}-clojure-${{ hashFiles('**/deps.edn') }}
+        restore-keys: |
+          ${{ runner.os }}-clojure-
+
+    - name: Calculate version
+      id: version
+      run: |
+        VERSION=$(clojure -T:build version | grep "Version:" | awk '{print $2}')
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+        echo "Calculated version: $VERSION"
+
+    - name: Check if tag exists
+      id: check_tag
+      run: |
+        if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+          echo "⚠️  Tag v${{ steps.version.outputs.version }} already exists"
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "✅ Tag v${{ steps.version.outputs.version }} does not exist"
+        fi
+
+    - name: Build JARs
+      run: |
+        echo "Building all project JARs..."
+
+        # Build server
+        cd projects/server
+        clojure -T:build jar
+        cd ../..
+
+        # Build client
+        cd projects/client
+        clojure -T:build jar
+        cd ../..
+
+        # Build in-memory-transport
+        cd projects/in-memory-transport
+        clojure -T:build jar
+        cd ../..
+
+        echo "✅ All JARs built successfully"
+
+    - name: List built artifacts
+      run: |
+        echo "Built artifacts:"
+        find projects -name "*.jar" -type f | while read jar; do
+          echo "  - $jar ($(du -h "$jar" | cut -f1))"
+        done
+
+    - name: Run unit tests
+      run: |
+        echo "Running unit tests..."
+        clojure -M:kaocha:dev:test
+
+    - name: Run integration tests
+      run: |
+        echo "Running integration tests..."
+        clojure -M:kaocha:dev:test --focus :integration
+
+    - name: Run smoke tests
+      run: |
+        echo "Running smoke tests..."
+        bash scripts/smoke-test.sh
+
+    - name: Install git-cliff
+      if: steps.check_tag.outputs.exists == 'false'
+      run: |
+        wget https://github.com/orhun/git-cliff/releases/download/v2.8.1/git-cliff-2.8.1-x86_64-unknown-linux-gnu.tar.gz
+        tar -xzf git-cliff-2.8.1-x86_64-unknown-linux-gnu.tar.gz
+        sudo mv git-cliff-2.8.1/git-cliff /usr/local/bin/
+        chmod +x /usr/local/bin/git-cliff
+        git-cliff --version
+
+    - name: Generate changelog
+      if: steps.check_tag.outputs.exists == 'false'
+      run: |
+        echo "Generating changelog for version ${{ steps.version.outputs.version }}..."
+        git-cliff --tag "v${{ steps.version.outputs.version }}" --output CHANGELOG.md
+        echo "📋 Changelog generated"
+        echo ""
+        echo "=== Changelog for this release ==="
+        git-cliff --tag "v${{ steps.version.outputs.version }}" --unreleased
+
+    - name: Create git tag
+      if: steps.check_tag.outputs.exists == 'false' && inputs.dry_run == false
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
+        git push origin "v${{ steps.version.outputs.version }}"
+        echo "✅ Tag v${{ steps.version.outputs.version }} created and pushed"
+
+    - name: Deploy to Clojars
+      if: steps.check_tag.outputs.exists == 'false' && inputs.dry_run == false
+      env:
+        CLOJARS_USERNAME: ${{ secrets.CLOJARS_USERNAME }}
+        CLOJARS_PASSWORD: ${{ secrets.CLOJARS_PASSWORD }}
+      run: |
+        echo "Deploying to Clojars..."
+
+        # Configure Maven settings for Clojars authentication
+        mkdir -p ~/.m2
+        cat > ~/.m2/settings.xml <<EOF
+        <settings>
+          <servers>
+            <server>
+              <id>clojars</id>
+              <username>${CLOJARS_USERNAME}</username>
+              <password>${CLOJARS_PASSWORD}</password>
+            </server>
+          </servers>
+        </settings>
+        EOF
+
+        # Deploy each project
+        for project in server client in-memory-transport; do
+          echo "Deploying $project..."
+          cd "projects/$project"
+          clojure -X:deploy
+          cd ../..
+        done
+
+        echo "✅ All artifacts deployed to Clojars"
+
+    - name: Create GitHub Release
+      if: steps.check_tag.outputs.exists == 'false' && inputs.dry_run == false
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ steps.version.outputs.version }}
+        name: Release v${{ steps.version.outputs.version }}
+        body_path: CHANGELOG.md
+        files: |
+          projects/server/target/*.jar
+          projects/client/target/*.jar
+          projects/in-memory-transport/target/*.jar
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Dry run summary
+      if: inputs.dry_run == true
+      run: |
+        echo "🔍 DRY RUN MODE - No changes were made"
+        echo ""
+        echo "The following would have been done:"
+        echo "  - Tag v${{ steps.version.outputs.version }} would be created"
+        echo "  - JARs would be deployed to Clojars"
+        echo "  - GitHub release would be created"
+        echo ""
+        echo "To perform an actual release, run this workflow with dry_run=false"
