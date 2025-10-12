@@ -1,13 +1,6 @@
 {:deps
- {poly/http {:local/root "../../components/http"}
-  poly/http-server {:local/root "../../components/http-server"}
-  poly/in-memory-transport {:local/root "../../components/in-memory-transport"}
-  poly/json-rpc {:local/root "../../components/json-rpc"}
-  poly/log {:local/root "../../components/log"}
-  poly/logging {:local/root "../../components/logging"}
+ {poly/logging {:local/root "../../components/logging"}
   poly/mcp-server {:local/root "../../components/mcp-server"}
-  poly/server-transport {:local/root "../../components/server-transport"}
-  poly/tools {:local/root "../../components/tools"}
   poly/sse-server {:local/root "../../bases/sse-server"}
   poly/stdio-server {:local/root "../../bases/stdio-server"}}
 
