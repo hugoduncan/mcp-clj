@@ -19,7 +19,7 @@
                                          :prefix  {:type        "string"
                                                    :description "Optional prefix for the message"}}
                             :required   ["message"]}
-           :implementation (fn [{:keys [message prefix]}]
+           :implementation (fn [_context {:keys [message prefix]}]
                              {:content
                               [{:type "text"
                                 :text (str (when prefix (str prefix ": ")) message)}]
@@ -33,7 +33,7 @@
                                         :b {:type        "number"
                                             :description "Second number"}}
                            :required   ["a" "b"]}
-          :implementation (fn [{:keys [a b]}]
+          :implementation (fn [_context {:keys [a b]}]
                             {:content [{:type "text"
                                         :text (str "Result: " (+ a b))}]
                              :isError false})}
@@ -44,7 +44,7 @@
                              :properties {:message {:type        "string"
                                                     :description "Error message to throw"}}
                              :required   ["message"]}
-            :implementation (fn [{:keys [message]}]
+            :implementation (fn [_context {:keys [message]}]
                               (throw (ex-info message {:type :test-error})))}
 
    "complex" {:name           "complex"
@@ -55,7 +55,7 @@
                                                     :minimum     1
                                                     :maximum     10}}
                                :required   ["count"]}
-              :implementation (fn [{:keys [count]}]
+              :implementation (fn [_context {:keys [count]}]
                                 {:content [{:type "text"
                                             :text (str "Generated " count " items:")}
                                            {:type "text"

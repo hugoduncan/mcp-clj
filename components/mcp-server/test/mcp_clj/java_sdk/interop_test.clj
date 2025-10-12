@@ -393,7 +393,7 @@
                      :inputSchema {:type "object"
                                    :properties {:input {:type "string"}}
                                    :required ["input"]}
-                     :implementation (fn [args]
+                     :implementation (fn [_server args]
                                        {:content [{:type "text"
                                                    :text (str "Processed: " (:input args))}]})}]
 

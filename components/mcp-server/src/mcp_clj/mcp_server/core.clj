@@ -4,6 +4,7 @@
     [clojure.set :as set]
     [mcp-clj.json-rpc.protocols :as json-rpc-protocols]
     [mcp-clj.log :as log]
+    [mcp-clj.mcp-server.logging :as logging]
     [mcp-clj.mcp-server.prompts :as prompts]
     [mcp-clj.mcp-server.resources :as resources]
     [mcp-clj.mcp-server.subscriptions :as subscriptions]
@@ -21,7 +22,8 @@
    initialized?
    client-info
    client-capabilities
-   protocol-version])
+   protocol-version
+   log-level])
 
 (defrecord ^:private MCPServer
   [json-rpc-server
@@ -29,7 +31,8 @@
    tool-registry
    prompt-registry
    resource-registry
-   resource-subscriptions]
+   resource-subscriptions
+   capabilities]
 
   AutoCloseable
 
@@ -37,7 +40,11 @@
 
 (defn- request-session-id
   [request]
-  (get (:query-params request) "session_id"))
+  (cond
+    ;; For HTTP/SSE transports: request is a map with :query-params
+    (map? request) (get (:query-params request) "session_id")
+    ;; For STDIO transport: request is just the method string
+    :else "stdio"))
 
 (defn- request-session
   [server request]
@@ -151,20 +158,23 @@
      :isError false}))
 
 (defn- negotiate-initialization
-  "Negotiate initialization request according to MCP specification"
-  [{:keys [protocolVersion capabilities clientInfo] :as params}]
+  "Negotiate initialization request according to MCP specification.
+  
+  server-capabilities should contain capability configs like {:logging {}}"
+  [server-capabilities {:keys [protocolVersion capabilities clientInfo] :as params}]
   (let [negotiation (version/negotiate-version protocolVersion)
         {:keys [negotiated-version client-was-supported? supported-versions]} negotiation
         warnings (when-not client-was-supported?
                    [(str "Client version " protocolVersion " not supported. "
                          "Using " negotiated-version ". "
                          "Supported versions: " (pr-str supported-versions))])
-        ;; Create base server capabilities
-        base-capabilities {;; :logging   {} needs to implement logging/setLevel
-                           :tools {:listChanged true}
-                           :resources {:listChanged true
-                                       :subscribe true}
-                           :prompts {:listChanged true}}
+        ;; Create base server capabilities, conditionally including logging
+        base-capabilities (cond-> {:tools {:listChanged true}
+                                   :resources {:listChanged true
+                                               :subscribe true}
+                                   :prompts {:listChanged true}}
+                            (contains? server-capabilities :logging)
+                            (assoc :logging {}))
         ;; Apply version-specific capability formatting
         version-capabilities (version/handle-version-specific-behavior
                                negotiated-version
@@ -194,7 +204,9 @@
   "Handle initialize request from client"
   [server params]
   (log/info :server/initialize params)
-  (let [{:keys [negotiation client-info response]} (negotiate-initialization params)
+  (let [{:keys [negotiation client-info response]} (negotiate-initialization
+                                                     (:capabilities server)
+                                                     params)
         {:keys [negotiated-version]} negotiation]
     (when-not (:client-was-supported? negotiation)
       (log/warn :server/version-fallback
@@ -214,9 +226,11 @@
   [server _params]
   (log/info :server/initialized)
   (fn [session]
+    (log/info :server/marking-session-initialized {:session-id (:session-id session)})
     (swap! (:session-id->session server)
            update (:session-id session)
-           assoc :initialized? true)))
+           assoc :initialized? true)
+    (log/info :server/session-marked-initialized {:session-id (:session-id session)})))
 
 (defn- handle-ping
   "Handle ping request"
@@ -232,26 +246,28 @@
 
 (defn- handle-call-tool
   "Handle tools/call request from client"
-  [server {:keys [name arguments] :as _params}]
+  [server {:keys [name arguments] :as params}]
   (log/info :server/tools-call)
-  (if-let [{:keys [implementation inputSchema]} (get
-                                                  @(:tool-registry server)
-                                                  name)]
-    (try
-      (let [missing-args (set/difference
-                           (set (mapv keyword (:required inputSchema)))
-                           (set (keys arguments)))]
-        (if (empty? missing-args)
-          (transform-tool-result (implementation arguments))
-          {:content [(text-map
-                       (str "Missing args: " (vec missing-args) ", found "
-                            (set (keys arguments))))]
+  (let [session-id (-> params meta :session-id)]
+    (if-let [{:keys [implementation inputSchema]} (get
+                                                    @(:tool-registry server)
+                                                    name)]
+      (try
+        (let [missing-args (set/difference
+                             (set (mapv keyword (:required inputSchema)))
+                             (set (keys arguments)))]
+          (if (empty? missing-args)
+            (let [context {:server server :session-id session-id}]
+              (transform-tool-result (implementation context arguments)))
+            {:content [(text-map
+                         (str "Missing args: " (vec missing-args) ", found "
+                              (set (keys arguments))))]
+             :isError true}))
+        (catch Throwable e
+          {:content [(text-map (str "Error: " (.getMessage e)))]
            :isError true}))
-      (catch Throwable e
-        {:content [(text-map (str "Error: " (.getMessage e)))]
-         :isError true}))
-    {:content [(text-map (str "Tool not found: " name))]
-     :isError true}))
+      {:content [(text-map (str "Tool not found: " name))]
+       :isError true})))
 
 (defn- version-aware-handle-call-tool
   "Version-aware wrapper for handle-call-tool"
@@ -272,7 +288,9 @@
   "Handle resources/read request from client"
   [server params]
   (log/info :server/resources-read)
-  (resources/read-resource (:resource-registry server) params))
+  (let [session-id (-> params meta :session-id)
+        context {:server server :session-id session-id}]
+    (resources/read-resource context (:resource-registry server) params)))
 
 (defn- handle-subscribe-resource
   "Handle resources/subscribe request from client"
@@ -311,6 +329,35 @@
   (log/info :server/prompts-get)
   (prompts/get-prompt (:prompt-registry server) params))
 
+(defn- handle-logging-set-level
+  "Handle logging/setLevel request from client to set minimum log level"
+  [server params]
+  (log/info :server/logging-set-level {:params params})
+  (let [session-id (-> params meta :session-id)
+        level-str (:level params)
+        level (keyword level-str)]
+    (log/info :server/logging-set-level-details
+              {:session-id session-id
+               :level level
+               :level-str level-str
+               :valid? (logging/valid-level? level)})
+    (if (logging/valid-level? level)
+      (do
+        (swap! (:session-id->session server)
+               assoc-in [session-id :log-level] level)
+        (log/info :server/logging-level-updated
+                  {:session-id session-id
+                   :level level
+                   :sessions (keys @(:session-id->session server))
+                   :updated-session (get @(:session-id->session server) session-id)})
+        {})
+      (throw (ex-info "Invalid log level"
+                      {:code -32602
+                       :message "Invalid params"
+                       :data {:level level-str
+                              :valid-levels ["debug" "info" "notice" "warning"
+                                             "error" "critical" "alert" "emergency"]}})))))
+
 (defn- request-handler
   "Wrap a handler to support async responses and session updates"
   [server handler request params]
@@ -319,7 +366,7 @@
         ;; Create session on-demand if missing (for in-memory transport)
         session (or session
                     (when session-id
-                      (let [new-session (->Session session-id false nil nil nil)]
+                      (let [new-session (->Session session-id false nil nil nil nil)]
                         (swap! (:session-id->session server) assoc session-id new-session)
                         (log/info :server/session-created {:session-id session-id})
                         new-session)))
@@ -365,20 +412,25 @@
 (defn- create-handlers
   "Create request handlers with server reference"
   [server]
-  (update-vals
-    {"initialize" handle-initialize
-     "notifications/initialized" handle-initialized
-     "ping" handle-ping
-     "tools/list" handle-list-tools
-     "tools/call" handle-call-tool
-     "resources/list" handle-list-resources
-     "resources/read" handle-read-resource
-     "resources/subscribe" handle-subscribe-resource
-     "resources/unsubscribe" handle-unsubscribe-resource
-     "prompts/list" handle-list-prompts
-     "prompts/get" handle-get-prompt}
-    (fn [handler]
-      #(request-handler server handler %1 %2))))
+  (let [base-handlers {"initialize" handle-initialize
+                       "notifications/initialized" handle-initialized
+                       "ping" handle-ping
+                       "tools/list" handle-list-tools
+                       "tools/call" handle-call-tool
+                       "resources/list" handle-list-resources
+                       "resources/read" handle-read-resource
+                       "resources/subscribe" handle-subscribe-resource
+                       "resources/unsubscribe" handle-unsubscribe-resource
+                       "prompts/list" handle-list-prompts
+                       "prompts/get" handle-get-prompt}
+        ;; Conditionally add logging handler if capability is enabled
+        handlers (if (contains? (:capabilities server) :logging)
+                   (assoc base-handlers "logging/setLevel" handle-logging-set-level)
+                   base-handlers)]
+    (update-vals
+      handlers
+      (fn [handler]
+        #(request-handler server handler %1 %2)))))
 
 (defn add-tool!
   "Add or update a tool in a running server"
@@ -418,7 +470,7 @@
 
 (defn- on-sse-connect
   [server id]
-  (let [session (->Session id false nil nil nil)]
+  (let [session (->Session id false nil nil nil nil)]
     (log/info :server/sse-connect {:session-id id})
     (swap! (:session-id->session server) assoc id session)))
 
@@ -465,6 +517,7 @@
   - :tools - Map of tool name to tool definition
   - :prompts - Map of prompt name to prompt definition
   - :resources - Map of resource name to resource definition
+  - :capabilities - Map of capability configs (e.g., {:logging {}})
 
   Transport configuration:
   - {:type :stdio :num-threads N} - Standard input/output
@@ -475,12 +528,14 @@
     (create-server {:transport {:type :stdio}
                     :tools {...}})
     (create-server {:transport {:type :http :port 3001}
-                    :prompts {...}})"
+                    :prompts {...}
+                    :capabilities {:logging {}}})"
   ^MCPServer
-  [{:keys [transport tools prompts resources]
+  [{:keys [transport tools prompts resources capabilities]
     :or {tools tools/default-tools
          prompts prompts/default-prompts
-         resources resources/default-resources}
+         resources resources/default-resources
+         capabilities {}}
     :as opts}]
   (when-not transport
     (throw (ex-info "Missing :transport configuration"
@@ -497,6 +552,12 @@
     (when-not (prompts/valid-prompt? prompt)
       (throw (ex-info "Invalid prompt in constructor" {:prompt prompt}))))
   (let [session-id->session (atom {})
+        ;; For STDIO transport, create a default session BEFORE creating handlers
+        ;; to avoid race condition where initialized notification arrives before session exists
+        _ (when (= (:type transport) :stdio)
+            (let [default-session (->Session "stdio" false nil nil nil nil)]
+              (swap! session-id->session assoc "stdio" default-session)
+              (log/info :server/stdio-session-created {:session-id "stdio"})))
         tool-registry (atom tools)
         prompt-registry (atom prompts)
         resource-registry (atom resources)
@@ -507,7 +568,8 @@
                  tool-registry
                  prompt-registry
                  resource-registry
-                 (atom {}))
+                 (atom {})
+                 capabilities)
         ;; Create handlers before creating the JSON-RPC server to avoid race
         ;; conditions
         handlers (create-handlers server)
@@ -528,5 +590,6 @@
     ;; race window
     (json-rpc-protocols/set-handlers! json-rpc-server handlers)
     (deliver rpc-server-prom json-rpc-server)
+
     (log/info :server/started {})
     server))

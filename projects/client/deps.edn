@@ -1,7 +1,2 @@
 {:deps
- {poly/client-transport {:local/root "../../components/client-transport"}
-  poly/http-client {:local/root "../../components/http-client"}
-  poly/json-rpc {:local/root "../../components/json-rpc"}
-  poly/log {:local/root "../../components/log"}
-  poly/mcp-client {:local/root "../../components/mcp-client"}
-  poly/mcp-server {:local/root "../../components/mcp-server"}}}
+ {poly/mcp-client {:local/root "../../components/mcp-client"}}}

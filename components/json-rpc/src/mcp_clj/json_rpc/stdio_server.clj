@@ -88,7 +88,7 @@
         (dispatch-rpc-call executor handler rpc-call)
         (do
           (log/warn :rpc/no-such-method
-                    {:method             (:method rpc-call)
+                    {:method (:method rpc-call)
                      :available-handlers (keys handlers)})
           (write-json!
             *out*
@@ -127,16 +127,16 @@
 (defn create-server
   "Create JSON-RPC server over stdio."
   [{:keys [num-threads handlers]
-    :or   {num-threads (* 2 (.availableProcessors (Runtime/getRuntime)))
-           handlers    nil}}]
+    :or {num-threads (* 2 (.availableProcessors (Runtime/getRuntime)))
+         handlers nil}}]
   (log/debug :server/starting {:msg "Starting"})
   (let [executor (executor/create-executor num-threads)
         handlers (atom handlers)
-        running  (atom true)
-        out      *out*
-        in       (input-reader)
-        #_       (PushbackReader.
-                  (InputStreamReader. System/in) 1024)
+        running (atom true)
+        out *out*
+        in (input-reader)
+        #_(PushbackReader.
+           (InputStreamReader. System/in) 1024)
 
         server-future
         (future
@@ -149,7 +149,7 @@
                            (recur)))
                 (when @running
                   (let [[rpc-call ex :as resp] (read-json in)
-                        _                      (log/debug :rpc/call {:call rpc-call})
+                        _ (log/debug :rpc/call {:call rpc-call})
                         v
                         (cond
                           (nil? resp)
@@ -199,6 +199,12 @@
       (throw (ex-info "Handlers must be a map"
                       {:handlers handlers})))
     (reset! (:handlers server) handlers))
+
+  (notify! [server _session-id method params]
+    (log/debug :server/notify! {:method method :params params})
+    (write-json!
+      (:out server)
+      (json-protocol/json-rpc-notification method params)))
 
   (notify-all! [server method params]
     (log/debug :server/notify-all! {:method method :params params})

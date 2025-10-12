@@ -125,6 +125,15 @@
     (reset! (:handlers server) handler-map)
     (log/debug :in-memory/handlers-set {:handler-count (count handler-map)}))
 
+  (notify! [server _session-id method params]
+    (log/debug :in-memory/notify {:method method :params params})
+    ;; In-memory transport has single client, so notify! behaves same as notify-all!
+    (let [notification {:jsonrpc "2.0"
+                        :method method
+                        :params params}]
+      (shared/offer-to-client! (:shared-transport server) notification)
+      (log/debug :in-memory/notification-sent {:method method})))
+
   (notify-all! [server method params]
     (log/debug :in-memory/notify-all {:method method :params params})
     ;; Send notification to client via shared transport

@@ -4,6 +4,7 @@
     [mcp-clj.client-transport.factory :as transport-factory]
     [mcp-clj.client-transport.protocol :as transport-protocol]
     [mcp-clj.log :as log]
+    [mcp-clj.mcp-client.logging :as logging]
     [mcp-clj.mcp-client.prompts :as prompts]
     [mcp-clj.mcp-client.resources :as resources]
     [mcp-clj.mcp-client.session :as session]
@@ -215,7 +216,11 @@
 (defn wait-for-ready
   "Wait for client to be ready, with optional timeout (defaults to 30 seconds).
 
-  Returns true when client is ready.
+  Returns the server's initialization response containing:
+  - :protocolVersion - Negotiated protocol version
+  - :capabilities - Server capabilities map
+  - :serverInfo - Server information (name, version, etc.)
+
   Throws exception if client transitions to :error state or times out waiting."
   ([client] (wait-for-ready client 30000))
   ([client timeout-ms]
@@ -223,7 +228,11 @@
      (.get ^CompletableFuture (:initialization-future client)
            timeout-ms
            TimeUnit/MILLISECONDS)
-     true
+     ;; Return the initialization response from the session
+     (let [session @(:session client)]
+       {:protocolVersion (:protocol-version session)
+        :capabilities (:server-capabilities session)
+        :serverInfo (:server-info session)})
      (catch TimeoutException _
        (let [session-state (:state @(:session client))]
          (if (= :error session-state)
@@ -411,3 +420,62 @@
   Returns a CompletableFuture that resolves immediately."
   [client callback-fn]
   (resources/unsubscribe-resources-changed-impl! client callback-fn))
+
+(defn set-log-level!
+  "Set the minimum log level for this client session.
+
+  The server will only send log messages at or above the specified level.
+  This controls server-side filtering - all subscribed callbacks receive
+  the same filtered messages.
+
+  Args:
+    client - MCP client instance
+    level - Log level keyword (:debug :info :notice :warning :error :critical :alert :emergency)
+
+  Returns:
+    CompletableFuture<EmptyObject> that completes when server acknowledges the level change.
+
+  Throws:
+    ExceptionInfo with :invalid-log-level if level is not one of the 8 RFC 5424 levels.
+
+  Logs a warning if server doesn't declare logging capability.
+
+  Example:
+    @(set-log-level! client :warning)
+    ;; Server will only send :warning, :error, :critical, :alert, :emergency"
+  [client level]
+  (logging/set-log-level-impl! client level))
+
+(defn subscribe-log-messages!
+  "Subscribe to log messages from the server.
+
+  The server filters messages based on the level set via set-log-level!.
+  All subscribers receive the same filtered messages.
+
+  Args:
+    client - MCP client instance
+    callback - Function called with log message map: (fn [{:keys [level logger data]}] ...)
+
+  The callback receives:
+    :level - Keyword log level (:error, :warning, etc.)
+    :logger - Optional string component name (may be nil)
+    :data - Message data (map, string, or other value)
+
+  Multiple subscribers are supported. Each will receive all log messages.
+
+  Callback exceptions are caught and logged to avoid crashing the client.
+
+  Returns:
+    CompletableFuture<Function> that resolves to an unsubscribe function.
+    Call the unsubscribe function to stop receiving messages: (unsub)
+
+  Example:
+    (-> (subscribe-log-messages!
+          client
+          (fn [{:keys [level logger data]}]
+            (println level logger data)))
+        (deref)
+        (def unsub))
+    ;; Later: (unsub)"
+  [client callback]
+  (logging/subscribe-log-messages-impl! client callback))

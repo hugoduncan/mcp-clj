@@ -20,7 +20,7 @@
    :uri "file:///test.txt"
    :mime-type "text/plain"
    :description "A test resource"
-   :implementation (fn [_uri]
+   :implementation (fn [_server _uri]
                      {:contents [{:uri "file:///test.txt"
                                   :mimeType "text/plain"
                                   :text "test content"}]})})
