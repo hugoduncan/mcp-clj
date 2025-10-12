@@ -44,6 +44,18 @@ jobs:
     - name: Check code style
       run: cljstyle check
 
+    - name: Check for reflection warnings
+      run: |
+        clojure -M:dev scripts/check-reflection.clj 2>&1 | tee reflection-warnings.log
+
+        if grep -q "Reflection warning" reflection-warnings.log; then
+          echo "❌ Reflection warnings found!"
+          grep "Reflection warning" reflection-warnings.log
+          exit 1
+        else
+          echo "✅ No reflection warnings found"
+        fi
+
     - name: Run unit tests
       run: clojure -M:kaocha:dev:test
 
