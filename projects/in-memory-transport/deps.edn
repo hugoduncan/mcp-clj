@@ -1,3 +1,11 @@
 {:deps
  {poly/in-memory-transport
-  {:local/root "../../components/in-memory-transport"}}}
+  {:local/root "../../components/in-memory-transport"}}
+
+ :aliases
+ {:build {:extra-paths ["../../dev"]
+          :extra-deps {io.github.clojure/tools.build {:mvn/version "0.10.5"}}
+          :ns-default build
+          :exec-fn jar
+          :exec-args {:project-name "in-memory-transport"
+                      :lib io.github.hugoduncan/mcp-clj-in-memory-transport}}}}
