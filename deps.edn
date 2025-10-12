@@ -88,4 +88,7 @@
                  :exec-fn mcp-clj.stdio-server.main/start
                  :deps {poly/server {:local/root "projects/server"}
                         org.clojure/clojure {:mvn/version "1.12.0"}}
-                 :jvm-opts ["-Djdk.attach.allowAttachSelf"]}}}
+                 :jvm-opts ["-Djdk.attach.allowAttachSelf"]}
+  :build {:extra-paths ["dev"]
+          :extra-deps {io.github.clojure/tools.build {:mvn/version "0.10.5"}}
+          :ns-default build}}}
