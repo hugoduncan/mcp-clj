@@ -7,7 +7,7 @@
   This is separate from the internal mcp-clj.log component which is used for
   debugging the mcp-clj framework itself."
   (:require
-    [mcp-clj.json-rpc.protocols :as json-rpc-protocols]))
+   [mcp-clj.json-rpc.protocols :as json-rpc-protocols]))
 
 ;; Log level constants and utilities
 
@@ -57,28 +57,33 @@
 ;; Core logging API
 
 (defn log-message
-  "Send a log message to a specific session at the specified level.
+  "Send a log message to client session(s) at the specified level.
 
   Args:
-    context - Map with :server and :session-id keys
+    context - Map with :server key and optional :session-id key
     level - One of: :debug :info :notice :warning :error :critical :alert :emergency
     data - Any JSON-serializable data (map, string, vector, etc.)
 
   Options:
     :logger - Optional string identifying the logger/component name
 
-  Sends notification only to the specified session if it is initialized and
-  has requested this log level or higher.
+  When :session-id is present in context, sends notification only to that specific
+  session if it is initialized and has requested this log level or higher.
+
+  When :session-id is nil or not present in context, broadcasts to all initialized
+  sessions that have requested this log level or higher.
 
   Security: DO NOT include sensitive data (credentials, PII, internal system
   details) in log messages. Server authors are responsible for sanitization.
 
   Examples:
+    ;; Send to specific session (from tool implementation)
     (log-message {:server server :session-id \"session-123\"} :error
                  {:error \"Connection failed\" :host \"localhost\"}
                  :logger \"database\")
-    (log-message {:server server :session-id \"stdio\"} :info
-                 {:status \"Server started\"})"
+    
+    ;; Broadcast to all sessions
+    (log-message {:server server} :info {:status \"Server started\"})"
   [context level data & {:keys [logger]}]
   (when-not (valid-level? level)
     (throw (ex-info "Invalid log level"
@@ -86,22 +91,33 @@
                      :valid-levels (keys log-levels)})))
 
   (let [{:keys [server session-id]} context
-        session (get @(:session-id->session server) session-id)
         rpc-server @(:json-rpc-server server)
         params (cond-> {:level (name level)
                         :data data}
                  logger (assoc :logger logger))]
 
-    ;; Send notification only to the specified session if it should receive this
-    ;; level
-    (when (and session
-               (:initialized? session)
-               (should-send-to-session? session level))
-      (json-rpc-protocols/notify!
-        rpc-server
-        session-id
-        "notifications/message"
-        params))))
+    (if session-id
+      ;; Send to specific session
+      (let [session (get @(:session-id->session server) session-id)]
+        (when (and session
+                   (:initialized? session)
+                   (should-send-to-session? session level))
+          (json-rpc-protocols/notify!
+           rpc-server
+           session-id
+           "notifications/message"
+           params)))
+
+      ;; Broadcast to all initialized sessions
+      (let [sessions @(:session-id->session server)]
+        (doseq [[sid session] sessions]
+          (when (and (:initialized? session)
+                     (should-send-to-session? session level))
+            (json-rpc-protocols/notify!
+             rpc-server
+             sid
+             "notifications/message"
+             params)))))))
 
 ;; Convenience functions for each log level
 

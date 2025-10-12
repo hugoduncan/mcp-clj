@@ -7,15 +7,15 @@
 
   Version-specific behavior is tested using conditional assertions."
   (:require
-    [clojure.test :refer [deftest is testing]]
-    [mcp-clj.compliance-test.test-helpers :as helpers]
-    [mcp-clj.mcp-client.core :as client]
-    [mcp-clj.mcp-server.core :as mcp-server]
-    [mcp-clj.mcp-server.logging :as server-logging])
+   [clojure.test :refer [deftest is testing]]
+   [mcp-clj.compliance-test.test-helpers :as helpers]
+   [mcp-clj.mcp-client.core :as client]
+   [mcp-clj.mcp-server.core :as mcp-server]
+   [mcp-clj.mcp-server.logging :as server-logging])
   (:import
-    (java.util.concurrent
-      CountDownLatch
-      TimeUnit)))
+   (java.util.concurrent
+    CountDownLatch
+    TimeUnit)))
 
 ;; Test Helpers
 
@@ -29,22 +29,22 @@
 
         ;; Create server with logging capability
         mcp-server (mcp-server/create-server
-                     {:transport {:type :in-memory
-                                  :shared shared-transport}
-                      :tools test-tools
-                      :server-info {:name "test-server"
-                                    :version "1.0.0"}
-                      :capabilities {:logging {}}})
+                    {:transport {:type :in-memory
+                                 :shared shared-transport}
+                     :tools test-tools
+                     :server-info {:name "test-server"
+                                   :version "1.0.0"}
+                     :capabilities {:logging {}}})
 
         _ (reset! server-atom mcp-server)
 
         ;; Create client
         mcp-client (client/create-client
-                     {:transport {:type :in-memory
-                                  :shared shared-transport}
-                      :client-info {:name "test-client"
-                                    :version "1.0.0"}
-                      :protocol-version protocol-version})
+                    {:transport {:type :in-memory
+                                 :shared shared-transport}
+                     :client-info {:name "test-client"
+                                   :version "1.0.0"}
+                     :protocol-version protocol-version})
 
         ;; Wait for client to initialize and capture response
         init-response (client/wait-for-ready mcp-client 5000)]
@@ -65,19 +65,19 @@
 
         ;; Create server WITHOUT logging capability
         mcp-server (mcp-server/create-server
-                     {:transport {:type :in-memory
-                                  :shared shared-transport}
-                      :tools test-tools
-                      :server-info {:name "test-server"
-                                    :version "1.0.0"}})
+                    {:transport {:type :in-memory
+                                 :shared shared-transport}
+                     :tools test-tools
+                     :server-info {:name "test-server"
+                                   :version "1.0.0"}})
 
         ;; Create client
         mcp-client (client/create-client
-                     {:transport {:type :in-memory
-                                  :shared shared-transport}
-                      :client-info {:name "test-client"
-                                    :version "1.0.0"}
-                      :protocol-version protocol-version})
+                    {:transport {:type :in-memory
+                                 :shared shared-transport}
+                     :client-info {:name "test-client"
+                                   :version "1.0.0"}
+                     :protocol-version protocol-version})
 
         ;; Wait for client to initialize and capture response
         init-response (client/wait-for-ready mcp-client 5000)]
@@ -212,14 +212,14 @@
               (Thread/sleep 100)
 
               ;; Send messages at all levels
-              (server-logging/debug server {:msg "debug message"})
-              (server-logging/info server {:msg "info message"})
-              (server-logging/notice server {:msg "notice message"})
-              (server-logging/warn server {:msg "warning message"})
-              (server-logging/error server {:msg "error message"})
-              (server-logging/critical server {:msg "critical message"})
-              (server-logging/alert server {:msg "alert message"})
-              (server-logging/emergency server {:msg "emergency message"})
+              (server-logging/debug {:server server} {:msg "debug message"})
+              (server-logging/info {:server server} {:msg "info message"})
+              (server-logging/notice {:server server} {:msg "notice message"})
+              (server-logging/warn {:server server} {:msg "warning message"})
+              (server-logging/error {:server server} {:msg "error message"})
+              (server-logging/critical {:server server} {:msg "critical message"})
+              (server-logging/alert {:server server} {:msg "alert message"})
+              (server-logging/emergency {:server server} {:msg "emergency message"})
 
               (Thread/sleep 200)
 
@@ -239,9 +239,9 @@
               @(client/set-log-level! client :debug)
               (Thread/sleep 100)
 
-              (server-logging/debug server {:msg "debug"})
-              (server-logging/info server {:msg "info"})
-              (server-logging/emergency server {:msg "emergency"})
+              (server-logging/debug {:server server} {:msg "debug"})
+              (server-logging/info {:server server} {:msg "info"})
+              (server-logging/emergency {:server server} {:msg "emergency"})
 
               (Thread/sleep 200)
 
@@ -257,9 +257,9 @@
               @(client/set-log-level! client :emergency)
               (Thread/sleep 100)
 
-              (server-logging/error server {:msg "error"})
-              (server-logging/critical server {:msg "critical"})
-              (server-logging/emergency server {:msg "emergency"})
+              (server-logging/error {:server server} {:msg "error"})
+              (server-logging/critical {:server server} {:msg "critical"})
+              (server-logging/emergency {:server server} {:msg "emergency"})
 
               (Thread/sleep 200)
 
@@ -356,14 +356,14 @@
               ;; Don't call set-log-level! - use default
               (Thread/sleep 100)
 
-              (server-logging/debug server {:msg "debug"})
-              (server-logging/info server {:msg "info"})
-              (server-logging/notice server {:msg "notice"})
-              (server-logging/warn server {:msg "warning"})
-              (server-logging/error server {:msg "error"})
-              (server-logging/critical server {:msg "critical"})
-              (server-logging/alert server {:msg "alert"})
-              (server-logging/emergency server {:msg "emergency"})
+              (server-logging/debug {:server server} {:msg "debug"})
+              (server-logging/info {:server server} {:msg "info"})
+              (server-logging/notice {:server server} {:msg "notice"})
+              (server-logging/warn {:server server} {:msg "warning"})
+              (server-logging/error {:server server} {:msg "error"})
+              (server-logging/critical {:server server} {:msg "critical"})
+              (server-logging/alert {:server server} {:msg "alert"})
+              (server-logging/emergency {:server server} {:msg "emergency"})
 
               (Thread/sleep 200)
 
@@ -400,14 +400,14 @@
               (reset! (:atom collector) [])
 
               ;; Send one message at each level
-              (server-logging/debug server {:level "debug"})
-              (server-logging/info server {:level "info"})
-              (server-logging/notice server {:level "notice"})
-              (server-logging/warn server {:level "warning"})
-              (server-logging/error server {:level "error"})
-              (server-logging/critical server {:level "critical"})
-              (server-logging/alert server {:level "alert"})
-              (server-logging/emergency server {:level "emergency"})
+              (server-logging/debug {:server server} {:level "debug"})
+              (server-logging/info {:server server} {:level "info"})
+              (server-logging/notice {:server server} {:level "notice"})
+              (server-logging/warn {:server server} {:level "warning"})
+              (server-logging/error {:server server} {:level "error"})
+              (server-logging/critical {:server server} {:level "critical"})
+              (server-logging/alert {:server server} {:level "alert"})
+              (server-logging/emergency {:server server} {:level "emergency"})
 
               (Thread/sleep 200)
 
@@ -436,10 +436,10 @@
               @(client/set-log-level! client :critical)
               (Thread/sleep 100)
 
-              (server-logging/error server {:msg "error"})
-              (server-logging/critical server {:msg "critical"})
-              (server-logging/alert server {:msg "alert"})
-              (server-logging/emergency server {:msg "emergency"})
+              (server-logging/error {:server server} {:msg "error"})
+              (server-logging/critical {:server server} {:msg "critical"})
+              (server-logging/alert {:server server} {:msg "alert"})
+              (server-logging/emergency {:server server} {:msg "emergency"})
 
               (Thread/sleep 200)
 
