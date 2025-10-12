@@ -281,6 +281,31 @@ clj -M:kaocha:dev:test --focus mcp-clj.mcp-server.core-test
 (clojure.test/run-tests 'mcp-clj.mcp-server.core-test)
 ```
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes and version history.
+
+### Generating Changelog Locally
+
+Install git-cliff:
+
+```bash
+# macOS
+brew install git-cliff
+
+# Or download from https://github.com/orhun/git-cliff/releases
+```
+
+Generate changelog:
+
+```bash
+# Preview unreleased changes
+git cliff --unreleased
+
+# Update CHANGELOG.md
+git cliff -o CHANGELOG.md
+```
+
 ## Architecture
 
 mcp-clj uses a **polylith-style architecture** with component-based organization:
