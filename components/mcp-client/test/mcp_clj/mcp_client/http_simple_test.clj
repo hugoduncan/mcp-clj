@@ -19,7 +19,7 @@
                           :inputSchema    {:type       "object"
                                            :properties {:msg {:type "string"}}
                                            :required   ["msg"]}
-                          :implementation (fn [{:keys [msg]}]
+                          :implementation (fn [_context {:keys [msg]}]
                                             {:content
                                              [{:type "text" :text msg}]
                                              :isError false})}}})

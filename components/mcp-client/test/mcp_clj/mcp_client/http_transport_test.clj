@@ -21,7 +21,7 @@
                                      :properties {:message {:type "string"}}
                                      :required   ["message"]}
                        :implementation
-                       (fn [args]
+                       (fn [_context args]
                          {:content
                           [{:type "text"
                             :text (str "Echo: " (:message args))}]
