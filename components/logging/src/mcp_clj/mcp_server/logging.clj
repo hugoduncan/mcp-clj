@@ -7,7 +7,7 @@
   This is separate from the internal mcp-clj.log component which is used for
   debugging the mcp-clj framework itself."
   (:require
-   [mcp-clj.json-rpc.protocols :as json-rpc-protocols]))
+    [mcp-clj.json-rpc.protocols :as json-rpc-protocols]))
 
 ;; Log level constants and utilities
 
@@ -103,10 +103,10 @@
                    (:initialized? session)
                    (should-send-to-session? session level))
           (json-rpc-protocols/notify!
-           rpc-server
-           session-id
-           "notifications/message"
-           params)))
+            rpc-server
+            session-id
+            "notifications/message"
+            params)))
 
       ;; Broadcast to all initialized sessions
       (let [sessions @(:session-id->session server)]
@@ -114,10 +114,10 @@
           (when (and (:initialized? session)
                      (should-send-to-session? session level))
             (json-rpc-protocols/notify!
-             rpc-server
-             sid
-             "notifications/message"
-             params)))))))
+              rpc-server
+              sid
+              "notifications/message"
+              params)))))))
 
 ;; Convenience functions for each log level
 

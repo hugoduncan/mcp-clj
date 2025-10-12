@@ -7,15 +7,15 @@
 
   Version-specific behavior is tested using conditional assertions."
   (:require
-   [clojure.test :refer [deftest is testing]]
-   [mcp-clj.compliance-test.test-helpers :as helpers]
-   [mcp-clj.mcp-client.core :as client]
-   [mcp-clj.mcp-server.core :as mcp-server]
-   [mcp-clj.mcp-server.logging :as server-logging])
+    [clojure.test :refer [deftest is testing]]
+    [mcp-clj.compliance-test.test-helpers :as helpers]
+    [mcp-clj.mcp-client.core :as client]
+    [mcp-clj.mcp-server.core :as mcp-server]
+    [mcp-clj.mcp-server.logging :as server-logging])
   (:import
-   (java.util.concurrent
-    CountDownLatch
-    TimeUnit)))
+    (java.util.concurrent
+      CountDownLatch
+      TimeUnit)))
 
 ;; Test Helpers
 
@@ -29,22 +29,22 @@
 
         ;; Create server with logging capability
         mcp-server (mcp-server/create-server
-                    {:transport {:type :in-memory
-                                 :shared shared-transport}
-                     :tools test-tools
-                     :server-info {:name "test-server"
-                                   :version "1.0.0"}
-                     :capabilities {:logging {}}})
+                     {:transport {:type :in-memory
+                                  :shared shared-transport}
+                      :tools test-tools
+                      :server-info {:name "test-server"
+                                    :version "1.0.0"}
+                      :capabilities {:logging {}}})
 
         _ (reset! server-atom mcp-server)
 
         ;; Create client
         mcp-client (client/create-client
-                    {:transport {:type :in-memory
-                                 :shared shared-transport}
-                     :client-info {:name "test-client"
-                                   :version "1.0.0"}
-                     :protocol-version protocol-version})
+                     {:transport {:type :in-memory
+                                  :shared shared-transport}
+                      :client-info {:name "test-client"
+                                    :version "1.0.0"}
+                      :protocol-version protocol-version})
 
         ;; Wait for client to initialize and capture response
         init-response (client/wait-for-ready mcp-client 5000)]
@@ -65,19 +65,19 @@
 
         ;; Create server WITHOUT logging capability
         mcp-server (mcp-server/create-server
-                    {:transport {:type :in-memory
-                                 :shared shared-transport}
-                     :tools test-tools
-                     :server-info {:name "test-server"
-                                   :version "1.0.0"}})
+                     {:transport {:type :in-memory
+                                  :shared shared-transport}
+                      :tools test-tools
+                      :server-info {:name "test-server"
+                                    :version "1.0.0"}})
 
         ;; Create client
         mcp-client (client/create-client
-                    {:transport {:type :in-memory
-                                 :shared shared-transport}
-                     :client-info {:name "test-client"
-                                   :version "1.0.0"}
-                     :protocol-version protocol-version})
+                     {:transport {:type :in-memory
+                                  :shared shared-transport}
+                      :client-info {:name "test-client"
+                                    :version "1.0.0"}
+                      :protocol-version protocol-version})
 
         ;; Wait for client to initialize and capture response
         init-response (client/wait-for-ready mcp-client 5000)]
