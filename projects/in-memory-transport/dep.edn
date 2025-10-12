@@ -1,0 +1,3 @@
+{:deps
+ {poly/in-memory-transport
+  {:local/root "../../components/in-memory-transport"}}}
