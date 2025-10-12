@@ -1,1 +1,4 @@
 /reflection-warnings.log
+
+# Build artifacts
+projects/*/target/

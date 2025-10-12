@@ -6,4 +6,10 @@
 
  :aliases
  {:sse-server {:main-opts ["-m" "mcp-clj.sse-server.main"]}
-  :stdio-server {:main-opts ["-m" "mcp-clj.stdio-server.main"]}}}
+  :stdio-server {:main-opts ["-m" "mcp-clj.stdio-server.main"]}
+  :build {:extra-paths ["../../dev"]
+          :extra-deps {io.github.clojure/tools.build {:mvn/version "0.10.5"}}
+          :ns-default build
+          :exec-fn jar
+          :exec-args {:project-name "server"
+                      :lib io.github.hugoduncan/mcp-clj-server}}}}

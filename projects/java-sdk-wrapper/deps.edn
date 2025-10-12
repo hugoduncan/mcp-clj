@@ -1,2 +1,10 @@
 {:deps
- {poly/interop {:local/root "../../components/interop"}}}
+ {poly/interop {:local/root "../../components/interop"}}
+
+ :aliases
+ {:build {:extra-paths ["../../dev"]
+          :extra-deps {io.github.clojure/tools.build {:mvn/version "0.10.5"}}
+          :ns-default build
+          :exec-fn jar
+          :exec-args {:project-name "java-sdk-wrapper"
+                      :lib io.github.hugoduncan/mcp-clj-java-sdk-wrapper}}}}
