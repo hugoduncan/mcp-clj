@@ -11,9 +11,11 @@
 
   The :build alias in each project's deps.edn configures the project-specific
   parameters."
-  (:require [clojure.tools.build.api :as b]))
+  (:require
+    [clojure.tools.build.api :as b]))
 
 (def major-minor "0.1")
+
 (def root-dir
   "Find the repository root by looking for deps.edn with :build alias."
   (let [cwd (System/getProperty "user.dir")]
@@ -93,7 +95,7 @@
     ;; Clean first
     (clean opts)
 
-;; Copy source files from basis paths and local dependencies
+    ;; Copy source files from basis paths and local dependencies
     (let [basis-paths (:paths basis)
           ;; Extract paths from local/root dependencies
           local-deps (filter #(contains? (val %) :local/root) (:libs basis))
