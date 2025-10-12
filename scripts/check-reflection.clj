@@ -2,7 +2,8 @@
 (require 'clojure.java.io)
 (require 'clojure.string)
 
-(defn file->namespace [^java.io.File file]
+(defn file->namespace
+  [^java.io.File file]
   (-> (.getPath file)
       (clojure.string/replace #"^(components|bases)/[^/]+/src/" "")
       (clojure.string/replace #"\.clj[cs]?$" "")
@@ -10,7 +11,8 @@
       (clojure.string/replace #"_" "-")
       symbol))
 
-(defn find-source-files []
+(defn find-source-files
+  []
   (->> [(clojure.java.io/file "components")
         (clojure.java.io/file "bases")]
        (filter (fn [^java.io.File f] (.exists f)))
