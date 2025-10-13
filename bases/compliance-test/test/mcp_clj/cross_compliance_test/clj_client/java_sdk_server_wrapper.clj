@@ -34,7 +34,7 @@
       (log/info :trigger-tool {:uri uri})
       (java-sdk/notify-resource-updated server-record uri)
       (when update-latch
-        (.countDown update-latch))
+        (.countDown ^CountDownLatch update-latch))
       {:content [{:type "text"
                   :text (str "Triggered update for: " uri)}]
        :isError false})))
@@ -123,9 +123,9 @@
   [{:keys [server in-writer out-reader]}]
   (try
     (when in-writer
-      (.close in-writer))
+      (.close ^BufferedWriter in-writer))
     (when out-reader
-      (.close out-reader))
+      (.close ^BufferedReader out-reader))
     (when server
       (java-sdk/stop-server server))
     (catch Exception e

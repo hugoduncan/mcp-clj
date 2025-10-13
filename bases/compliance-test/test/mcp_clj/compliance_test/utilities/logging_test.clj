@@ -120,7 +120,7 @@
 
 (defn wait-for-log-messages
   "Wait for latch to count down with timeout. Returns true if completed, false if timeout."
-  [latch timeout-ms]
+  [^CountDownLatch latch timeout-ms]
   (.await latch timeout-ms TimeUnit/MILLISECONDS))
 
 ;; Compliance Tests
