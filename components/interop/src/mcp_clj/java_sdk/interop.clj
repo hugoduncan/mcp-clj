@@ -368,7 +368,7 @@
         ;; Add resource update consumer if provided
         builder (if resource-update-handler
                   (if async?
-                    (.resourcesUpdatedConsumer
+                    (.resourcesUpdateConsumer
                       ^McpClient$AsyncSpec builder
                       (reify java.util.function.Function
                         (apply
@@ -392,7 +392,7 @@
                                                {:error e
                                                 :message (.getMessage e)
                                                 :stack-trace (with-out-str (.printStackTrace e))})))))))))
-                    (.resourcesUpdatedConsumer
+                    (.resourcesChangeConsumer
                       ^McpClient$SyncSpec builder
                       (reify java.util.function.Consumer
                         (accept
@@ -880,8 +880,8 @@
                        (McpSchema$ResourcesUpdatedNotification. uri (clj->java-map meta))
                        (McpSchema$ResourcesUpdatedNotification. uri nil))]
     (if (:async? server-record)
-      (.notifyResourceUpdated ^McpAsyncServer java-server notification)
-      (.notifyResourceUpdated ^McpSyncServer java-server notification)))
+      (.notifyResourcesUpdated ^McpAsyncServer java-server notification)
+      (.notifyResourcesUpdated ^McpSyncServer java-server notification)))
   server-record)
 
 (defn start-server
