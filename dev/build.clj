@@ -127,3 +127,47 @@
 
     (println "\nBuild complete:" jar-file)
     jar-file))
+
+(defn deploy
+  "Deploy a JAR to Clojars.
+
+  Builds the JAR first if it doesn't exist, then deploys to Clojars using
+  the credentials configured in ~/.m2/settings.xml.
+
+  Options:
+    :project-name - Name of the project (e.g., 'server', 'client')
+    :lib - Qualified library name (e.g., io.github.hugoduncan/mcp-clj-server)
+
+  Requires CLOJARS_USERNAME and CLOJARS_PASSWORD environment variables or
+  Maven settings.xml configuration."
+  [{:keys [project-name lib] :as opts}]
+  (when-not project-name
+    (throw (ex-info "Missing required :project-name" opts)))
+  (when-not lib
+    (throw (ex-info "Missing required :lib" opts)))
+
+  ;; Load deps-deploy dynamically (only needed for deploy, not jar)
+  (require '[deps-deploy.deps-deploy :as dd])
+
+  (let [v (version nil)
+        jar-file (jar-file-path project-name v)
+        class-dir (project-class-dir project-name)
+        project-dir (str root-dir "/projects/" project-name)
+        basis (b/create-basis {:project (str project-dir "/deps.edn")})]
+
+    ;; Build JAR if it doesn't exist
+    (when-not (.exists (clojure.java.io/file jar-file))
+      (println "JAR not found, building first...")
+      (jar opts))
+
+    (println "\nDeploying" lib v "to Clojars")
+    (println "JAR file:" jar-file)
+
+    ;; Deploy to Clojars using deps-deploy
+    ((resolve 'deps-deploy.deps-deploy/deploy)
+     {:installer :remote
+      :artifact jar-file
+      :pom-file (str class-dir "/META-INF/maven/"
+                     (namespace lib) "/" (name lib) "/pom.xml")})
+
+    (println "\nDeploy complete:" lib v)))
