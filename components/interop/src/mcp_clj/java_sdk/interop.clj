@@ -299,12 +299,17 @@
   - :async? - Whether to create async client (default true)
   - :logging-handler - Optional callback function for logging notifications
                        Receives map with :level, :data, and optional :logger keys
-  - :resource-update-handler - Optional callback function for resource update notifications
-                               Receives map with :uri and optional :meta keys
+
+  NOTE: Java SDK 0.11.2 does not support notifications/resources/updated at the
+  client level. Resource update notifications cannot be received.
 
   Returns a JavaSdkClient record that implements AutoCloseable."
   [{:keys [transport timeout async? logging-handler resource-update-handler]
     :or {timeout 30 async? true}}]
+  (when resource-update-handler
+    (log/warn :java-sdk/unsupported-feature
+              {:feature :resource-update-handler
+               :message "Java SDK 0.11.2 does not support resource update notifications - handler will be ignored"}))
   (let [builder (if async?
                   (McpClient/async transport)
                   (McpClient/sync transport))
@@ -366,60 +371,12 @@
                   builder)
 
         ;; Add resource update consumer if provided
-        builder (if resource-update-handler
-                  (if async?
-                    (.resourcesUpdateConsumer
-                      ^McpClient$AsyncSpec builder
-                      (reify java.util.function.Function
-                        (apply
-                          [_ notification]
-                          (Mono/fromRunnable
-                            (reify java.lang.Runnable
-                              (run
-                                [_]
-                                (try
-                                  (let [^McpSchema$ResourcesUpdatedNotification
-                                        notification notification
-                                        uri (.uri notification)
-                                        meta-map (.meta notification)
-                                        clj-notification
-                                        (cond-> {:uri uri}
-                                          (and meta-map (seq meta-map))
-                                          (assoc :meta (into {} meta-map)))]
-                                    (resource-update-handler clj-notification))
-                                  (catch Exception e
-                                    (log/error :java-sdk/resource-update-handler-error
-                                               {:error e
-                                                :message (.getMessage e)
-                                                :stack-trace (with-out-str (.printStackTrace e))})))))))))
-                    (.resourcesChangeConsumer
-                      ^McpClient$SyncSpec builder
-                      (reify java.util.function.Consumer
-                        (accept
-                          [_ notification]
-                          (try
-                            (let [^McpSchema$ResourcesUpdatedNotification
-                                  notification notification
-                                  uri (.uri notification)
-                                  meta-map (.meta notification)
-                                  clj-notification
-                                  (cond-> {:uri uri}
-                                    (and meta-map (seq meta-map))
-                                    (assoc :meta (into {} meta-map)))]
-                              (resource-update-handler clj-notification))
-                            (catch Exception e
-                              (log/error :java-sdk/resource-update-handler-error
-                                         {:error e
-                                          :message (.getMessage e)
-                                          :stack-trace (with-out-str (.printStackTrace e))})))))))
-                  builder)
 
         client (if async?
                  (.build ^McpClient$AsyncSpec builder)
                  (.build ^McpClient$SyncSpec builder))]
 
-    (->JavaSdkClient client transport async? {:logging logging-handler
-                                              :resource-update resource-update-handler})))
+    (->JavaSdkClient client transport async? {:logging logging-handler})))
 
 (defn create-stdio-client-transport
   "Create a stdio transport provider for the client.

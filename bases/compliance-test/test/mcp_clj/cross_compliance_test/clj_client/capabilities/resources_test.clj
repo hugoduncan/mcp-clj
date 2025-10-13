@@ -11,13 +11,15 @@
     [mcp-clj.compliance-test.test-helpers :as helpers]
     [mcp-clj.mcp-client.core :as client])
   (:import
+    (java.lang
+      AutoCloseable)
     (java.util.concurrent
       CountDownLatch
       TimeUnit)))
 
 (defn- create-client
   "Create Clojure client connected to Java SDK server with resources capability via stdio"
-  []
+  ^AutoCloseable []
   (client/create-client
     {:transport {:type :stdio
                  :command "clojure"
@@ -42,7 +44,7 @@
 
 (defn wait-for-notifications
   "Wait for latch to count down with timeout. Returns true if completed, false if timeout."
-  [latch timeout-ms]
+  [^CountDownLatch latch timeout-ms]
   (.await latch timeout-ms TimeUnit/MILLISECONDS))
 
 (deftest ^:integ clj-client-resources-capability-declaration-test
@@ -72,11 +74,9 @@
                   "Resources capability should have listChanged:true"))))))))
 
 (deftest ^:integ clj-client-resource-subscription-test
-  ;; Test that Clojure client can successfully subscribe to a resource on Java SDK server
   (testing "Clojure client can subscribe to resources on Java SDK server"
     (doseq [protocol-version helpers/test-protocol-versions]
       (testing (str "protocol version " protocol-version)
-
         (testing "subscribe to existing resource succeeds"
           (let [handler-setup (create-latch-resource-handler 0)]
             (with-open [mcp-client (create-client)]
@@ -89,7 +89,8 @@
                               "test://dynamic-resource"
                               (:handler handler-setup))]
                 ;; Subscription should complete without error
-                (is (nil? result) "Subscribe should return nil on success")))))))))
+                (is (nil? result)
+                    "Subscribe should return nil on success")))))))))
 
 (deftest ^:integ clj-client-resource-update-notification-test
   ;; Test that Clojure client receives notifications when resource is updated on Java SDK server
