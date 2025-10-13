@@ -213,9 +213,9 @@
       (let [create-server (ns-resolve
                             'mcp-clj.in-memory-transport.server
                             'create-in-memory-server)
-            server (create-server
-                     {:shared shared-transport}
-                     test-handlers)
+            _server (create-server
+                      {:shared shared-transport}
+                      test-handlers)
             client-transport (client/create-transport
                                {:shared shared-transport})]
 

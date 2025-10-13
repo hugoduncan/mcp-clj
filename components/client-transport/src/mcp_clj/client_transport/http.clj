@@ -41,7 +41,7 @@
 
 (defn create-transport
   "Create HTTP transport for connecting to MCP server"
-  [{:keys [url session-id notification-handler num-threads] :as config}]
+  [{:keys [url session-id notification-handler num-threads]}]
   (let [json-rpc-client (http-client/create-http-json-rpc-client
                           {:url url
                            :session-id session-id

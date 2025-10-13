@@ -8,10 +8,8 @@
       URI)
     (java.net.http
       HttpClient
-      HttpHeaders
       HttpRequest
       HttpRequest$BodyPublishers
-      HttpRequest$Builder
       HttpResponse
       HttpResponse$BodyHandler
       HttpResponse$BodyHandlers)
@@ -25,15 +23,15 @@
   (^HttpClient []
    (create-client {}))
   (^HttpClient [{:keys [connect-timeout follow-redirects]
-                 :or   {connect-timeout  30000
-                        follow-redirects :normal}}]
+                 :or {connect-timeout 30000
+                      follow-redirects :normal}}]
    (let [builder (HttpClient/newBuilder)]
      (when connect-timeout
        (.connectTimeout builder (Duration/ofMillis connect-timeout)))
      (case follow-redirects
-       :never  (.followRedirects
-                 builder
-                 java.net.http.HttpClient$Redirect/NEVER)
+       :never (.followRedirects
+                builder
+                java.net.http.HttpClient$Redirect/NEVER)
        :always (.followRedirects
                  builder
                  java.net.http.HttpClient$Redirect/ALWAYS)
@@ -44,14 +42,6 @@
 
 ;; Request Building
 
-(defn- build-headers
-  "Build headers for HTTP request"
-  [^HttpHeaders headers]
-  (reduce (fn [^HttpRequest$Builder builder [k v]]
-            (.header builder (name k) (str v)))
-          (HttpRequest/newBuilder)
-          headers))
-
 (defn- build-uri
   "Build URI from URL string"
   [url]
@@ -61,9 +51,9 @@
   "Build request body publisher"
   [body]
   (cond
-    (nil? body)    (HttpRequest$BodyPublishers/noBody)
+    (nil? body) (HttpRequest$BodyPublishers/noBody)
     (string? body) (HttpRequest$BodyPublishers/ofString body)
-    :else          (HttpRequest$BodyPublishers/ofString (str body))))
+    :else (HttpRequest$BodyPublishers/ofString (str body))))
 
 (defn- build-request
   "Build HTTP request"
@@ -77,9 +67,9 @@
 
     ;; Set method and body
     (case (keyword method)
-      :get    (.GET builder)
-      :post   (.POST builder (build-body body))
-      :put    (.PUT builder (build-body body))
+      :get (.GET builder)
+      :post (.POST builder (build-body body))
+      :put (.PUT builder (build-body body))
       :delete (.DELETE builder)
       (.method builder (str/upper-case (name method)) (build-body body)))
 
@@ -101,17 +91,17 @@
 (defn- process-response
   "Process HTTP response based on options"
   [^HttpResponse http-response {:keys [as] :or {as :string}}]
-  (let [status  (.statusCode http-response)
+  (let [status (.statusCode http-response)
         headers (parse-headers http-response)
-        body    (.body http-response)]
-    {:status  status
+        body (.body http-response)]
+    {:status status
      :headers headers
-     :body    (case as
-                :json   (when (and body (not (str/blank? body)))
-                          (json/read-str body :key-fn keyword))
-                :stream body
-                :string body
-                body)}))
+     :body (case as
+             :json (when (and body (not (str/blank? body)))
+                     (json/read-str body :key-fn keyword))
+             :stream body
+             :string body
+             body)}))
 
 ;; Public API
 
@@ -120,7 +110,7 @@
   ([client request-opts]
    (request client request-opts {}))
   ([^HttpClient client request-opts response-opts]
-   (let [http-request  (build-request request-opts)
+   (let [http-request (build-request request-opts)
          ^HttpResponse$BodyHandler body-handler
          (case (:as response-opts :string)
            :stream (HttpResponse$BodyHandlers/ofInputStream)
@@ -134,24 +124,24 @@
   ([url]
    (http-get url {}))
   ([url opts]
-   (let [client        (create-client)
-         request-opts  (merge {:method :get :url url} opts)
+   (let [client (create-client)
+         request-opts (merge {:method :get :url url} opts)
          response-opts (select-keys opts [:as :throw-exceptions])]
      (request client request-opts response-opts))))
 
 (defn http-post
   "Send HTTP POST request"
   ([url opts]
-   (let [client        (create-client)
-         request-opts  (merge {:method :post :url url} opts)
+   (let [client (create-client)
+         request-opts (merge {:method :post :url url} opts)
          response-opts (select-keys opts [:as :throw-exceptions])]
      (request client request-opts response-opts))))
 
 (defn http-put
   "Send HTTP PUT request"
   ([url opts]
-   (let [client        (create-client)
-         request-opts  (merge {:method :put :url url} opts)
+   (let [client (create-client)
+         request-opts (merge {:method :put :url url} opts)
          response-opts (select-keys opts [:as :throw-exceptions])]
      (request client request-opts response-opts))))
 
@@ -160,7 +150,7 @@
   ([url]
    (http-delete url {}))
   ([url opts]
-   (let [client        (create-client)
-         request-opts  (merge {:method :delete :url url} opts)
+   (let [client (create-client)
+         request-opts (merge {:method :delete :url url} opts)
          response-opts (select-keys opts [:as :throw-exceptions])]
      (request client request-opts response-opts))))
