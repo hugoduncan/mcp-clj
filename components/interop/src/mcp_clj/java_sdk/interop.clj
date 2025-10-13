@@ -50,15 +50,18 @@
       McpSchema$LoggingLevel
       McpSchema$LoggingMessageNotification
       McpSchema$ResourceLink
+      McpSchema$ResourcesUpdatedNotification
       McpSchema$ServerCapabilities
       McpSchema$ServerCapabilities$Builder
       McpSchema$ServerCapabilities$LoggingCapabilities
       McpSchema$ServerCapabilities$PromptCapabilities
       McpSchema$ServerCapabilities$ResourceCapabilities
       McpSchema$ServerCapabilities$ToolCapabilities
+      McpSchema$SubscribeRequest
       McpSchema$TextContent
       McpSchema$TextResourceContents
       McpSchema$Tool
+      McpSchema$UnsubscribeRequest
       McpServerTransportProvider)
     (java.lang
       AutoCloseable)
@@ -289,9 +292,11 @@
   - :async? - Whether to create async client (default true)
   - :logging-handler - Optional callback function for logging notifications
                        Receives map with :level, :data, and optional :logger keys
+  - :resource-update-handler - Optional callback function for resource update notifications
+                               Receives map with :uri and optional :meta keys
 
   Returns a JavaSdkClient record that implements AutoCloseable."
-  [{:keys [transport timeout async? logging-handler]
+  [{:keys [transport timeout async? logging-handler resource-update-handler]
     :or {timeout 30 async? true}}]
   (let [builder (if async?
                   (McpClient/async transport)
@@ -353,11 +358,61 @@
                                           :stack-trace (with-out-str (.printStackTrace e))})))))))
                   builder)
 
+        ;; Add resource update consumer if provided
+        builder (if resource-update-handler
+                  (if async?
+                    (.resourcesUpdatedConsumer
+                      ^McpClient$AsyncSpec builder
+                      (reify java.util.function.Function
+                        (apply
+                          [_ notification]
+                          (Mono/fromRunnable
+                            (reify java.lang.Runnable
+                              (run
+                                [_]
+                                (try
+                                  (let [^McpSchema$ResourcesUpdatedNotification
+                                        notification notification
+                                        uri (.uri notification)
+                                        meta-map (.meta notification)
+                                        clj-notification
+                                        (cond-> {:uri uri}
+                                          (and meta-map (seq meta-map))
+                                          (assoc :meta (into {} meta-map)))]
+                                    (resource-update-handler clj-notification))
+                                  (catch Exception e
+                                    (log/error :java-sdk/resource-update-handler-error
+                                               {:error e
+                                                :message (.getMessage e)
+                                                :stack-trace (with-out-str (.printStackTrace e))})))))))))
+                    (.resourcesUpdatedConsumer
+                      ^McpClient$SyncSpec builder
+                      (reify java.util.function.Consumer
+                        (accept
+                          [_ notification]
+                          (try
+                            (let [^McpSchema$ResourcesUpdatedNotification
+                                  notification notification
+                                  uri (.uri notification)
+                                  meta-map (.meta notification)
+                                  clj-notification
+                                  (cond-> {:uri uri}
+                                    (and meta-map (seq meta-map))
+                                    (assoc :meta (into {} meta-map)))]
+                              (resource-update-handler clj-notification))
+                            (catch Exception e
+                              (log/error :java-sdk/resource-update-handler-error
+                                         {:error e
+                                          :message (.getMessage e)
+                                          :stack-trace (with-out-str (.printStackTrace e))})))))))
+                  builder)
+
         client (if async?
                  (.build ^McpClient$AsyncSpec builder)
                  (.build ^McpClient$SyncSpec builder))]
 
-    (->JavaSdkClient client transport async? {:logging logging-handler})))
+    (->JavaSdkClient client transport async? {:logging logging-handler
+                                              :resource-update resource-update-handler})))
 
 (defn create-stdio-client-transport
   "Create a stdio transport provider for the client.
@@ -554,6 +609,53 @@
               (.setLoggingLevel
                 client
                 (McpSchema$LoggingLevel/valueOf (str/upper-case level-str)))
+              nil)))))))
+
+(defn subscribe-resource
+  "Subscribe to a resource via the Java SDK client.
+
+  Parameters:
+  - client-record - JavaSdkClient record
+  - uri - Resource URI string to subscribe to
+
+  Returns a CompletableFuture that completes when the subscription is established.
+  The future will complete exceptionally if the resource doesn't exist or subscription fails."
+  [^JavaSdkClient client-record ^String uri]
+  (log/info :java-sdk/subscribing-to-resource {:uri uri})
+  (let [request (McpSchema$SubscribeRequest. uri)]
+    (if (:async? client-record)
+      (let [^McpAsyncClient client (:client client-record)
+            mono (.subscribeResource client request)]
+        (.toFuture mono))
+      (CompletableFuture/supplyAsync
+        (reify java.util.function.Supplier
+          (get
+            [_]
+            (let [^McpSyncClient client (:client client-record)]
+              (.subscribeResource client request)
+              nil)))))))
+
+(defn unsubscribe-resource
+  "Unsubscribe from a resource via the Java SDK client.
+
+  Parameters:
+  - client-record - JavaSdkClient record
+  - uri - Resource URI string to unsubscribe from
+
+  Returns a CompletableFuture that completes when the unsubscription is processed."
+  [^JavaSdkClient client-record ^String uri]
+  (log/info :java-sdk/unsubscribing-from-resource {:uri uri})
+  (let [request (McpSchema$UnsubscribeRequest. uri)]
+    (if (:async? client-record)
+      (let [^McpAsyncClient client (:client client-record)
+            mono (.unsubscribeResource client request)]
+        (.toFuture mono))
+      (CompletableFuture/supplyAsync
+        (reify java.util.function.Supplier
+          (get
+            [_]
+            (let [^McpSyncClient client (:client client-record)]
+              (.unsubscribeResource client request)
               nil)))))))
 
 ;; Server API (placeholder - not fully implemented yet)
