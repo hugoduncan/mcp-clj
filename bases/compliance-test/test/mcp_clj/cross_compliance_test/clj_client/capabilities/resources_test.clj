@@ -2,28 +2,31 @@
   "Cross-compliance tests for MCP resource subscriptions using Clojure client + Java SDK server.
 
   Tests verify that resource subscription functionality works correctly when:
-  - Clojure mcp-client connects to Java SDK server
+  - Clojure mcp-client connects to Java SDK server via stdio transport
   - All MCP protocol versions (2024-11-05+)
 
-  This validates the full subscription workflow from Clojure client perspective.
-  
-  NOTE: These tests are currently disabled pending proper Java SDK server transport setup.
-  The Java SDK server requires stdio transport with System.in/System.out or HTTP/SSE transport,
-  which requires more complex test infrastructure than the simple pipe-based approach used here.
-  The test code is complete and correct, but the server wrapper needs to be enhanced to:
-  - Either spawn the Java SDK server as a subprocess with stdio transport
-  - Or use HTTP/SSE transport for testing
-  - Or properly redirect System.in/System.out for in-process testing"
+  This validates the full subscription workflow from Clojure client perspective."
   (:require
-    [clojure.test :refer [deftest is testing use-fixtures]]
+    [clojure.test :refer [deftest is testing]]
     [mcp-clj.compliance-test.test-helpers :as helpers]
-    [mcp-clj.cross-compliance-test.clj-client.java-sdk-server-wrapper :as server-wrapper]
     [mcp-clj.mcp-client.core :as client])
   (:import
     (java.util.concurrent
-      CompletableFuture
       CountDownLatch
       TimeUnit)))
+
+(defn- create-client
+  "Create Clojure client connected to Java SDK server with resources capability via stdio"
+  []
+  (client/create-client
+    {:transport {:type :stdio
+                 :command "clojure"
+                 :args ["-M:dev:test" "-m"
+                        "mcp-clj.cross-compliance-test.clj-client.java-sdk-resources-server-main"]}
+     :client-info {:name "clj-client-resources-test"
+                   :version "0.1.0"}
+     :capabilities {}
+     :protocol-version "2024-11-05"}))
 
 (defn create-latch-resource-handler
   "Create a resource update handler that counts down a latch for each notification received.
@@ -49,35 +52,24 @@
       (testing (str "protocol version " protocol-version)
 
         (testing "Java SDK server with resources capability declares subscribe:true to Clojure client"
-          (let [server-ctx (server-wrapper/create-java-sdk-server-with-resources {})
-                mcp-client (client/create-client
-                             {:transport {:type :in-memory
-                                          :in-stream (:in-stream server-ctx)
-                                          :out-stream (:out-stream server-ctx)}
-                              :client-info {:name "test-clojure-client"
-                                            :version "1.0.0"}})]
-            (try
-              ;; Wait for client to initialize
-              @(client/wait-for-ready mcp-client 5000)
+          (with-open [mcp-client (create-client)]
+            ;; Wait for client to initialize
+            (client/wait-for-ready mcp-client 5000)
 
-              ;; Get server capabilities
-              (let [session @(:session mcp-client)
-                    capabilities (:server-capabilities session)]
+            ;; Get server capabilities
+            (let [session @(:session mcp-client)
+                  capabilities (:server-capabilities session)]
 
-                (is (some? capabilities) "Server capabilities should be present")
-                (is (map? capabilities) "Capabilities should be a map")
-                (is (contains? capabilities :resources)
-                    "Server should declare resources capability")
-                (is (map? (:resources capabilities))
-                    "Resources capability should be a map")
-                (is (true? (:subscribe (:resources capabilities)))
-                    "Resources capability should have subscribe:true")
-                (is (true? (:listChanged (:resources capabilities)))
-                    "Resources capability should have listChanged:true"))
-
-              (finally
-                (client/close! mcp-client)
-                (server-wrapper/close-java-sdk-server server-ctx)))))))))
+              (is (some? capabilities) "Server capabilities should be present")
+              (is (map? capabilities) "Capabilities should be a map")
+              (is (contains? capabilities :resources)
+                  "Server should declare resources capability")
+              (is (map? (:resources capabilities))
+                  "Resources capability should be a map")
+              (is (true? (:subscribe (:resources capabilities)))
+                  "Resources capability should have subscribe:true")
+              (is (true? (:listChanged (:resources capabilities)))
+                  "Resources capability should have listChanged:true"))))))))
 
 (deftest ^:integ clj-client-resource-subscription-test
   ;; Test that Clojure client can successfully subscribe to a resource on Java SDK server
@@ -86,29 +78,18 @@
       (testing (str "protocol version " protocol-version)
 
         (testing "subscribe to existing resource succeeds"
-          (let [handler-setup (create-latch-resource-handler 0)
-                server-ctx (server-wrapper/create-java-sdk-server-with-resources {})
-                mcp-client (client/create-client
-                             {:transport {:type :in-memory
-                                          :in-stream (:in-stream server-ctx)
-                                          :out-stream (:out-stream server-ctx)}
-                              :client-info {:name "test-clojure-client"
-                                            :version "1.0.0"}})]
-            (try
+          (let [handler-setup (create-latch-resource-handler 0)]
+            (with-open [mcp-client (create-client)]
               ;; Wait for client to initialize
-              @(client/wait-for-ready mcp-client 5000)
+              (client/wait-for-ready mcp-client 5000)
 
               ;; Subscribe to the test resource
               (let [result @(client/subscribe-resource!
                               mcp-client
-                              (:resource-uri server-ctx)
+                              "test://dynamic-resource"
                               (:handler handler-setup))]
                 ;; Subscription should complete without error
-                (is (nil? result) "Subscribe should return nil on success"))
-
-              (finally
-                (client/close! mcp-client)
-                (server-wrapper/close-java-sdk-server server-ctx)))))))))
+                (is (nil? result) "Subscribe should return nil on success")))))))))
 
 (deftest ^:integ clj-client-resource-update-notification-test
   ;; Test that Clojure client receives notifications when resource is updated on Java SDK server
@@ -117,82 +98,56 @@
       (testing (str "protocol version " protocol-version)
 
         (testing "client receives notification when subscribed resource is updated"
-          (let [handler-setup (create-latch-resource-handler 1)
-                update-latch (CountDownLatch. 1)
-                server-ctx (server-wrapper/create-java-sdk-server-with-resources
-                             {:update-latch update-latch})
-                mcp-client (client/create-client
-                             {:transport {:type :in-memory
-                                          :in-stream (:in-stream server-ctx)
-                                          :out-stream (:out-stream server-ctx)}
-                              :client-info {:name "test-clojure-client"
-                                            :version "1.0.0"}})]
-            (try
+          (let [handler-setup (create-latch-resource-handler 1)]
+            (with-open [mcp-client (create-client)]
               ;; Wait for client to initialize
-              @(client/wait-for-ready mcp-client 5000)
+              (client/wait-for-ready mcp-client 5000)
 
               ;; Subscribe to the test resource
               @(client/subscribe-resource!
                  mcp-client
-                 (:resource-uri server-ctx)
+                 "test://dynamic-resource"
                  (:handler handler-setup))
 
               ;; Trigger resource update via tool
               @(client/call-tool mcp-client "trigger-resource-update"
-                                 {:uri (:resource-uri server-ctx)})
+                                 {:uri "test://dynamic-resource"})
 
               ;; Wait for notification with 5 second timeout
               (let [completed? (wait-for-notifications (:latch handler-setup) 5000)
                     received @(:notifications handler-setup)]
                 (is completed? "Should receive notification within timeout")
                 (is (= 1 (count received)) "Should receive exactly 1 notification")
-                (is (= (:resource-uri server-ctx) (:uri (first received)))
-                    "Notification should contain correct resource URI"))
-
-              (finally
-                (client/close! mcp-client)
-                (server-wrapper/close-java-sdk-server server-ctx)))))
+                (is (= "test://dynamic-resource" (:uri (first received)))
+                    "Notification should contain correct resource URI")))))
 
         (testing "multiple notifications are received for multiple updates"
-          (let [handler-setup (create-latch-resource-handler 3)
-                update-latch (CountDownLatch. 3)
-                server-ctx (server-wrapper/create-java-sdk-server-with-resources
-                             {:update-latch update-latch})
-                mcp-client (client/create-client
-                             {:transport {:type :in-memory
-                                          :in-stream (:in-stream server-ctx)
-                                          :out-stream (:out-stream server-ctx)}
-                              :client-info {:name "test-clojure-client"
-                                            :version "1.0.0"}})]
-            (try
+          (let [handler-setup (create-latch-resource-handler 3)]
+            (with-open [mcp-client (create-client)]
               ;; Wait for client to initialize
-              @(client/wait-for-ready mcp-client 5000)
+              (client/wait-for-ready mcp-client 5000)
 
               ;; Subscribe to the test resource
               @(client/subscribe-resource!
                  mcp-client
-                 (:resource-uri server-ctx)
+                 "test://dynamic-resource"
                  (:handler handler-setup))
 
               ;; Trigger multiple updates
               @(client/call-tool mcp-client "trigger-resource-update"
-                                 {:uri (:resource-uri server-ctx)})
+                                 {:uri "test://dynamic-resource"})
               @(client/call-tool mcp-client "trigger-resource-update"
-                                 {:uri (:resource-uri server-ctx)})
+                                 {:uri "test://dynamic-resource"})
               @(client/call-tool mcp-client "trigger-resource-update"
-                                 {:uri (:resource-uri server-ctx)})
+                                 {:uri "test://dynamic-resource"})
 
               ;; Wait for all notifications
               (let [completed? (wait-for-notifications (:latch handler-setup) 5000)
                     received @(:notifications handler-setup)]
                 (is completed? "Should receive all notifications within timeout")
                 (is (= 3 (count received)) "Should receive exactly 3 notifications")
-                (is (every? #(= (:resource-uri server-ctx) (:uri %)) received)
-                    "All notifications should contain correct resource URI"))
-
-              (finally
-                (client/close! mcp-client)
-                (server-wrapper/close-java-sdk-server server-ctx)))))))))
+                (is (every? #(= "test://dynamic-resource" (:uri %)) received)
+                    "All notifications should contain correct resource URI")))))))))
 
 (deftest ^:integ clj-client-resource-unsubscribe-test
   ;; Test that unsubscribing stops notification delivery from Java SDK server
@@ -201,54 +156,41 @@
       (testing (str "protocol version " protocol-version)
 
         (testing "unsubscribing stops notification delivery"
-          (let [handler-setup (create-latch-resource-handler 1)
-                update-latch (CountDownLatch. 2)
-                server-ctx (server-wrapper/create-java-sdk-server-with-resources
-                             {:update-latch update-latch})
-                mcp-client (client/create-client
-                             {:transport {:type :in-memory
-                                          :in-stream (:in-stream server-ctx)
-                                          :out-stream (:out-stream server-ctx)}
-                              :client-info {:name "test-clojure-client"
-                                            :version "1.0.0"}})]
-            (try
+          (let [handler-setup (create-latch-resource-handler 1)]
+            (with-open [mcp-client (create-client)]
               ;; Wait for client to initialize
-              @(client/wait-for-ready mcp-client 5000)
+              (client/wait-for-ready mcp-client 5000)
 
               ;; Subscribe to the test resource
               @(client/subscribe-resource!
                  mcp-client
-                 (:resource-uri server-ctx)
+                 "test://dynamic-resource"
                  (:handler handler-setup))
 
               ;; Trigger update to verify subscription works
               @(client/call-tool mcp-client "trigger-resource-update"
-                                 {:uri (:resource-uri server-ctx)})
+                                 {:uri "test://dynamic-resource"})
 
               ;; Wait for first notification
               (let [completed? (wait-for-notifications (:latch handler-setup) 5000)]
                 (is completed? "Should receive first notification"))
 
               ;; Now unsubscribe
-              @(client/unsubscribe-resource! mcp-client (:resource-uri server-ctx))
+              @(client/unsubscribe-resource! mcp-client "test://dynamic-resource")
 
               ;; Record notification count before triggering another update
               (let [notifications-before (count @(:notifications handler-setup))]
 
                 ;; Trigger another update
                 @(client/call-tool mcp-client "trigger-resource-update"
-                                   {:uri (:resource-uri server-ctx)})
+                                   {:uri "test://dynamic-resource"})
 
                 ;; Wait a bit to see if notification arrives (it shouldn't)
                 (Thread/sleep 2000)
 
                 (let [notifications-after (count @(:notifications handler-setup))]
                   (is (= notifications-before notifications-after)
-                      "Notification count should not increase after unsubscribe")))
-
-              (finally
-                (client/close! mcp-client)
-                (server-wrapper/close-java-sdk-server server-ctx)))))))))
+                      "Notification count should not increase after unsubscribe"))))))))))
 
 (deftest ^:integ clj-client-resource-error-handling-test
   ;; Test error handling for invalid subscriptions
@@ -257,17 +199,10 @@
       (testing (str "protocol version " protocol-version)
 
         (testing "subscribing to non-existent resource returns error"
-          (let [handler-setup (create-latch-resource-handler 0)
-                server-ctx (server-wrapper/create-java-sdk-server-with-resources {})
-                mcp-client (client/create-client
-                             {:transport {:type :in-memory
-                                          :in-stream (:in-stream server-ctx)
-                                          :out-stream (:out-stream server-ctx)}
-                              :client-info {:name "test-clojure-client"
-                                            :version "1.0.0"}})]
-            (try
+          (let [handler-setup (create-latch-resource-handler 0)]
+            (with-open [mcp-client (create-client)]
               ;; Wait for client to initialize
-              @(client/wait-for-ready mcp-client 5000)
+              (client/wait-for-ready mcp-client 5000)
 
               ;; Try to subscribe to a non-existent resource
               (let [future (client/subscribe-resource!
@@ -283,8 +218,4 @@
                     (is (or (instance? java.util.concurrent.ExecutionException e)
                             (instance? clojure.lang.ExceptionInfo e))
                         "Should throw execution exception or ExceptionInfo")))
-                (is @error-thrown? "Should throw error for non-existent resource"))
-
-              (finally
-                (client/close! mcp-client)
-                (server-wrapper/close-java-sdk-server server-ctx)))))))))
+                (is @error-thrown? "Should throw error for non-existent resource")))))))))

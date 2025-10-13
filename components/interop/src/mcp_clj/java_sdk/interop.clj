@@ -695,10 +695,8 @@
                        caps-builder)
         caps-builder (if-let [resources-cap (:resources capabilities)]
                        (let [subscribe (get resources-cap :subscribe false)
-                             list-changed (get resources-cap :listChanged false)
-                             res-cap (McpSchema$ServerCapabilities$ResourceCapabilities.
-                                       subscribe list-changed)]
-                         (.resources caps-builder res-cap))
+                             list-changed (get resources-cap :listChanged false)]
+                         (.resources caps-builder subscribe list-changed))
                        caps-builder)
         server-caps (.build caps-builder)
 
@@ -888,6 +886,9 @@
 
 (defn start-server
   "Start the Java SDK server.
+  
+  Note: The Java SDK server doesn't require explicit starting - it's ready
+  to handle requests once created with its transport.
 
   Args:
   - server-record: JavaSdkServer record
@@ -896,9 +897,7 @@
   [^JavaSdkServer server-record]
   (when-not (:server server-record)
     (throw (ex-info "Invalid server record" {:server-record server-record})))
-  (log/info :java-sdk/starting-server {:name (:name server-record)})
-  ;; (let [server (:server server-record)]
-  ;;   (.start server))
+  (log/info :java-sdk/server-ready {:name (:name server-record)})
   server-record)
 
 (defn stop-server
