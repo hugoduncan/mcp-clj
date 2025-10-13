@@ -12,7 +12,7 @@
   The :build alias in each project's deps.edn configures the project-specific
   parameters."
   (:require
-   [clojure.tools.build.api :as b]))
+    [clojure.tools.build.api :as b]))
 
 (def major-minor "0.1")
 
