@@ -211,3 +211,61 @@
       (is (factory/transport-registered? :stdio)))
 
     (clean-registry!)))
+
+(deftest unregister-transport-test
+  ;; Test unregister-transport! behavior in various scenarios
+  (testing "unregister-transport!"
+    (clean-registry!)
+
+    (testing "removes registered transport"
+      (factory/register-transport! :temp-transport mock-transport-factory)
+      (is (factory/transport-registered? :temp-transport))
+      (factory/unregister-transport! :temp-transport)
+      (is (not (factory/transport-registered? :temp-transport)))
+      (is (not (contains? (set (factory/list-transports)) :temp-transport))))
+
+    (testing "returns nil"
+      (factory/register-transport! :another-temp mock-transport-factory)
+      (is (nil? (factory/unregister-transport! :another-temp))))
+
+    (testing "is idempotent for non-existent transport"
+      (is (nil? (factory/unregister-transport! :never-registered)))
+      (is (not (factory/transport-registered? :never-registered))))
+
+    (testing "does not affect other registered transports"
+      (factory/register-transport! :transport-a mock-transport-factory)
+      (factory/register-transport! :transport-b mock-transport-factory)
+      (factory/unregister-transport! :transport-a)
+      (is (not (factory/transport-registered? :transport-a)))
+      (is (factory/transport-registered? :transport-b)))
+
+    (clean-registry!)))
+
+(deftest transport-registered-test
+  ;; Test transport-registered? predicate function
+  (testing "transport-registered?"
+    (clean-registry!)
+
+    (testing "returns true for registered transport"
+      (factory/register-transport! :test-registered mock-transport-factory)
+      (is (true? (factory/transport-registered? :test-registered))))
+
+    (testing "returns false for unregistered transport"
+      (is (false? (factory/transport-registered? :never-registered))))
+
+    (testing "returns false after unregistration"
+      (factory/register-transport! :will-be-removed mock-transport-factory)
+      (is (true? (factory/transport-registered? :will-be-removed)))
+      (factory/unregister-transport! :will-be-removed)
+      (is (false? (factory/transport-registered? :will-be-removed))))
+
+    (testing "works with built-in transports"
+      (is (true? (factory/transport-registered? :http)))
+      (is (true? (factory/transport-registered? :stdio))))
+
+    (testing "returns false for non-keyword types"
+      (is (false? (factory/transport-registered? "string-type")))
+      (is (false? (factory/transport-registered? 'symbol-type)))
+      (is (false? (factory/transport-registered? nil))))
+
+    (clean-registry!)))

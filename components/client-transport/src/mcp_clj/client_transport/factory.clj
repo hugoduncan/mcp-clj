@@ -12,16 +12,16 @@
 
 (defn register-transport!
   "Register a transport type with its factory function.
-  
+
   Parameters:
   - transport-type: Keyword identifying the transport (e.g. :http, :stdio)
   - factory-fn: Function that takes transport options map and returns Transport
-  
+
   The factory function will be called with the transport options (with :type removed)
   and should return an object implementing mcp-clj.client-transport.protocol/Transport.
-  
+
   Example:
-    (register-transport! :custom 
+    (register-transport! :custom
       (fn [opts] (create-custom-transport opts)))"
   [transport-type factory-fn]
   (when-not (keyword? transport-type)
@@ -33,9 +33,11 @@
   (swap! transport-registry assoc transport-type factory-fn)
   nil)
 
+#_{:clojure-lsp/ignore [:clojure-lsp/unused-public-var]}
+
 (defn unregister-transport!
   "Remove a transport type from the registry.
-  
+
   Parameters:
   - transport-type: Keyword identifying the transport to remove"
   [transport-type]
@@ -47,12 +49,14 @@
   []
   (vec (keys @transport-registry)))
 
+#_{:clojure-lsp/ignore [:clojure-lsp/unused-public-var]}
+
 (defn transport-registered?
   "Check if a transport type is registered.
-  
+
   Parameters:
   - transport-type: Keyword to check
-  
+
   Returns true if the transport type is registered, false otherwise."
   [transport-type]
   (contains? @transport-registry transport-type))
@@ -65,7 +69,7 @@
   Supports any registered transport type. Built-in types:
   - HTTP transport when :transport {:type :http ...} is provided
   - Stdio transport when :transport {:type :stdio ...} is provided
-  
+
   Custom transports can be added via register-transport!"
   [{:keys [transport] :as config}]
   (if-not transport
