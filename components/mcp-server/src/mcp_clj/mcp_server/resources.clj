@@ -105,21 +105,3 @@
     {:contents [{:uri uri
                  :text "Resource not found"}]
      :isError true}))
-
-(defn subscribe-resource
-  "Subscribe to updates for a resource.
-   Returns empty result if successful, error if resource not found."
-  [registry {:keys [uri] :as params}]
-  (log/info :resources/subscribe {:params params})
-  (if (some #(when (= uri (:uri %)) %) (vals @registry))
-    {}
-    {:content [{:type "text"
-                :text (str "Resource not found: " uri)}]
-     :isError true}))
-
-(defn unsubscribe-resource
-  "Unsubscribe from updates for a resource.
-   Returns empty result if successful."
-  [_registry {:keys [uri] :as params}]
-  (log/info :resources/unsubscribe {:params params})
-  {})
