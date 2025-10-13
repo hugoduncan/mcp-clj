@@ -106,7 +106,7 @@
     server))
 
 (defn- create-sse-server
-  [{:keys [port on-sse-connect on-sse-close allowed-origins] :as options} handlers]
+  [{:keys [port on-sse-connect on-sse-close allowed-origins]} handlers]
   (require 'mcp-clj.json-rpc.sse-server)
   (let [create-server (ns-resolve 'mcp-clj.json-rpc.sse-server 'create-server)
         set-handlers! (ns-resolve 'mcp-clj.json-rpc.sse-server 'set-handlers!)
@@ -121,7 +121,7 @@
     server))
 
 (defn- create-http-server
-  [{:keys [port num-threads on-connect on-disconnect allowed-origins] :as options} handlers]
+  [{:keys [port num-threads on-connect on-disconnect allowed-origins]} handlers]
   (require 'mcp-clj.json-rpc.http-server)
   (let [create-server (ns-resolve 'mcp-clj.json-rpc.http-server 'create-server)
         set-handlers! (ns-resolve 'mcp-clj.json-rpc.http-server 'set-handlers!)

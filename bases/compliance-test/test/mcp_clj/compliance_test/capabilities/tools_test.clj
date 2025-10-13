@@ -62,7 +62,7 @@
   ;; Test that tools/call executes tools with arguments and returns results
   (testing "tools/call executes tools correctly"
     (helpers/run-test-across-implementations
-      (fn [client-type protocol-version {:keys [client]}]
+      (fn [client-type _protocol-version {:keys [client]}]
         (testing "echo tool execution"
           (let [result (if (= client-type :clojure)
                          @(client/call-tool client "echo" {:message "test"})
@@ -88,7 +88,7 @@
   ;; Test error handling for invalid tool calls
   (testing "error handling for invalid tool calls"
     (helpers/run-test-across-implementations
-      (fn [client-type protocol-version {:keys [client]}]
+      (fn [client-type _protocol-version {:keys [client]}]
         (testing "tool execution error"
           (let [result (if (= client-type :clojure)
                          @(client/call-tool client "error" {:message "test error"})
@@ -119,7 +119,7 @@
   ;; Test that notifications/tools/list_changed is sent when tools change
   (testing "notifications/tools/list_changed sent when tools change"
     (helpers/run-test-across-implementations
-      (fn [client-type protocol-version {:keys [client server]}]
+      (fn [client-type _protocol-version {:keys [client server]}]
         (let [received-notifications (atom [])
               ;; Set up notification handler by subscribing to tools changes
               _ (when (= client-type :clojure)

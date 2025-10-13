@@ -78,15 +78,17 @@
 (defn- start-test-server
   "Start HTTP server with test tools"
   [& [opts]]
-  (let [server (server/create-server (merge {:transport {:type :http :port 0} ; Random port
-                                             :tools test-tools}
-                                            opts))]
-    (let [port (get-server-port server)]
-      (when-not port
-        ((:stop server))
-        (throw (ex-info "Server failed to start or port not available" {})))
-      (log/info :test/server-started {:port port})
-      server)))
+  (let [server (server/create-server
+                 (merge
+                   {:transport {:type :http :port 0} ; Random port
+                    :tools     test-tools}
+                   opts))
+        port (get-server-port server)]
+    (when-not port
+      ((:stop server))
+      (throw (ex-info "Server failed to start or port not available" {})))
+    (log/info :test/server-started {:port port})
+    server))
 
 (defn- create-test-client
   "Create HTTP client connected to test server"
@@ -260,7 +262,7 @@
 
           ;; Verify results are correct
           (doseq [[i result] (map-indexed vector results)]
-            (is (= (str "Result: " (+ i (+ i 10))) result)))))
+            (is (= (str "Result: " (+ i i 10)) result)))))
 
       (testing "concurrent tool discovery works"
         (let [futures (doall

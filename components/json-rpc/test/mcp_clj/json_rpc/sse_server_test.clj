@@ -157,6 +157,7 @@
       (let [test-data {:test "data"}
             response (send-request (make-request "echo" test-data 1))
             result (parse-response response)]
+        (is (map? result))
         (is (= http/Accepted (:status response)))
         (is (= "Accepted" (:body response)))
 

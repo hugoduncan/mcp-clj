@@ -142,17 +142,17 @@
         (testing "All servers support set-handlers!"
           (is (some? (json-rpc-protocols/set-handlers!
                        @(:json-rpc-server stdio-server)
-                       {"new" (fn [m p] {:test "result"})}))
+                       {"new" (fn [_m _p] {:test "result"})}))
               "stdio server should support set-handlers!")
 
           (is (some? (json-rpc-protocols/set-handlers!
                        @(:json-rpc-server sse-server)
-                       {"new" (fn [r p] {:test "result"})}))
+                       {"new" (fn [_r _p] {:test "result"})}))
               "sse server should support set-handlers!")
 
           (is (some? (json-rpc-protocols/set-handlers!
                        @(:json-rpc-server http-server)
-                       {"new" (fn [r p] {:test "result"})}))
+                       {"new" (fn [_r _p] {:test "result"})}))
               "http server should support set-handlers!"))
 
         (testing "All servers support notify-all!"

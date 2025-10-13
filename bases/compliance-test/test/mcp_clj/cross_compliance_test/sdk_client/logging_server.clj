@@ -9,9 +9,8 @@
     [mcp-clj.mcp-server.logging :as server-logging]))
 
 (defn trigger-logs
-  [server-atom context params]
-  (let [server (:server context)
-        levels (:levels params)
+  [context params]
+  (let [levels (:levels params)
         message (:message params)
         logger (:logger params)
         log-fn-map {:debug server-logging/debug
@@ -39,9 +38,7 @@
     (log/info :test-logging-server {:msg "Starting with logging capability"})
 
     ;; Atom to hold server reference for trigger-logs tool
-    (let [server-atom (atom nil)
-
-          ;; Define tools as a map
+    (let [;; Define tools as a map
           tools
           {"trigger-logs"
            {:name "trigger-logs"
@@ -60,7 +57,7 @@
               :logger {:type "string"
                        :description "Optional logger name"}}
              :required ["levels" "message"]}
-            :implementation (partial trigger-logs server-atom)}}
+            :implementation trigger-logs}}
 
           ;; Create server with logging capability
           server (mcp-server/create-server
@@ -69,9 +66,6 @@
                     :server-info {:name "test-logging-server"
                                   :version "1.0.0"}
                     :capabilities {:logging {}}})]
-
-      ;; Store server reference for trigger-logs tool
-      (reset! server-atom server)
 
       (log/info :test-logging-server {:msg "Started"})
 
