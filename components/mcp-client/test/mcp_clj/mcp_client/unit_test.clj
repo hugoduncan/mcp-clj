@@ -13,16 +13,22 @@
   "Ensure in-memory transport is registered in both client and server factories.
   Can be called multiple times safely - registration is idempotent."
   []
-  (client-transport-factory/register-transport! :in-memory
-                                                (fn [options]
-                                                  (require 'mcp-clj.in-memory-transport.client)
-                                                  (let [create-fn (ns-resolve 'mcp-clj.in-memory-transport.client 'create-transport)]
-                                                    (create-fn options))))
-  (server-transport-factory/register-transport! :in-memory
-                                                (fn [options handlers]
-                                                  (require 'mcp-clj.in-memory-transport.server)
-                                                  (let [create-server (ns-resolve 'mcp-clj.in-memory-transport.server 'create-in-memory-server)]
-                                                    (create-server options handlers)))))
+  (client-transport-factory/register-transport!
+    :in-memory
+    (fn [options]
+      (require 'mcp-clj.in-memory-transport.client)
+      (let [create-fn (ns-resolve
+                        'mcp-clj.in-memory-transport.client
+                        'create-transport)]
+        (create-fn options))))
+  (server-transport-factory/register-transport!
+    :in-memory
+    (fn [options handlers]
+      (require 'mcp-clj.in-memory-transport.server)
+      (let [create-server (ns-resolve
+                            'mcp-clj.in-memory-transport.server
+                            'create-in-memory-server)]
+        (create-server options handlers)))))
 
 ;; Ensure transport is registered at namespace load time
 (ensure-in-memory-transport-registered!)
@@ -30,10 +36,10 @@
 ;; Test Tools
 
 (def test-tools
-  {"echo" {:name "echo"
-           :description "Echo back the input"
-           :inputSchema {:type "object"
-                         :properties {:message {:type "string"}}}
+  {"echo" {:name           "echo"
+           :description    "Echo back the input"
+           :inputSchema    {:type "object"
+                            :properties {:message {:type "string"}}}
            :implementation (fn [_context args]
                              {:content
                               [{:type "text"
@@ -54,7 +60,8 @@
    "error-tool" {:name "error-tool"
                  :description "Tool that throws an error"
                  :inputSchema {:type "object"}
-                 :implementation (fn [_context _] (throw (ex-info "Test error" {})))}})
+                 :implementation (fn [_context _]
+                                   (throw (ex-info "Test error" {})))}})
 
 ;; Helper Functions
 
@@ -110,8 +117,10 @@
             (is (= {:name "test-client" :version "1.0.0"}
                    (:client-info info)))
             (is (= {} (:client-capabilities info)))
-            (is (some? (:server-info info))) ; Server should provide info
-            (is (map? (:server-capabilities info))) ; Server should declare capabilities
+            (is (some? (:server-info info))
+                "Server should provide info")
+            (is (map? (:server-capabilities info))
+                "Server should declare capabilities")
             (is (:transport-alive? info))))
 
         (finally
@@ -179,25 +188,25 @@
                                (range 5))
                 add-futures (mapv
                               #(client/call-tool client "add" {:a % :b (inc %)})
-                              (range 3))]
+                              (range 3))
 
-            ;; Wait for all to complete
-            (let [echo-results (mapv #(deref % 2000 :timeout) echo-futures)
-                  add-results (mapv #(deref % 2000 :timeout) add-futures)]
+                ;; Wait for all to complete
+                echo-results (mapv #(deref % 2000 :timeout) echo-futures)
+                add-results (mapv #(deref % 2000 :timeout) add-futures)]
 
-              ;; All should complete successfully
-              (is (every? #(not= :timeout %) echo-results))
-              (is (every? #(not= :timeout %) add-results))
+            ;; All should complete successfully
+            (is (every? #(not= :timeout %) echo-results))
+            (is (every? #(not= :timeout %) add-results))
 
-              ;; Check echo results
-              (doseq [[i result] (map-indexed vector echo-results)]
-                (is (= (str "Echo: message-" i)
-                       (-> result :content first :text))))
+            ;; Check echo results
+            (doseq [[i result] (map-indexed vector echo-results)]
+              (is (= (str "Echo: message-" i)
+                     (-> result :content first :text))))
 
-              ;; Check add results
-              (doseq [[i result] (map-indexed vector add-results)]
-                (is (= (str (+ i (inc i)))
-                       (-> result :content first :text)))))))
+            ;; Check add results
+            (doseq [[i result] (map-indexed vector add-results)]
+              (is (= (str (+ i (inc i)))
+                     (-> result :content first :text))))))
 
         (finally
           (cleanup-test-env test-env))))))

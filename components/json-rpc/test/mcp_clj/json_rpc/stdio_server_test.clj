@@ -9,29 +9,14 @@
   (:import
     (java.io
       BufferedReader
-      ByteArrayInputStream
       ByteArrayOutputStream
       StringReader)))
-
-(defn- create-test-input
-  "Create input stream from JSON-RPC requests"
-  [requests]
-  (let [json-lines (map json/write-str requests)
-        input-str (str/join "\n" json-lines)]
-    (ByteArrayInputStream. (.getBytes input-str))))
 
 (defn- capture-output
   "Capture output from a function that writes to *out*"
   [f]
   (with-out-str
     (f)))
-
-(defn- parse-json-lines
-  "Parse JSON-RPC responses from output lines"
-  [output-str]
-  (->> (str/split-lines output-str)
-       (remove empty?)
-       (map #(json/read-str % :key-fn keyword))))
 
 (deftest test-read-json
   (testing "reads valid JSON"
@@ -72,7 +57,7 @@
 
 (deftest test-handle-json-rpc
   (testing "processes valid request and returns result"
-    (let [handler (fn [method params]
+    (let [handler (fn [method _params]
                     (when (= method "test")
                       {:result "success"}))
           request {:method "test" :params {:arg "value"} :id 1}
@@ -82,7 +67,7 @@
              (json/read-str response :key-fn keyword)))))
 
   (testing "returns nil for handler returning nil"
-    (let [handler (fn [method params] nil)
+    (let [handler (fn [_method _params] nil)
           request {:method "test" :params {} :id 1}
           response (#'stdio-server/handle-json-rpc handler request)]
       (is (nil? response))))
@@ -196,8 +181,9 @@
 (deftest ^:integ test-set-handlers
   (testing "sets valid handlers"
     (let [server (stdio-server/create-server {})
-          handlers {"add" (fn [method params] {:sum (+ (first params) (second params))})
-                    "echo" (fn [method params] params)}]
+          handlers {"add" (fn [_method params]
+                            {:sum (+ (first params) (second params))})
+                    "echo" (fn [_method params] params)}]
       (stdio-server/set-handlers! server handlers)
       (is (= handlers @(:handlers server)))
       (stdio-server/stop! server)))
@@ -275,7 +261,7 @@
   (testing "JsonRpcServer protocol implementation"
     (testing "set-handlers! through protocol"
       (let [server (stdio-server/create-server {})
-            test-handler (fn [method params] {:protocol-result params})]
+            test-handler (fn [_method params] {:protocol-result params})]
         (protocols/set-handlers! server {"protocol-test" test-handler})
         (is (= {"protocol-test" test-handler} @(:handlers server)))
         (stdio-server/stop! server)))
@@ -293,7 +279,7 @@
 
     (testing "protocol functions work with server instance"
       (let [server (stdio-server/create-server {})
-            handlers {"test" (fn [method params] {:test "result"})}]
+            handlers {"test" (fn [_method _params] {:test "result"})}]
         (is (satisfies? protocols/JsonRpcServer server))
         (protocols/set-handlers! server handlers)
         (is (= handlers @(:handlers server)))

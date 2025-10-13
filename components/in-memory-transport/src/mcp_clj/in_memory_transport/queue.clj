@@ -20,19 +20,3 @@
   Returns the item or nil if timeout elapsed."
   [^LinkedBlockingQueue queue timeout-ms]
   (.poll queue timeout-ms TimeUnit/MILLISECONDS))
-
-(defn poll-no-wait!
-  "Poll an item from the queue without waiting.
-  Returns the item or nil if queue is empty."
-  [^LinkedBlockingQueue queue]
-  (.poll queue))
-
-(defn size
-  "Get the current size of the queue"
-  [^LinkedBlockingQueue queue]
-  (.size queue))
-
-(defn queue-empty?
-  "Check if the queue is empty"
-  [^LinkedBlockingQueue queue]
-  (.isEmpty queue))

@@ -1,6 +1,7 @@
 (ns mcp-clj.json-rpc.stdio-client-test
   "Tests for JSON-RPC stdio client functionality"
   (:require
+    [clojure.string :as str]
     [clojure.test :refer [deftest is testing]]
     [mcp-clj.json-rpc.executor :as executor]
     [mcp-clj.json-rpc.stdio-client :as stdio-client])
@@ -165,17 +166,16 @@
         (.close bw)
 
         (let [output (.toString sw)]
-          (is (clojure.string/includes? output "jsonrpc"))
-          (is (clojure.string/includes? output "test"))
-          (is (clojure.string/ends-with? output "\n")))))
+          (is (str/includes? output "jsonrpc"))
+          (is (str/includes? output "test"))
+          (is (str/ends-with? output "\n")))))
 
     (testing "read-json-with-logging success"
       (let [json-input "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"success\"}\n"
             sr (StringReader. json-input)
-            br (BufferedReader. sr)]
-
-        (let [result (stdio-client/read-json-with-logging br)]
-          (is (= {:jsonrpc "2.0" :id 1 :result "success"} result)))))
+            br (BufferedReader. sr)
+            result (stdio-client/read-json-with-logging br)]
+        (is (= {:jsonrpc "2.0" :id 1 :result "success"} result))))
 
     (testing "read-json-with-logging EOF"
       (let [sr (StringReader. "")
@@ -203,27 +203,30 @@
         (.put (:pending-requests client) request-id response-future)
 
         ;; Create input with response and notification
-        (let [json-input (str "{\"jsonrpc\":\"2.0\",\"id\":" request-id ",\"result\":\"test-result\"}\n"
-                              "{\"jsonrpc\":\"2.0\",\"method\":\"notification\",\"params\":{}}\n")
+        (let [json-input (str
+                           "{\"jsonrpc\":\"2.0\",\"id\":" request-id ",\"result\":\"test-result\"}\n"
+                           "{\"jsonrpc\":\"2.0\",\"method\":\"notification\",\"params\":{}}\n")
               sr (StringReader. json-input)
-              br (BufferedReader. sr)]
+              br (BufferedReader. sr)
+              ;; Start reader loop in background
+              reader-future (future
+                              (stdio-client/message-reader-loop
+                                br
+                                running
+                                client))]
+          ;; Wait a bit for processing
+          (Thread/sleep 100)
 
-          ;; Start reader loop in background
-          (let [reader-future (future
-                                (stdio-client/message-reader-loop br running client))]
+          ;; Stop the loop
+          (reset! running false)
 
-            ;; Wait a bit for processing
-            (Thread/sleep 100)
+          ;; Wait for reader to finish
+          @reader-future
 
-            ;; Stop the loop
-            (reset! running false)
-
-            ;; Wait for reader to finish
-            @reader-future
-
-            ;; Verify response was processed
-            (is (.isDone response-future))
-            (is (= "test-result" (.get response-future 100 TimeUnit/MILLISECONDS)))))
+          ;; Verify response was processed
+          (is (.isDone response-future))
+          (is (= "test-result"
+                 (.get response-future 100 TimeUnit/MILLISECONDS))))
 
         (stdio-client/close-json-rpc-client! client)))
 
@@ -301,14 +304,14 @@
             futures (atom [])]
 
         ;; Create multiple pending requests
-        (doseq [i (range num-operations)]
+        (doseq [_ (range num-operations)]
           (let [request-id (stdio-client/generate-request-id client)
                 future (CompletableFuture.)]
             (.put (:pending-requests client) request-id future)
             (swap! futures conj {:id request-id :future future})))
 
         ;; Simulate responses for all requests
-        (doseq [{:keys [id future]} @futures]
+        (doseq [{:keys [id]} @futures]
           (let [response {:id id :result {:index id}}]
             (stdio-client/handle-response client response)))
 
@@ -334,9 +337,9 @@
           (.flush bw)
           (let [output (.toString sw)]
             ;; Verify request was sent
-            (is (clojure.string/includes? output "test-method"))
-            (is (clojure.string/includes? output "\"id\":1"))
-            (is (clojure.string/includes? output "param")))
+            (is (str/includes? output "test-method"))
+            (is (str/includes? output "\"id\":1"))
+            (is (str/includes? output "param")))
 
           ;; Verify future is pending
           (is (not (.isDone future)))
@@ -373,9 +376,9 @@
         ;; Flush and verify notification was sent
         (.flush bw)
         (let [output (.toString sw)]
-          (is (clojure.string/includes? output "notify-method"))
-          (is (clojure.string/includes? output "data"))
-          (is (not (clojure.string/includes? output "\"id\":"))))
+          (is (str/includes? output "notify-method"))
+          (is (str/includes? output "data"))
+          (is (not (str/includes? output "\"id\":"))))
 
         (testing "multiple notifications"
           ;; Clear previous output
@@ -387,8 +390,8 @@
           ;; Verify all notifications sent
           (.flush bw)
           (let [output (.toString sw)]
-            (is (clojure.string/includes? output "notify-1"))
-            (is (clojure.string/includes? output "notify-2"))
-            (is (clojure.string/includes? output "42"))))
+            (is (str/includes? output "notify-1"))
+            (is (str/includes? output "notify-2"))
+            (is (str/includes? output "42"))))
 
         (stdio-client/close-json-rpc-client! client)))))

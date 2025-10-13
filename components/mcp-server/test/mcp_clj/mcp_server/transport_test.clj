@@ -1,22 +1,9 @@
 (ns mcp-clj.mcp-server.transport-test
   "Tests for MCP server transport selection and functionality"
   (:require
-    [clojure.data.json :as json]
-    [clojure.java.io :as io]
-    [clojure.string :as str]
     [clojure.test :refer [deftest is testing]]
     [mcp-clj.json-rpc.protocols :as json-rpc-protocols]
-    [mcp-clj.mcp-server.core :as mcp]
-    [mcp-clj.tools.core :as tools])
-  (:import
-    (java.io
-      ByteArrayInputStream
-      ByteArrayOutputStream
-      PipedInputStream
-      PipedOutputStream
-      StringReader)
-    (java.util.concurrent
-      TimeUnit)))
+    [mcp-clj.mcp-server.core :as mcp]))
 
 (def test-tool
   {:name "test-add"

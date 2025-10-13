@@ -104,7 +104,7 @@
   (try
     (loop []
       (when @running-atom
-        (when-let [[message error :as result] (stdio/read-json reader)]
+        (when-let [[message error] (stdio/read-json reader)]
           (cond
             error
             (log/error :rpc/read-error {:error error})
@@ -131,7 +131,7 @@
 (defn read-json-with-logging
   "Read JSON message with debug logging"
   [^BufferedReader reader]
-  (when-let [[message error :as result] (stdio/read-json reader)]
+  (when-let [[message error] (stdio/read-json reader)]
     (if error
       (do
         (log/error :rpc/read-error {:error error})

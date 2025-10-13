@@ -127,17 +127,17 @@
                           (java-sdk/call-tool
                             client
                             "clj-eval"
-                            {:code (str "(+ " i " 10)")})))]
+                            {:code (str "(+ " i " 10)")})))
+              results (doall (map deref futures))]
 
           ;; Wait for all to complete
-          (let [results (doall (map deref futures))]
-            (is (= 3 (count results)))
+          (is (= 3 (count results)))
 
-            ;; Each should be a valid result
-            (doseq [result results]
-              (is (map? result))
-              (is (contains? result :content))
-              (is (sequential? (:content result)))))))
+          ;; Each should be a valid result
+          (doseq [result results]
+            (is (map? result))
+            (is (contains? result :content))
+            (is (sequential? (:content result))))))
 
       (testing "mixed operation types concurrently"
         (let [list-future (java-sdk/list-tools client)
@@ -147,19 +147,16 @@
               ls-result   @ls-future
               eval-result @eval-future]
 
-          ;; Wait for all to complete
-          (let []
+          ;; List tools result
+          (is (map? list-result))
+          (is (contains? list-result :tools))
 
-            ;; List tools result
-            (is (map? list-result))
-            (is (contains? list-result :tools))
+          ;; ls result
+          (is (map? ls-result))
+          (is (contains? ls-result :content))
 
-            ;; ls result
-            (is (map? ls-result))
-            (is (contains? ls-result :content))
-
-            ;; eval result
-            (is (= "42" (-> eval-result :content first :text)))))))))
+          ;; eval result
+          (is (= "42" (-> eval-result :content first :text))))))))
 
 (deftest ^:integ test-server-session-robustness
   (testing "server session robustness via Java SDK client"

@@ -4,7 +4,6 @@
    This tests cross-implementation compatibility by using our Clojure MCP client
    to communicate with the Java SDK MCP server subprocess."
   (:require
-    [clojure.string :as str]
     [clojure.test :refer [deftest is testing]]
     [mcp-clj.log :as log]
     [mcp-clj.mcp-client.core :as client])

@@ -1,6 +1,7 @@
 (ns mcp-clj.compliance-test.test-helpers
   "Shared test helpers for MCP compliance tests"
   (:require
+    [clojure.test :refer [testing]]
     [mcp-clj.client-transport.factory :as client-transport-factory]
     [mcp-clj.in-memory-transport.shared :as shared]
     [mcp-clj.java-sdk.interop :as java-sdk]
@@ -239,12 +240,6 @@
 
 ;; Test Environment Creation
 
-(defn- stop-in-memory-server!
-  "Stop an in-memory server"
-  [server]
-  (require 'mcp-clj.in-memory-transport.server)
-  ((ns-resolve 'mcp-clj.in-memory-transport.server 'stop!) server))
-
 (defn create-clojure-pair
   "Create Clojure client + Clojure server pair using in-memory transport.
 
@@ -404,7 +399,7 @@
   [test-fn]
   (doseq [impl test-implementations
           protocol-version test-protocol-versions]
-    (clojure.test/testing (str (:name impl) " [" protocol-version "]")
+    (testing (str (:name impl) " [" protocol-version "]")
       (let [pair ((:create-fn impl) protocol-version)]
         (try
           (test-fn (:client-type impl) protocol-version pair)

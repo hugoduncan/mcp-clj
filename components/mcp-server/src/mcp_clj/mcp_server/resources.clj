@@ -3,9 +3,6 @@
   (:require
     [mcp-clj.log :as log]))
 
-(defrecord ResourceDefinition
-  [name uri mime-type description annotations implementation])
-
 (defn- valid-string?
   [x]
   (and (string? x)
@@ -91,7 +88,7 @@
 
 (defn- read-resource-impl
   "Default implementation for reading a resource"
-  [context {:keys [implementation] :as resource} uri]
+  [context {:keys [implementation] :as _resource} uri]
   (if implementation
     (implementation context uri)
     {:contents [{:uri uri

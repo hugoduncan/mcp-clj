@@ -20,7 +20,7 @@
 (defn create-sdk-client-with-logging-server
   "Create Java SDK client connected to Clojure server with logging enabled.
   Returns map with :client, :init-response, :log-messages atom, and :cleanup-fn."
-  [protocol-version]
+  [_protocol-version]
   (let [;; Atom to collect log messages
         log-messages (atom [])
 
@@ -65,15 +65,6 @@
   [latch timeout-ms]
   (.await latch timeout-ms TimeUnit/MILLISECONDS))
 
-(defn collect-log-messages
-  "Create a callback function and atom to collect log messages.
-  Returns map with :atom containing collected messages and :callback function."
-  []
-  (let [received (atom [])]
-    {:atom received
-     :callback (fn [params]
-                 (swap! received conj params))}))
-
 ;; Compliance Tests
 
 (deftest ^:integ sdk-client-logging-capability-declaration-test
@@ -85,7 +76,6 @@
 
         (testing "server with :logging {} declares logging capability to SDK client"
           (let [pair (create-sdk-client-with-logging-server protocol-version)
-                client (:client pair)
                 init-response (:init-response pair)
                 capabilities (:capabilities init-response)]
             (try
@@ -123,7 +113,7 @@
                           :logging-handler (:handler handler-setup)})
 
                 ;; Initialize the client
-                init-response (java-sdk/initialize-client client)]
+                _init-response (java-sdk/initialize-client client)]
             (try
               ;; Set log level to debug to receive all messages
               @(java-sdk/set-logging-level client :debug)
@@ -161,7 +151,7 @@
                           :async? true
                           :logging-handler (:handler handler-setup)})
 
-                init-response (java-sdk/initialize-client client)]
+                _init-response (java-sdk/initialize-client client)]
             (try
               @(java-sdk/set-logging-level client :debug)
 
@@ -197,7 +187,7 @@
                           :async? true
                           :logging-handler (:handler handler-setup)})
 
-                init-response (java-sdk/initialize-client client)]
+                _init-response (java-sdk/initialize-client client)]
             (try
               ;; Set level to warning - should only receive warning and above
               @(java-sdk/set-logging-level client :warning)

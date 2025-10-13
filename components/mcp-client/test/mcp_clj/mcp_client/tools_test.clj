@@ -72,7 +72,7 @@
 (deftest call-tool-success-test
   ;; Tests successful tool execution returns CompletableFuture with content
   (testing "successful tool execution returns CompletableFuture with content"
-    (let [handler (fn [method params]
+    (let [handler (fn [_method _params]
                     {:content "success result" :isError false})
           client (create-test-client-with-handler handler)]
       (try
@@ -84,7 +84,7 @@
           (stop-server! (:server client))))))
 
   (testing "tool execution with no JSON content parsing"
-    (let [handler (fn [method params]
+    (let [handler (fn [_method _params]
                     {:content [{:type "text" :text "{\"key\": \"value\"}"}]
                      :isError false})
           client (create-test-client-with-handler handler)]
@@ -103,7 +103,7 @@
 (deftest call-tool-error-test
   ;; Tests tool execution returns future with error map when isError is true
   (testing "tool execution returns future with error map when isError is true"
-    (let [handler (fn [method params]
+    (let [handler (fn [_method _params]
                     {:content "error message" :isError true})
           client (create-test-client-with-handler handler)]
       (try
@@ -133,7 +133,7 @@
   (testing "successful tools list request returns CompletableFuture"
     (let [mock-tools [{:name "echo" :description "Echo tool"}
                       {:name "calc" :description "Calculator tool"}]
-          handler (fn [method params]
+          handler (fn [_method _params]
                     {:tools mock-tools})
           client (create-test-client-with-handler handler)]
       (try
@@ -147,7 +147,7 @@
           (stop-server! (:server client))))))
 
   (testing "error handling in tools list returns failed future"
-    (let [handler (fn [method params]
+    (let [handler (fn [_method _params]
                     (throw (ex-info "Connection failed" {})))
           client (create-test-client-with-handler handler)]
       (try
@@ -161,7 +161,7 @@
 (deftest call-tool-impl-test
   ;; Tests successful tool call returns CompletableFuture
   (testing "successful tool call returns CompletableFuture"
-    (let [handler (fn [method params]
+    (let [handler (fn [_method _params]
                     {:content "tool result"
                      :isError false})
           client (create-test-client-with-handler handler)]
@@ -174,7 +174,7 @@
           (stop-server! (:server client))))))
 
   (testing "tool call with error response returns future with error map"
-    (let [handler (fn [method params]
+    (let [handler (fn [_method _params]
                     {:content "Tool execution failed"
                      :isError true})
           client (create-test-client-with-handler handler)]
@@ -189,7 +189,7 @@
           (stop-server! (:server client))))))
 
   (testing "tool call with handler exception"
-    (let [handler (fn [method params]
+    (let [handler (fn [_method _params]
                     (throw (ex-info "Handler error" {})))
           client (create-test-client-with-handler handler)]
       (try

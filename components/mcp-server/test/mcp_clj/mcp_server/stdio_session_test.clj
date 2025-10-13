@@ -1,19 +1,12 @@
 (ns mcp-clj.mcp-server.stdio-session-test
   "Tests for STDIO transport session management.
-  
+
   Verifies that STDIO transport properly creates and manages sessions,
   particularly for the initialized notification which arrives early in
   the lifecycle before any other requests."
   (:require
-    [clojure.data.json :as json]
-    [clojure.java.io :as io]
-    [clojure.string :as str]
     [clojure.test :refer [deftest is testing]]
-    [mcp-clj.mcp-server.core :as mcp])
-  (:import
-    (java.io
-      BufferedReader
-      StringReader)))
+    [mcp-clj.mcp-server.core :as mcp]))
 
 (deftest stdio-session-creation-test
   ;; Test that STDIO transport creates a default session on server creation
@@ -64,13 +57,12 @@
 (deftest stdio-request-handler-session-test
   ;; Test that request handlers can find the STDIO session
   (testing "STDIO request handlers receive session correctly"
-    (let [received-sessions (atom [])
-          test-tool {:name "test-tool"
+    (let [test-tool {:name "test-tool"
                      :description "Test tool for session verification"
                      :inputSchema {:type "object"
                                    :properties {}
                                    :required []}
-                     :implementation (fn [_server params]
+                     :implementation (fn [_server _params]
                                        ;; This will be called by the handler
                                        [{:type "text" :text "ok"}])}
           server (mcp/create-server {:transport {:type :stdio}

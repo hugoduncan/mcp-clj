@@ -72,7 +72,7 @@
 
   Returns:
     Feature-specific result based on the protocol version"
-  (fn [protocol-version feature-type context]
+  (fn [protocol-version feature-type _context]
     [protocol-version feature-type]))
 
 (defmethod handle-version-specific-behavior :default
@@ -155,7 +155,7 @@
 ;; Header validation
 
 (defmethod handle-version-specific-behavior ["2025-06-18" :headers]
-  [protocol-version _ {:keys [headers]}]
+  [_protocol-version _ {:keys [headers]}]
   ;; 2025-06-18 requires MCP-Protocol-Version header
   (let [mcp-version-header (get headers "mcp-protocol-version")]
     (if mcp-version-header
@@ -164,13 +164,13 @@
        :error "MCP-Protocol-Version header is required for version 2025-06-18"})))
 
 (defmethod handle-version-specific-behavior ["2025-03-26" :headers]
-  [protocol-version _ {:keys [headers]}]
+  [_protocol-version _ {:keys [headers]}]
   ;; 2025-03-26 does not require MCP-Protocol-Version header
   (let [mcp-version-header (get headers "mcp-protocol-version")]
     {:valid? true :protocol-version mcp-version-header}))
 
 (defmethod handle-version-specific-behavior ["2024-11-05" :headers]
-  [protocol-version _ {:keys [headers]}]
+  [_protocol-version _ {:keys [headers]}]
   ;; 2024-11-05 does not require MCP-Protocol-Version header
   (let [mcp-version-header (get headers "mcp-protocol-version")]
     {:valid? true :protocol-version mcp-version-header}))

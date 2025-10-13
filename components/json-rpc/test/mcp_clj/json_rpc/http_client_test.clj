@@ -4,9 +4,7 @@
     [mcp-clj.json-rpc.http-client :as http-client])
   (:import
     (java.util.concurrent
-      ConcurrentHashMap)
-    (java.util.concurrent.atomic
-      AtomicLong)))
+      ConcurrentHashMap)))
 
 (deftest create-http-json-rpc-client-test
   ;; Test client creation and basic functionality without HTTP server
