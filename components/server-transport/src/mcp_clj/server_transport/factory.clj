@@ -29,6 +29,8 @@
   (swap! transport-registry assoc transport-type factory-fn)
   nil)
 
+#_{:clojure-lsp/ignore [:clojure-lsp/unused-public-var]}
+
 (defn unregister-transport!
   "Remove a transport type from the registry.
 
@@ -42,6 +44,8 @@
   "Return a vector of all registered transport types."
   []
   (vec (keys @transport-registry)))
+
+#_{:clojure-lsp/ignore [:clojure-lsp/unused-public-var]}
 
 (defn transport-registered?
   "Check if a transport type is registered.
