@@ -2,7 +2,6 @@
   "JSON-RPC client for HTTP transport with SSE support"
   (:require
     [clojure.data.json :as json]
-    [clojure.java.io :as io]
     [clojure.string :as str]
     [mcp-clj.http-client.core :as http-client]
     [mcp-clj.json-rpc.executor :as executor]

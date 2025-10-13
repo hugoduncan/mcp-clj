@@ -3,14 +3,8 @@
     [clojure.data.json :as json]
     [clojure.test :refer [deftest is testing use-fixtures]]
     [hato.client :as hato]
-    [mcp-clj.http :as http]
     [mcp-clj.json-rpc.http-server :as http-server]
-    [mcp-clj.json-rpc.json-protocol :as json-protocol]
-    [mcp-clj.json-rpc.protocols :as protocols])
-  (:import
-    (java.util.concurrent
-      CountDownLatch
-      TimeUnit)))
+    [mcp-clj.json-rpc.protocols :as protocols]))
 
 ;; Test Fixtures and Helpers
 

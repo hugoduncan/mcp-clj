@@ -10,8 +10,9 @@
   "Test polymorphic behavior across different server types"
   [create-server-fn server-type]
   (let [server (create-server-fn)
-        handlers {"echo" (fn [method params] params)
-                  "add" (fn [method params] {:sum (+ (first params) (second params))})}]
+        handlers
+        {"echo" (fn [_method params] params)
+         "add" (fn [_method params] {:sum (+ (first params) (second params))})}]
 
     (testing (str server-type " - satisfies JsonRpcServer protocol")
       (is (satisfies? protocols/JsonRpcServer server)))
@@ -48,7 +49,7 @@
         (is (satisfies? protocols/JsonRpcServer stdio-server)))
 
       (testing "Protocol functions work on both server types"
-        (let [test-handlers {"test" (fn [method params] {:result params})}]
+        (let [test-handlers {"test" (fn [_method params] {:result params})}]
           ;; Test set-handlers! on both
           (protocols/set-handlers! sse-server test-handlers)
           (protocols/set-handlers! stdio-server test-handlers)
@@ -86,10 +87,10 @@
 
 (deftest cross-server-handler-compatibility-test
   (testing "Handlers work consistently across server types"
-    (let [shared-handlers {"echo" (fn [method params] params)
-                           "multiply" (fn [method params]
+    (let [shared-handlers {"echo" (fn [_method params] params)
+                           "multiply" (fn [_method params]
                                         {:result (* (first params) (second params))})
-                           "error" (fn [method params]
+                           "error" (fn [_method params]
                                      (throw (ex-info "Test error" {:params params})))}
           sse-server (sse-server/create-server {:port 0})
           stdio-server (stdio-server/create-server {})]
@@ -121,7 +122,7 @@
                    (stdio-server/create-server {})
                    (sse-server/create-server {:port 0})
                    (stdio-server/create-server {})]
-          shared-handlers {"ping" (fn [method params] "pong")}]
+          shared-handlers {"ping" (fn [_method _params] "pong")}]
 
       (testing "Bulk operations on heterogeneous server collection"
         ;; Set handlers on all servers

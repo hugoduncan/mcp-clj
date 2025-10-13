@@ -74,19 +74,9 @@
   "Send JSON-RPC request"
   [url request]
   (prn :send-request url request)
-  (-> (hato/post url
-                 {:headers {"Content-Type" "application/json"}
-                  :body (json/write-str request)})
-      #_:body
-      #_(json/read-str :key-fn keyword)))
-
-(defn make-request
-  "Create JSON-RPC request"
-  [method params id]
-  {:jsonrpc "2.0"
-   :method method
-   :params params
-   :id id})
+  (hato/post url
+             {:headers {"Content-Type" "application/json"}
+              :body    (json/write-str request)}))
 
 (defn- poll
   [^BlockingQueue queue]
@@ -181,14 +171,6 @@
     (prn state-key (get data data-key))
     (assoc state state-key (get data data-key))))
 
-(defn- update-state-apply-data
-  [state-key]
-  (fn apply-data
-    [state data]
-    (prn :apply-data :state state :data data)
-    (prn state-key data)
-    (assoc state state-key data)))
-
 (defn- json-request
   [method params & [id]]
   (cond->
@@ -251,7 +233,7 @@
                       (flush))))]
           (testing "initialisation"
             (let [state (assoc state :plan (initialisation-plan))
-                  [state' result] (run-plan state)]
+                  [_state' result] (run-plan state)]
               (is (= :passed result))))
           (future-cancel f))))))
 
@@ -421,7 +403,7 @@
                       (flush))))]
           (testing "initialisation"
             (let [state (assoc state :plan (initialisation-plan))
-                  [state' result] (run-plan state)]
+                  [_state' result] (run-plan state)]
               (is (= :passed result))
 
               ;; Add a tool dynamically - this should trigger notifications
@@ -520,7 +502,7 @@
                                             :isError false}
                                            nil
                                            0)}}])
-                        [state' result] (run-plan state)]
+                        [_state' result] (run-plan state)]
                     (is (= :passed result))))))
             (future-cancel f)))))))
 
@@ -565,7 +547,7 @@
                              {:resources []}
                              {}
                              0)}}])
-                      [state' result] (run-plan state)
+                      [_state' result] (run-plan state)
                       _ (testing "resources/list"
                           (is (= :passed result)))]))))
           (future-cancel f))))))
@@ -617,7 +599,7 @@
                                   :required true}]}]}
                              nil
                              0)}}])
-                      [state' result] (run-plan state)
+                      [_state' result] (run-plan state)
                       _ (testing "prompts/list"
                           (is (= :passed result)))]))))
           (future-cancel f))))))

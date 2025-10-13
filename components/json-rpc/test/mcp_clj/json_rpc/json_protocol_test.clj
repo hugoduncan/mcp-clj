@@ -1,6 +1,6 @@
 (ns mcp-clj.json-rpc.json-protocol-test
   (:require
-    [clojure.test :refer :all]
+    [clojure.test :refer [deftest is testing]]
     [mcp-clj.json-rpc.json-protocol :as protocol]))
 
 (deftest json-conversion

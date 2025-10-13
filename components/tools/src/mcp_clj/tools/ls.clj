@@ -104,7 +104,7 @@
                                               (>= (inc current-depth) max-depth))) ; can't go deeper
                                        remaining-files))
                         (swap! result assoc :max-depth-reached true))))
-                  (catch Exception e
+                  (catch Exception _e
                     ;; Skip directories we can't read
                     nil))))]
 

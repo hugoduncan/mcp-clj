@@ -10,9 +10,7 @@
   (:import
     (java.io
       BufferedReader
-      BufferedWriter
-      InputStreamReader
-      OutputStreamWriter)
+      InputStreamReader)
     (java.util.concurrent
       RejectedExecutionException)))
 

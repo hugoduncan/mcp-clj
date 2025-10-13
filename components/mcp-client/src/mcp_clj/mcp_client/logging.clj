@@ -1,11 +1,10 @@
 (ns mcp-clj.mcp-client.logging
   "Logging support for MCP client.
-  
+
   Provides functions for setting log levels and subscribing to log messages
   from MCP servers following the logging utility protocol."
   (:require
     [mcp-clj.log :as log]
-    [mcp-clj.mcp-client.session :as session]
     [mcp-clj.mcp-client.subscriptions :as subscriptions]
     [mcp-clj.mcp-client.transport :as transport])
   (:import
@@ -33,7 +32,7 @@
 
 (defn keyword->string
   "Convert a log level keyword to its string representation.
-  
+
   Examples:
     (keyword->string :error) => \"error\"
     (keyword->string :warning) => \"warning\""
@@ -42,7 +41,7 @@
 
 (defn string->keyword
   "Convert a log level string to its keyword representation.
-  
+
   Examples:
     (string->keyword \"error\") => :error
     (string->keyword \"warning\") => :warning"
@@ -53,7 +52,7 @@
 
 (defn set-log-level-impl!
   "Implementation of set-log-level! - sets minimum log level on the server.
-  
+
   Validates the level, checks server capability, and sends logging/setLevel request."
   [client level]
   (when-not (valid-level? level)
@@ -78,7 +77,7 @@
 
 (defn subscribe-log-messages-impl!
   "Implementation of subscribe-log-messages! - subscribes to log message notifications.
-  
+
   Returns a CompletableFuture that resolves to an unsubscribe function."
   [client callback-fn]
   (let [registry (:subscription-registry client)]

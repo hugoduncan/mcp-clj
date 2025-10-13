@@ -7,8 +7,10 @@
 
   Version-specific behavior is tested using conditional assertions."
   (:require
+    [clojure.string :as str]
     [clojure.test :refer [deftest is testing]]
     [mcp-clj.compliance-test.test-helpers :as helpers]
+    [mcp-clj.in-memory-transport.shared :as shared]
     [mcp-clj.mcp-client.core :as client]
     [mcp-clj.mcp-server.core :as mcp-server]
     [mcp-clj.mcp-server.logging :as server-logging])
@@ -23,9 +25,12 @@
   "Create server with logging capability enabled for given protocol version.
   Returns map with :client, :server, :init-response, and :cleanup-fn."
   [protocol-version]
-  (let [shared-transport (mcp-clj.in-memory-transport.shared/create-shared-transport)
+  (let [shared-transport (shared/create-shared-transport)
         server-atom (atom nil)
-        test-tools (helpers/create-test-tools protocol-version :server-atom server-atom)
+        test-tools (helpers/create-test-tools
+                     protocol-version
+                     :server-atom
+                     server-atom)
 
         ;; Create server with logging capability
         mcp-server (mcp-server/create-server
@@ -60,7 +65,7 @@
   "Create server WITHOUT logging capability for given protocol version.
   Returns map with :client, :server, :init-response, and :cleanup-fn."
   [protocol-version]
-  (let [shared-transport (mcp-clj.in-memory-transport.shared/create-shared-transport)
+  (let [shared-transport (shared/create-shared-transport)
         test-tools (helpers/create-test-tools protocol-version)
 
         ;; Create server WITHOUT logging capability
@@ -106,9 +111,9 @@
         messages (atom [])
         call-count (atom 0)]
     {:callback (fn [params]
-                 (let [count (swap! call-count inc)]
-                   (swap! messages conj params)
-                   (.countDown latch)))
+                 (swap! call-count inc)
+                 (swap! messages conj params)
+                 (.countDown latch))
      :messages messages
      :latch latch
      :call-count call-count}))
@@ -425,7 +430,7 @@
                                 (name (:level msg))
                                 (:level msg))]
                     (is (string? level) "Level should be string")
-                    (is (= level (clojure.string/lower-case level))
+                    (is (= level (str/lower-case level))
                         "Level should be lowercase")))))
 
             (testing "severity ordering is correct"

@@ -1,22 +1,9 @@
 (ns mcp-clj.mcp-server.transport-test
   "Tests for MCP server transport selection and functionality"
   (:require
-    [clojure.data.json :as json]
-    [clojure.java.io :as io]
-    [clojure.string :as str]
     [clojure.test :refer [deftest is testing]]
     [mcp-clj.json-rpc.protocols :as json-rpc-protocols]
-    [mcp-clj.mcp-server.core :as mcp]
-    [mcp-clj.tools.core :as tools])
-  (:import
-    (java.io
-      ByteArrayInputStream
-      ByteArrayOutputStream
-      PipedInputStream
-      PipedOutputStream
-      StringReader)
-    (java.util.concurrent
-      TimeUnit)))
+    [mcp-clj.mcp-server.core :as mcp]))
 
 (def test-tool
   {:name "test-add"
@@ -155,17 +142,17 @@
         (testing "All servers support set-handlers!"
           (is (some? (json-rpc-protocols/set-handlers!
                        @(:json-rpc-server stdio-server)
-                       {"new" (fn [m p] {:test "result"})}))
+                       {"new" (fn [_m _p] {:test "result"})}))
               "stdio server should support set-handlers!")
 
           (is (some? (json-rpc-protocols/set-handlers!
                        @(:json-rpc-server sse-server)
-                       {"new" (fn [r p] {:test "result"})}))
+                       {"new" (fn [_r _p] {:test "result"})}))
               "sse server should support set-handlers!")
 
           (is (some? (json-rpc-protocols/set-handlers!
                        @(:json-rpc-server http-server)
-                       {"new" (fn [r p] {:test "result"})}))
+                       {"new" (fn [_r _p] {:test "result"})}))
               "http server should support set-handlers!"))
 
         (testing "All servers support notify-all!"

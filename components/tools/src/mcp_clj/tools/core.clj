@@ -6,9 +6,8 @@
 
 (defn valid-tool?
   "Validate a tool definition"
-  [{:keys [name description inputSchema implementation] :as tool}]
+  [{:keys [name description inputSchema implementation] :as _tool}]
   (and (string? name)
-       (not (empty? name))
        (string? description)
        (map? inputSchema)
        (ifn? implementation)))

@@ -12,6 +12,7 @@
   The :build alias in each project's deps.edn configures the project-specific
   parameters."
   (:require
+    [clojure.java.io :as io]
     [clojure.tools.build.api :as b]))
 
 (def major-minor "0.1")
@@ -19,10 +20,10 @@
 (def root-dir
   "Find the repository root by looking for deps.edn with :build alias."
   (let [cwd (System/getProperty "user.dir")]
-    (loop [dir (clojure.java.io/file cwd)]
+    (loop [dir (io/file cwd)]
       (cond
         (nil? dir) cwd
-        (.exists (clojure.java.io/file dir "dev" "build.clj")) (.getPath dir)
+        (.exists (io/file dir "dev" "build.clj")) (.getPath dir)
         :else (recur (.getParentFile dir))))))
 
 (defn version

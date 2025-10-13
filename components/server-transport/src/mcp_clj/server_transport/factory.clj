@@ -29,6 +29,8 @@
   (swap! transport-registry assoc transport-type factory-fn)
   nil)
 
+#_{:clojure-lsp/ignore [:clojure-lsp/unused-public-var]}
+
 (defn unregister-transport!
   "Remove a transport type from the registry.
 
@@ -42,6 +44,8 @@
   "Return a vector of all registered transport types."
   []
   (vec (keys @transport-registry)))
+
+#_{:clojure-lsp/ignore [:clojure-lsp/unused-public-var]}
 
 (defn transport-registered?
   "Check if a transport type is registered.
@@ -102,7 +106,7 @@
     server))
 
 (defn- create-sse-server
-  [{:keys [port on-sse-connect on-sse-close allowed-origins] :as options} handlers]
+  [{:keys [port on-sse-connect on-sse-close allowed-origins]} handlers]
   (require 'mcp-clj.json-rpc.sse-server)
   (let [create-server (ns-resolve 'mcp-clj.json-rpc.sse-server 'create-server)
         set-handlers! (ns-resolve 'mcp-clj.json-rpc.sse-server 'set-handlers!)
@@ -117,7 +121,7 @@
     server))
 
 (defn- create-http-server
-  [{:keys [port num-threads on-connect on-disconnect allowed-origins] :as options} handlers]
+  [{:keys [port num-threads on-connect on-disconnect allowed-origins]} handlers]
   (require 'mcp-clj.json-rpc.http-server)
   (let [create-server (ns-resolve 'mcp-clj.json-rpc.http-server 'create-server)
         set-handlers! (ns-resolve 'mcp-clj.json-rpc.http-server 'set-handlers!)

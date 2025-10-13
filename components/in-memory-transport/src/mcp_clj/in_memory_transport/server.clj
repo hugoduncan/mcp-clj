@@ -86,7 +86,7 @@
 
   The shared transport should be the same instance used by the client."
   [options handlers]
-  (let [{:keys [shared on-connect on-disconnect]} options]
+  (let [{:keys [shared]} options]
     (when-not shared
       (throw (ex-info "Missing :shared transport in server configuration"
                       {:config options})))
@@ -101,7 +101,7 @@
 
 (defn start!
   "Start the in-memory server (no-op for in-memory transport)"
-  [server]
+  [_server]
   (log/info :in-memory/server-started {}))
 
 (defn stop!
