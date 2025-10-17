@@ -63,7 +63,8 @@
                         "components/stdio-server/test"
                         "components/tools/test"
                         "components/versions/test"]
-           :kaocha.filter/focus-meta [:integ]}]
+           :kaocha.filter/focus-meta [:integ]
+           :skip-meta [:disabled]}]
 
   :plugins [:kaocha.plugin/randomize
             :kaocha.plugin/filter
