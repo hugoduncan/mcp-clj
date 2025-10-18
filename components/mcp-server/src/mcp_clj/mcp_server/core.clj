@@ -305,7 +305,7 @@
         {})
       (throw (ex-info "Resource not found"
                       {:code -32602
-                       :message "Invalid params"
+                       :message "Resource not found"
                        :data {:uri uri}})))))
 
 (defn- handle-unsubscribe-resource

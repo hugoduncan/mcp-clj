@@ -84,7 +84,10 @@
 ;; - clj-client-resource-update-notification-test
 ;; - clj-client-resource-unsubscribe-test
 
-(deftest ^:disabled clj-client-resource-subscription-test
+(deftest ^:integ ^:disabled clj-client-resource-subscription-test
+  ;; DISABLED: Java SDK server does not implement resources/subscribe
+  ;; The Java SDK server returns "Method not found: resources/subscribe" error
+  ;; when attempting to subscribe to resources.
   (testing "Clojure client can subscribe to resources on Java SDK server"
     (doseq [protocol-version helpers/test-protocol-versions]
       (testing (str "protocol version " protocol-version)
@@ -103,12 +106,13 @@
                 (is (nil? result)
                     "Subscribe should return nil on success")))))))))
 
-(deftest ^:disabled clj-client-resource-update-notification-test
-  ;; Test that Clojure client receives notifications when resource is updated on Java SDK server
+(deftest ^:integ ^:disabled clj-client-resource-update-notification-test
+  ;; DISABLED: Java SDK server does not implement resources/subscribe
+  ;; The Java SDK server returns "Method not found: resources/subscribe" error
+  ;; when attempting to subscribe to resources.
   (testing "Clojure client receives resource update notifications from Java SDK server"
     (doseq [protocol-version helpers/test-protocol-versions]
       (testing (str "protocol version " protocol-version)
-
         (testing "client receives notification when subscribed resource is updated"
           (let [handler-setup (create-latch-resource-handler 1)]
             (with-open [mcp-client (create-client)]
@@ -123,15 +127,13 @@
 
               ;; Trigger resource update via tool
               @(client/call-tool mcp-client "trigger-resource-update"
-                                 {:uri "test://dynamic-resource"})
+                                 {:resourceUri "test://dynamic-resource"})
 
-              ;; Wait for notification with 5 second timeout
-              (let [completed? (wait-for-notifications (:latch handler-setup) 5000)
-                    received @(:notifications handler-setup)]
-                (is completed? "Should receive notification within timeout")
-                (is (= 1 (count received)) "Should receive exactly 1 notification")
-                (is (= "test://dynamic-resource" (:uri (first received)))
-                    "Notification should contain correct resource URI")))))
+              ;; Wait for notification
+              (is (wait-for-notifications (:latch handler-setup) 1000)
+                  "Should receive resource update notification")
+              (is (= "test://dynamic-resource" @(:last-uri handler-setup))
+                  "Should receive notification for correct resource"))))
 
         (testing "multiple notifications are received for multiple updates"
           (let [handler-setup (create-latch-resource-handler 3)]
@@ -147,26 +149,26 @@
 
               ;; Trigger multiple updates
               @(client/call-tool mcp-client "trigger-resource-update"
-                                 {:uri "test://dynamic-resource"})
+                                 {:resourceUri "test://dynamic-resource"})
               @(client/call-tool mcp-client "trigger-resource-update"
-                                 {:uri "test://dynamic-resource"})
+                                 {:resourceUri "test://dynamic-resource"})
               @(client/call-tool mcp-client "trigger-resource-update"
-                                 {:uri "test://dynamic-resource"})
+                                 {:resourceUri "test://dynamic-resource"})
 
-              ;; Wait for all notifications
-              (let [completed? (wait-for-notifications (:latch handler-setup) 5000)
-                    received @(:notifications handler-setup)]
-                (is completed? "Should receive all notifications within timeout")
-                (is (= 3 (count received)) "Should receive exactly 3 notifications")
-                (is (every? #(= "test://dynamic-resource" (:uri %)) received)
-                    "All notifications should contain correct resource URI")))))))))
+              ;; Should receive all 3 notifications
+              (is (wait-for-notifications (:latch handler-setup) 2000)
+                  "Should receive all resource update notifications")
+              (is (= 3 @(:notification-count handler-setup))
+                  "Should receive exactly 3 notifications"))))))))
 
-(deftest ^:disabled clj-client-resource-unsubscribe-test
+(deftest ^:integ ^:disabled clj-client-resource-unsubscribe-test
+  ;; DISABLED: Java SDK server does not implement resources/subscribe
+  ;; The Java SDK server returns "Method not found: resources/subscribe" error
+  ;; when attempting to subscribe to resources.
   ;; Test that unsubscribing stops notification delivery from Java SDK server
-  (testing "Clojure client can unsubscribe from resources on Java SDK server"
+  (testing "Clojure client can unsubscribe from resources"
     (doseq [protocol-version helpers/test-protocol-versions]
       (testing (str "protocol version " protocol-version)
-
         (testing "unsubscribing stops notification delivery"
           (let [handler-setup (create-latch-resource-handler 1)]
             (with-open [mcp-client (create-client)]
@@ -181,30 +183,28 @@
 
               ;; Trigger update to verify subscription works
               @(client/call-tool mcp-client "trigger-resource-update"
-                                 {:uri "test://dynamic-resource"})
+                                 {:resourceUri "test://dynamic-resource"})
+              (is (wait-for-notifications (:latch handler-setup) 1000)
+                  "Initial subscription should work")
 
-              ;; Wait for first notification
-              (let [completed? (wait-for-notifications (:latch handler-setup) 5000)]
-                (is completed? "Should receive first notification"))
-
-              ;; Now unsubscribe
+              ;; Unsubscribe from the resource
               @(client/unsubscribe-resource! mcp-client "test://dynamic-resource")
 
-              ;; Record notification count before triggering another update
-              (let [notifications-before (count @(:notifications handler-setup))]
+              ;; Create new latch for testing post-unsubscribe
+              (reset! (:latch handler-setup) (CountDownLatch. 1))
 
-                ;; Trigger another update
-                @(client/call-tool mcp-client "trigger-resource-update"
-                                   {:uri "test://dynamic-resource"})
+              ;; Trigger another update - should NOT receive notification
+              @(client/call-tool mcp-client "trigger-resource-update"
+                                 {:resourceUri "test://dynamic-resource"})
 
-                ;; Wait a bit to see if notification arrives (it shouldn't)
-                (Thread/sleep 2000)
+              ;; Should timeout waiting for notification
+              (is (not (wait-for-notifications (:latch handler-setup) 500))
+                  "Should not receive notification after unsubscribe"))))))))
 
-                (let [notifications-after (count @(:notifications handler-setup))]
-                  (is (= notifications-before notifications-after)
-                      "Notification count should not increase after unsubscribe"))))))))))
-
-(deftest ^:disabled clj-client-resource-error-handling-test
+(deftest ^:integ ^:disabled clj-client-resource-error-handling-test
+  ;; DISABLED: Java SDK server does not implement resources/subscribe
+  ;; The Java SDK server returns "Method not found: resources/subscribe" error
+  ;; when attempting to subscribe to resources.
   ;; Test error handling for invalid subscriptions
   (testing "Clojure client handles subscription errors correctly with Java SDK server"
     (doseq [protocol-version helpers/test-protocol-versions]
