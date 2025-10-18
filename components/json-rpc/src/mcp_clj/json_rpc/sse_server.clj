@@ -38,9 +38,32 @@
   "Process a JSON-RPC request"
   [handler {:keys [method params id]} request reply!-fn]
   (log/info :rpc/invoke {:method method :params params})
-  (when-let [response (handler request params)]
-    (log/info :server/handler-response response)
-    (reply!-fn (json-protocol/json-rpc-result response id))))
+  (try
+    (when-let [response (handler request params)]
+      (log/info :server/handler-response response)
+      (reply!-fn (json-protocol/json-rpc-result response id)))
+    (catch clojure.lang.ExceptionInfo e
+      (let [data (ex-data e)]
+        (if (and (:code data) (:message data))
+          (do
+            (log/info :rpc/handler-json-rpc-error {:error data})
+            (reply!-fn (json-protocol/json-rpc-error
+                         (:code data)
+                         (:message data)
+                         id
+                         (:data data))))
+          (do
+            (log/error :rpc/handler-error {:error e})
+            (reply!-fn (json-protocol/json-rpc-error
+                         :internal-error
+                         (.getMessage e)
+                         id))))))
+    (catch Throwable e
+      (log/error :rpc/handler-error {:error e})
+      (reply!-fn (json-protocol/json-rpc-error
+                   :internal-error
+                   (.getMessage e)
+                   id)))))
 
 (defn- dispatch-rpc-call
   [executor handler rpc-call request reply!-fn]

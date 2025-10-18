@@ -303,9 +303,10 @@
         (swap! (:resource-subscriptions server)
                subscriptions/subscribe! session-id uri)
         {})
-      {:content [{:type "text"
-                  :text (str "Resource not found: " uri)}]
-       :isError true})))
+      (throw (ex-info "Resource not found"
+                      {:code -32602
+                       :message "Invalid params"
+                       :data {:uri uri}})))))
 
 (defn- handle-unsubscribe-resource
   "Handle resources/unsubscribe request from client"

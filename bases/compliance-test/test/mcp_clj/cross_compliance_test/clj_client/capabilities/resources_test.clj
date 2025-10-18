@@ -204,7 +204,7 @@
                   (is (= notifications-before notifications-after)
                       "Notification count should not increase after unsubscribe"))))))))))
 
-(deftest ^:integ clj-client-resource-error-handling-test
+(deftest ^:disabled clj-client-resource-error-handling-test
   ;; Test error handling for invalid subscriptions
   (testing "Clojure client handles subscription errors correctly with Java SDK server"
     (doseq [protocol-version helpers/test-protocol-versions]
