@@ -27,7 +27,9 @@
       McpServer$AsyncSpecification
       McpServer$SingleSessionSyncSpecification
       McpServer$StreamableSyncSpecification
+      McpServerFeatures$AsyncResourceSpecification
       McpServerFeatures$AsyncToolSpecification$Builder
+      McpServerFeatures$SyncResourceSpecification
       McpServerFeatures$SyncToolSpecification
       McpServerFeatures$SyncToolSpecification$Builder
       McpSyncServer)
@@ -46,19 +48,27 @@
       McpSchema$EmbeddedResource
       McpSchema$ImageContent
       McpSchema$InitializeResult
+      McpSchema$ListResourcesResult
       McpSchema$ListToolsResult
       McpSchema$LoggingLevel
       McpSchema$LoggingMessageNotification
+      McpSchema$ReadResourceRequest
+      McpSchema$ReadResourceResult
+      McpSchema$Resource
+      McpSchema$ResourceContents
       McpSchema$ResourceLink
+      McpSchema$ResourcesUpdatedNotification
       McpSchema$ServerCapabilities
       McpSchema$ServerCapabilities$Builder
       McpSchema$ServerCapabilities$LoggingCapabilities
       McpSchema$ServerCapabilities$PromptCapabilities
       McpSchema$ServerCapabilities$ResourceCapabilities
       McpSchema$ServerCapabilities$ToolCapabilities
+      McpSchema$SubscribeRequest
       McpSchema$TextContent
       McpSchema$TextResourceContents
       McpSchema$Tool
+      McpSchema$UnsubscribeRequest
       McpServerTransportProvider)
     (java.lang
       AutoCloseable)
@@ -290,9 +300,16 @@
   - :logging-handler - Optional callback function for logging notifications
                        Receives map with :level, :data, and optional :logger keys
 
+  NOTE: Java SDK 0.11.2 does not support notifications/resources/updated at the
+  client level. Resource update notifications cannot be received.
+
   Returns a JavaSdkClient record that implements AutoCloseable."
-  [{:keys [transport timeout async? logging-handler]
+  [{:keys [transport timeout async? logging-handler resource-update-handler]
     :or {timeout 30 async? true}}]
+  (when resource-update-handler
+    (log/warn :java-sdk/unsupported-feature
+              {:feature :resource-update-handler
+               :message "Java SDK 0.11.2 does not support resource update notifications - handler will be ignored"}))
   (let [builder (if async?
                   (McpClient/async transport)
                   (McpClient/sync transport))
@@ -352,6 +369,8 @@
                                           :message (.getMessage e)
                                           :stack-trace (with-out-str (.printStackTrace e))})))))))
                   builder)
+
+        ;; Add resource update consumer if provided
 
         client (if async?
                  (.build ^McpClient$AsyncSpec builder)
@@ -556,6 +575,53 @@
                 (McpSchema$LoggingLevel/valueOf (str/upper-case level-str)))
               nil)))))))
 
+(defn subscribe-resource
+  "Subscribe to a resource via the Java SDK client.
+
+  Parameters:
+  - client-record - JavaSdkClient record
+  - uri - Resource URI string to subscribe to
+
+  Returns a CompletableFuture that completes when the subscription is established.
+  The future will complete exceptionally if the resource doesn't exist or subscription fails."
+  [^JavaSdkClient client-record ^String uri]
+  (log/info :java-sdk/subscribing-to-resource {:uri uri})
+  (let [request (McpSchema$SubscribeRequest. uri)]
+    (if (:async? client-record)
+      (let [^McpAsyncClient client (:client client-record)
+            mono (.subscribeResource client request)]
+        (.toFuture mono))
+      (CompletableFuture/supplyAsync
+        (reify java.util.function.Supplier
+          (get
+            [_]
+            (let [^McpSyncClient client (:client client-record)]
+              (.subscribeResource client request)
+              nil)))))))
+
+(defn unsubscribe-resource
+  "Unsubscribe from a resource via the Java SDK client.
+
+  Parameters:
+  - client-record - JavaSdkClient record
+  - uri - Resource URI string to unsubscribe from
+
+  Returns a CompletableFuture that completes when the unsubscription is processed."
+  [^JavaSdkClient client-record ^String uri]
+  (log/info :java-sdk/unsubscribing-from-resource {:uri uri})
+  (let [request (McpSchema$UnsubscribeRequest. uri)]
+    (if (:async? client-record)
+      (let [^McpAsyncClient client (:client client-record)
+            mono (.unsubscribeResource client request)]
+        (.toFuture mono))
+      (CompletableFuture/supplyAsync
+        (reify java.util.function.Supplier
+          (get
+            [_]
+            (let [^McpSyncClient client (:client client-record)]
+              (.unsubscribeResource client request)
+              nil)))))))
+
 ;; Server API (placeholder - not fully implemented yet)
 
 (defn create-java-server
@@ -566,34 +632,45 @@
   - :version - Server version (default '0.1.0')
   - :async? - Whether to create async server (default true)
   - :transport - Server transport provider (default stdio)
+  - :capabilities - Map of capabilities to enable:
+    - :tools - Enable tools capability (default true)
+    - :resources - Enable resources capability with optional :subscribe and :listChanged
 
   Returns a JavaSdkServer record that implements AutoCloseable."
-  [{:keys [name version async? transport]
-    :or {name "java-sdk-server" version "0.1.0" async? true}}]
+  [{:keys [name version async? transport capabilities]
+    :or {name "java-sdk-server" version "0.1.0" async? true
+         capabilities {:tools true}}}]
   (log/debug :java-sdk/creating-server
-             {:name name :version version :async? async?})
+             {:name name :version version :async? async? :capabilities capabilities})
   (let [transport
         (or transport (create-stdio-server-transport))
+
+        ;; Build capabilities
+        caps-builder (McpSchema$ServerCapabilities$Builder.)
+        caps-builder (if (:tools capabilities)
+                       (.tools caps-builder true)
+                       caps-builder)
+        caps-builder (if-let [resources-cap (:resources capabilities)]
+                       (let [subscribe (get resources-cap :subscribe false)
+                             list-changed (get resources-cap :listChanged false)]
+                         (.resources caps-builder subscribe list-changed))
+                       caps-builder)
+        server-caps (.build caps-builder)
+
         server (if async?
                  (let [builder (if (instance? McpServerTransportProvider transport)
                                  (McpServer/async ^McpServerTransportProvider transport)
                                  (McpServer/async ^WebFluxStreamableServerTransportProvider transport))]
                    (-> ^McpServer$AsyncSpecification builder
                        (.serverInfo name version)
-                       (.capabilities
-                         (-> (McpSchema$ServerCapabilities$Builder.)
-                             (.tools true)
-                             (.build)))
+                       (.capabilities server-caps)
                        (.build)))
                  (let [builder (if (instance? McpServerTransportProvider transport)
                                  (McpServer/sync ^McpServerTransportProvider transport)
                                  (McpServer/sync ^WebFluxStreamableServerTransportProvider transport))]
                    (-> ^McpServer$StreamableSyncSpecification builder
                        (.serverInfo name version)
-                       (.capabilities
-                         (-> (McpSchema$ServerCapabilities$Builder.)
-                             (.tools true)
-                             (.build)))
+                       (.capabilities server-caps)
                        (.build))))]
     (->JavaSdkServer server name version async?)))
 
@@ -675,8 +752,100 @@
         (.addTool sync-server tool-spec))))
   server-record)
 
+(defn register-resource
+  "Register a resource with the Java SDK server.
+
+  Args:
+  - server-record: JavaSdkServer record
+  - resource-spec: Map with :uri, :name, :description, :mime-type, :implementation keys
+    - :uri - Resource URI (required)
+    - :name - Human-readable name (required)
+    - :description - Optional description
+    - :mime-type - Optional MIME type
+    - :implementation - Function taking [exchange request] and returning resource contents
+
+  Returns the updated server record."
+  [^JavaSdkServer server-record
+   {:keys [uri name description mime-type implementation] :as resource-spec}]
+  (when-not (:server server-record)
+    (throw (ex-info "Invalid server record" {:server-record server-record})))
+  (log/info :java-sdk/registering-resource {:uri uri :name name})
+
+  (let [resource-builder (-> (McpSchema$Resource/builder)
+                             (.uri uri)
+                             (.name name))
+        resource-builder (if description
+                           (.description resource-builder description)
+                           resource-builder)
+        resource-builder (if mime-type
+                           (.mimeType resource-builder mime-type)
+                           resource-builder)
+        resource (.build resource-builder)
+        ^McpServer java-server (:server server-record)]
+
+    (if (:async? server-record)
+      (let [read-handler (fn [exchange ^McpSchema$ReadResourceRequest read-request]
+                           (let [req-uri (.uri read-request)
+                                 clj-result (implementation exchange req-uri)]
+                             ;; Convert Clojure result to Java ReadResourceResult
+                             (let [contents-list (java.util.ArrayList.)]
+                               (doseq [content (:contents clj-result)]
+                                 (let [text-contents (McpSchema$TextResourceContents.
+                                                       (:uri content)
+                                                       (:mimeType content "text/plain")
+                                                       (:text content))]
+                                   (.add contents-list text-contents)))
+                               (McpSchema$ReadResourceResult. contents-list))))
+            resource-spec (McpServerFeatures$AsyncResourceSpecification.
+                            resource
+                            read-handler)]
+        (.addResource ^McpAsyncServer java-server resource-spec))
+      (let [read-handler (fn [exchange ^McpSchema$ReadResourceRequest read-request]
+                           (let [req-uri (.uri read-request)
+                                 clj-result (implementation exchange req-uri)]
+                             ;; Convert Clojure result to Java ReadResourceResult
+                             (let [contents-list (java.util.ArrayList.)]
+                               (doseq [content (:contents clj-result)]
+                                 (let [text-contents (McpSchema$TextResourceContents.
+                                                       (:uri content)
+                                                       (:mimeType content "text/plain")
+                                                       (:text content))]
+                                   (.add contents-list text-contents)))
+                               (McpSchema$ReadResourceResult. contents-list))))
+            resource-spec (McpServerFeatures$SyncResourceSpecification.
+                            resource
+                            read-handler)]
+        (.addResource ^McpSyncServer java-server resource-spec))))
+  server-record)
+
+(defn notify-resource-updated
+  "Send a resource updated notification from the Java SDK server.
+
+  Args:
+  - server-record: JavaSdkServer record
+  - uri: URI of the resource that was updated
+  - meta: Optional metadata map
+
+  Returns the updated server record."
+  [^JavaSdkServer server-record uri & [meta]]
+  (when-not (:server server-record)
+    (throw (ex-info "Invalid server record" {:server-record server-record})))
+  (log/info :java-sdk/notifying-resource-updated {:uri uri :meta meta})
+
+  (let [^McpServer java-server (:server server-record)
+        notification (if meta
+                       (McpSchema$ResourcesUpdatedNotification. uri (clj->java-map meta))
+                       (McpSchema$ResourcesUpdatedNotification. uri nil))]
+    (if (:async? server-record)
+      (.notifyResourcesUpdated ^McpAsyncServer java-server notification)
+      (.notifyResourcesUpdated ^McpSyncServer java-server notification)))
+  server-record)
+
 (defn start-server
   "Start the Java SDK server.
+  
+  Note: The Java SDK server doesn't require explicit starting - it's ready
+  to handle requests once created with its transport.
 
   Args:
   - server-record: JavaSdkServer record
@@ -685,9 +854,7 @@
   [^JavaSdkServer server-record]
   (when-not (:server server-record)
     (throw (ex-info "Invalid server record" {:server-record server-record})))
-  (log/info :java-sdk/starting-server {:name (:name server-record)})
-  ;; (let [server (:server server-record)]
-  ;;   (.start server))
+  (log/info :java-sdk/server-ready {:name (:name server-record)})
   server-record)
 
 (defn stop-server

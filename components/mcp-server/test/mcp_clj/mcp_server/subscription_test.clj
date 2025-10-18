@@ -192,10 +192,13 @@
                       (is msg "Should receive subscribe error response")
                       (is (= "message" (:event msg)))
                       (let [data (:data msg)]
-                        (is (true? (get-in data [:result :isError]))
-                            "Should return error for non-existent resource")
+                        (is (get data :error)
+                            "Should return JSON-RPC error for non-existent resource")
+                        (is (= -32602 (get-in data [:error :code]))
+                            "Should return -32602 (Invalid params) error code")
                         (is (str/includes?
-                              (get-in data [:result :content 0 :text])
-                              "not found")))))))))
+                              (str (get-in data [:error :message]))
+                              "not found")
+                            "Error message should mention 'not found'"))))))))
 
           (future-cancel f))))))

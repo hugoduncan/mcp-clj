@@ -52,11 +52,11 @@
 
   (try
     ;; Create SDK server with stdio transport
-    (with-open [server (java-sdk/create-java-server
-                         {:name    "java-sdk-test-server"
-                          :version "1.0.0"
-                          ;; Use sync for simpler subprocess handling
-                          :async?  false})]
+    (with-open [^java.lang.AutoCloseable server (java-sdk/create-java-server
+                                                  {:name    "java-sdk-test-server"
+                                                   :version "1.0.0"
+                                                   ;; Use sync for simpler subprocess handling
+                                                   :async?  false})]
       (let [tools (create-test-tools)]
 
         (log/info :sdk-server-main/server-created {:name (:name server)})

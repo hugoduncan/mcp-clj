@@ -43,9 +43,9 @@
   "Remove test directory"
   [temp-path]
   (letfn [(delete-recursively
-            [file]
+            [^java.io.File file]
             (when (.isDirectory file)
-              (doseq [child (.listFiles file)]
+              (doseq [^java.io.File child (.listFiles file)]
                 (delete-recursively child)))
             (.delete file))]
     (delete-recursively (io/file temp-path))))

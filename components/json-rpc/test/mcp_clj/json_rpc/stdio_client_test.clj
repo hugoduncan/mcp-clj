@@ -28,7 +28,7 @@
       (let [input-stream (BufferedReader. (StringReader. ""))
             output-stream (BufferedWriter. (StringWriter.))
             client (stdio-client/create-json-rpc-client input-stream output-stream)]
-        (is (= (.getName (type client)) "mcp_clj.json_rpc.stdio_client.JSONRPClient"))
+        (is (= (.getName ^Class (type client)) "mcp_clj.json_rpc.stdio_client.JSONRPClient"))
         (is (instance? ConcurrentHashMap (:pending-requests client)))
         (is (instance? clojure.lang.Atom (:request-id-counter client)))
         (is (some? (:executor client)))
@@ -41,7 +41,7 @@
       (let [input-stream (BufferedReader. (StringReader. ""))
             output-stream (BufferedWriter. (StringWriter.))
             client (stdio-client/create-json-rpc-client input-stream output-stream {:num-threads 4})]
-        (is (= (.getName (type client)) "mcp_clj.json_rpc.stdio_client.JSONRPClient"))
+        (is (= (.getName ^Class (type client)) "mcp_clj.json_rpc.stdio_client.JSONRPClient"))
         (is (= 0 @(:request-id-counter client)))
         (stdio-client/close-json-rpc-client! client)))))
 
@@ -79,11 +79,12 @@
     (let [client (create-test-client)]
 
       (testing "successful response handling"
-        (let [future (CompletableFuture.)
+        (let [^CompletableFuture future (CompletableFuture.)
               request-id 42
-              response {:id request-id :result {:success true}}]
+              response {:id request-id :result {:success true}}
+              ^ConcurrentHashMap pending-requests (:pending-requests client)]
           ;; Register pending request
-          (.put (:pending-requests client) request-id future)
+          (.put pending-requests request-id future)
 
           ;; Handle response
           (stdio-client/handle-response client response)
@@ -93,15 +94,16 @@
           (is (= {:success true} (.get future 100 TimeUnit/MILLISECONDS)))
 
           ;; Verify request removed from pending
-          (is (nil? (.get (:pending-requests client) request-id)))))
+          (is (nil? (.get pending-requests request-id)))))
 
       (testing "error response handling"
-        (let [future (CompletableFuture.)
+        (let [^CompletableFuture future (CompletableFuture.)
               request-id 43
               error-response {:id request-id
-                              :error {:code -32601 :message "Method not found"}}]
+                              :error {:code -32601 :message "Method not found"}}
+              ^ConcurrentHashMap pending-requests (:pending-requests client)]
           ;; Register pending request
-          (.put (:pending-requests client) request-id future)
+          (.put pending-requests request-id future)
 
           ;; Handle error response
           (stdio-client/handle-response client error-response)
@@ -179,11 +181,12 @@
     (testing "processes responses and notifications"
       (let [client (create-test-client)
             running (atom true)
-            response-future (CompletableFuture.)
-            request-id 1]
+            ^CompletableFuture response-future (CompletableFuture.)
+            request-id 1
+            ^ConcurrentHashMap pending-requests (:pending-requests client)]
 
         ;; Register pending request
-        (.put (:pending-requests client) request-id response-future)
+        (.put pending-requests request-id response-future)
 
         ;; Create input with response and notification
         (let [json-input (str
@@ -229,14 +232,15 @@
 
     (testing "close-json-rpc-client! cancels pending requests"
       (let [client (create-test-client)
-            future1 (CompletableFuture.)
-            future2 (CompletableFuture.)
+            ^CompletableFuture future1 (CompletableFuture.)
+            ^CompletableFuture future2 (CompletableFuture.)
             request-id-1 1
-            request-id-2 2]
+            request-id-2 2
+            ^ConcurrentHashMap pending-requests (:pending-requests client)]
 
         ;; Add pending requests
-        (.put (:pending-requests client) request-id-1 future1)
-        (.put (:pending-requests client) request-id-2 future2)
+        (.put pending-requests request-id-1 future1)
+        (.put pending-requests request-id-2 future2)
 
         ;; Close client
         (stdio-client/close-json-rpc-client! client)
@@ -246,19 +250,20 @@
         (is (.isCancelled future2))
 
         ;; Verify pending requests map was cleared
-        (is (= 0 (.size (:pending-requests client))))))
+        (is (= 0 (.size pending-requests)))))
 
     (testing "executor shutdown"
-      (let [client (create-test-client)]
+      (let [client (create-test-client)
+            ^java.util.concurrent.ExecutorService executor (:executor client)]
 
         ;; Verify executor is running initially
-        (is (not (.isShutdown (:executor client))))
+        (is (not (.isShutdown executor)))
 
         ;; Close client
         (stdio-client/close-json-rpc-client! client)
 
         ;; Verify executor was shut down
-        (is (.isShutdown (:executor client)))))))
+        (is (.isShutdown executor))))))
 
 (deftest integration-test
   (testing "JSONRPClient integration scenarios"
@@ -266,10 +271,11 @@
     (testing "complete request-response cycle simulation"
       (let [client (create-test-client)
             request-id (stdio-client/generate-request-id client)
-            future (CompletableFuture.)]
+            ^CompletableFuture future (CompletableFuture.)
+            ^ConcurrentHashMap pending-requests (:pending-requests client)]
 
         ;; Simulate registering a request
-        (.put (:pending-requests client) request-id future)
+        (.put pending-requests request-id future)
 
         ;; Simulate receiving a response
         (let [response {:id request-id :result {:data "test-data"}}]
@@ -284,13 +290,14 @@
     (testing "multiple concurrent operations"
       (let [client (create-test-client)
             num-operations 50
-            futures (atom [])]
+            futures (atom [])
+            ^ConcurrentHashMap pending-requests (:pending-requests client)]
 
         ;; Create multiple pending requests
         (doseq [_ (range num-operations)]
           (let [request-id (stdio-client/generate-request-id client)
                 future (CompletableFuture.)]
-            (.put (:pending-requests client) request-id future)
+            (.put pending-requests request-id future)
             (swap! futures conj {:id request-id :future future})))
 
         ;; Simulate responses for all requests
@@ -299,11 +306,11 @@
             (stdio-client/handle-response client response)))
 
         ;; Verify all futures completed
-        (doseq [{:keys [future]} @futures]
+        (doseq [{:keys [^CompletableFuture future]} @futures]
           (is (.isDone future)))
 
         ;; Verify no pending requests remain
-        (is (= 0 (.size (:pending-requests client))))
+        (is (= 0 (.size pending-requests)))
 
         (stdio-client/close-json-rpc-client! client)))))
 
@@ -314,7 +321,7 @@
           client (stdio-client/create-json-rpc-client (BufferedReader. (StringReader. "")) bw)]
 
       (testing "successful request sending"
-        (let [future (stdio-client/send-request! client "test-method" {:param "value"} 5000)]
+        (let [^CompletableFuture future (stdio-client/send-request! client "test-method" {:param "value"} 5000)]
 
           ;; Flush the writer to capture output
           (.flush bw)
@@ -336,7 +343,7 @@
           (is (= "success" (.get future 100 TimeUnit/MILLISECONDS)))))
 
       (testing "request timeout handling"
-        (let [future (stdio-client/send-request! client "timeout-method" {} 50)]
+        (let [^CompletableFuture future (stdio-client/send-request! client "timeout-method" {} 50)]
 
           ;; Wait for timeout
           (Thread/sleep 100)

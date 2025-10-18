@@ -5,7 +5,7 @@
 (defn file->namespace
   [^java.io.File file]
   (-> (.getPath file)
-      (clojure.string/replace #"^(components|bases)/[^/]+/src/" "")
+      (clojure.string/replace #"^(components|bases)/[^/]+/(src|test)/" "")
       (clojure.string/replace #"\.clj[cs]?$" "")
       (clojure.string/replace #"/" ".")
       (clojure.string/replace #"_" "-")
@@ -20,7 +20,7 @@
        (filter (fn [^java.io.File f]
                  (and (.isFile f)
                       (re-find #"\.clj[cs]?$" (.getName f))
-                      (re-find #"/src/" (.getPath f)))))
+                      (re-find #"/(src|test)/" (.getPath f)))))
        (map file->namespace)
        distinct))
 
