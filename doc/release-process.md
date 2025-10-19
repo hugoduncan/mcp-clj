@@ -83,9 +83,9 @@ This will:
 
 The following projects are released to Clojars:
 
-- `io.github.hugoduncan/mcp-clj-server`
-- `io.github.hugoduncan/mcp-clj-client`
-- `io.github.hugoduncan/mcp-clj-in-memory-transport`
+- `org.hugoduncan/mcp-clj-server`
+- `org.hugoduncan/mcp-clj-client`
+- `org.hugoduncan/mcp-clj-in-memory-transport`
 
 Test-only projects (`test-dep`, `java-sdk-wrapper`) are not released.
 

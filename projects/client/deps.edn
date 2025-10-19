@@ -7,11 +7,11 @@
           :ns-default build
           :exec-fn jar
           :exec-args {:project-name "client"
-                      :lib io.github.hugoduncan/mcp-clj-client}}
+                      :lib org.hugoduncan/mcp-clj-client}}
   :deploy {:extra-paths ["../../dev"]
            :extra-deps {io.github.clojure/tools.build {:mvn/version "0.10.5"}
                         slipset/deps-deploy {:mvn/version "0.2.2"}}
            :ns-default build
            :exec-fn deploy
            :exec-args {:project-name "client"
-                       :lib io.github.hugoduncan/mcp-clj-client}}}}
+                       :lib org.hugoduncan/mcp-clj-client}}}}

@@ -7,4 +7,4 @@
           :ns-default build
           :exec-fn jar
           :exec-args {:project-name "java-sdk-wrapper"
-                      :lib io.github.hugoduncan/mcp-clj-java-sdk-wrapper}}}}
+                      :lib org.hugoduncan/mcp-clj-java-sdk-wrapper}}}}
