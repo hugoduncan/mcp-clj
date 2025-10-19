@@ -109,7 +109,7 @@ jobs:
       if: steps.check_tag.outputs.exists == 'false'
       run: |
         wget https://github.com/orhun/git-cliff/releases/download/v2.10.1/git-cliff-2.10.1-aarch64-unknown-linux-gnu.tar.gz
-        tar -xzf git-cliff-2.8.1-x86_64-unknown-linux-gnu.tar.gz
+        tar -xzf git-cliff-2.10.1-aarch64-unknown-linux-gnu.tar.gz
         sudo mv git-cliff-2.8.1/git-cliff /usr/local/bin/
         chmod +x /usr/local/bin/git-cliff
         git-cliff --version
