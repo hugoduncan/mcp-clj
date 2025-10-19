@@ -11,4 +11,4 @@
           :ns-default build
           :exec-fn jar
           :exec-args {:project-name "test-dep"
-                      :lib io.github.hugoduncan/mcp-clj-test-dep}}}}
+                      :lib org.hugoduncan/mcp-clj-test-dep}}}}

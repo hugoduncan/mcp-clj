@@ -5,7 +5,7 @@
   based on git commit count. All projects share the same version number.
 
   Usage:
-    clj -T:build jar :project-name '\"server\"' :lib 'io.github.hugoduncan/mcp-clj-server'
+    clj -T:build jar :project-name '\"server\"' :lib 'org.hugoduncan/mcp-clj-server'
     clj -T:build clean :project-name '\"server\"'
     clj -T:build version
 
@@ -71,7 +71,7 @@
 
   Options:
     :project-name - Name of the project (e.g., 'server', 'client')
-    :lib - Qualified library name (e.g., io.github.hugoduncan/mcp-clj-server)
+    :lib - Qualified library name (e.g., org.hugoduncan/mcp-clj-server)
     :src-dirs - Optional vector of source directories to include
     :resource-dirs - Optional vector of resource directories to include
 
@@ -137,7 +137,7 @@
 
   Options:
     :project-name - Name of the project (e.g., 'server', 'client')
-    :lib - Qualified library name (e.g., io.github.hugoduncan/mcp-clj-server)
+    :lib - Qualified library name (e.g., org.hugoduncan/mcp-clj-server)
 
   Requires CLOJARS_USERNAME and CLOJARS_PASSWORD environment variables or
   Maven settings.xml configuration."
