@@ -74,10 +74,11 @@
     :lib - Qualified library name (e.g., org.hugoduncan/mcp-clj-server)
     :src-dirs - Optional vector of source directories to include
     :resource-dirs - Optional vector of resource directories to include
+    :pom-data - Optional vector of additional POM metadata (e.g., licenses)
 
   The JAR is built as a thin JAR (no dependencies bundled) with pom.xml
   metadata. Version is automatically determined from git commit count."
-  [{:keys [project-name lib src-dirs resource-dirs] :as opts}]
+  [{:keys [project-name lib src-dirs resource-dirs pom-data] :as opts}]
   (when-not project-name
     (throw (ex-info "Missing required :project-name" opts)))
   (when-not lib
@@ -115,11 +116,12 @@
 
     ;; Write pom.xml
     (println "Writing pom.xml")
-    (b/write-pom {:class-dir class-dir
-                  :lib lib
-                  :version v
-                  :basis basis
-                  :src-dirs ["src"]})
+    (b/write-pom (cond-> {:class-dir class-dir
+                          :lib lib
+                          :version v
+                          :basis basis
+                          :src-dirs ["src"]}
+                   pom-data (assoc :pom-data pom-data)))
 
     ;; Create JAR
     (println "Creating JAR")
