@@ -7,11 +7,31 @@
           :ns-default build
           :exec-fn jar
           :exec-args {:project-name "client"
-                      :lib org.hugoduncan/mcp-clj-client}}
+                      :lib org.hugoduncan/mcp-clj-client
+                      :pom-data [[:description "Clojure MCP client for connecting to MCP servers"]
+                                 [:url "https://github.com/hugoduncan/mcp-clj"]
+                                 [:licenses
+                                  [:license
+                                   [:name "Eclipse Public License 2.0"]
+                                   [:url "https://www.eclipse.org/legal/epl-2.0/"]]]
+                                 [:scm
+                                  [:url "https://github.com/hugoduncan/mcp-clj"]
+                                  [:connection "scm:git:git://github.com/hugoduncan/mcp-clj.git"]
+                                  [:developerConnection "scm:git:ssh://git@github.com/hugoduncan/mcp-clj.git"]]]}}
   :deploy {:extra-paths ["../../dev"]
            :extra-deps {io.github.clojure/tools.build {:mvn/version "0.10.5"}
                         slipset/deps-deploy {:mvn/version "0.2.2"}}
            :ns-default build
            :exec-fn deploy
            :exec-args {:project-name "client"
-                       :lib org.hugoduncan/mcp-clj-client}}}}
+                       :lib org.hugoduncan/mcp-clj-client
+                       :pom-data [[:description "Clojure MCP client for connecting to MCP servers"]
+                                  [:url "https://github.com/hugoduncan/mcp-clj"]
+                                  [:licenses
+                                   [:license
+                                    [:name "Eclipse Public License 2.0"]
+                                    [:url "https://www.eclipse.org/legal/epl-2.0/"]]]
+                                  [:scm
+                                   [:url "https://github.com/hugoduncan/mcp-clj"]
+                                   [:connection "scm:git:git://github.com/hugoduncan/mcp-clj.git"]
+                                   [:developerConnection "scm:git:ssh://git@github.com/hugoduncan/mcp-clj.git"]]]}}}}
