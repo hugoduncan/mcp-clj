@@ -73,22 +73,29 @@
 ;; Pending requests management
 
 (defn add-pending-request!
-  "Add a pending request future"
+  "Add a pending request future.
+   
+   Coerces request-id to Long for consistent map key type."
   [shared-transport request-id future]
-  (swap! (:pending-requests shared-transport) assoc request-id future))
+  (swap! (:pending-requests shared-transport) assoc (long request-id) future))
 
 (defn remove-pending-request!
-  "Remove and return a pending request future"
+  "Remove and return a pending request future.
+   
+   Coerces request-id to Long to handle JSON parsing returning Integer."
   ^CompletableFuture [shared-transport request-id]
   (let [requests (:pending-requests shared-transport)
-        future   (get @requests request-id)]
-    (swap! requests dissoc request-id)
+        id (long request-id)
+        future (get @requests id)]
+    (swap! requests dissoc id)
     future))
 
 (defn get-pending-request
-  "Get a pending request future without removing it"
+  "Get a pending request future without removing it.
+   
+   Coerces request-id to Long to handle JSON parsing returning Integer."
   [shared-transport request-id]
-  (get @(:pending-requests shared-transport) request-id))
+  (get @(:pending-requests shared-transport) (long request-id)))
 
 ;; Server handler management
 
