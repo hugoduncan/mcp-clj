@@ -243,11 +243,11 @@
       (stdio-server/stop! server)))
 
   (testing "handles various malformed JSON inputs"
-    (let [test-cases ["{invalid json}"
-                      "{\"a\":}"
-                      "[unclosed"
-                      ""
-                      "not json"]]
+    (let [test-cases ["{invalid json}\n"
+                      "{\"a\":}\n"
+                      "[unclosed\n"
+                      "\n"
+                      "not json\n"]]
       (doseq [malformed test-cases]
         (let [reader (BufferedReader. (StringReader. malformed))
               [result error] (#'stdio-server/read-json reader)]
