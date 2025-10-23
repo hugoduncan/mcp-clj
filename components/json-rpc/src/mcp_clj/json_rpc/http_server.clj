@@ -1,10 +1,10 @@
 (ns mcp-clj.json-rpc.http-server
   "JSON-RPC 2.0 server with MCP Streamable HTTP transport (2025-03-26 spec)"
   (:require
-    [cheshire.core :as json]
     [clojure.string :as str]
     [mcp-clj.http :as http]
     [mcp-clj.http-server.adapter :as http-server]
+    [mcp-clj.json :as json]
     [mcp-clj.json-rpc.executor :as executor]
     [mcp-clj.json-rpc.json-protocol :as json-protocol]
     [mcp-clj.json-rpc.protocols :as protocols]
@@ -91,7 +91,7 @@
       (let [session-id (extract-session-id request)
             session (get @session-id->session session-id)
             body-str (slurp (:body request))
-            rpc-data (json/parse-string body-str true)]
+            rpc-data (json/parse body-str)]
         (log/info :rpc/http-post
                   {:session-id session-id
                    :has-session (some? session)
@@ -135,7 +135,7 @@
                       session-id
                       (fn [message]
                         (let [event-id (.incrementAndGet event-counter)]
-                          (reply! (assoc (sse/message (json/generate-string message))
+                          (reply! (assoc (sse/message (json/write message))
                                          :id (str event-id)))))
                       (fn []
                         (log/info :http/sse-close {:session-id session-id})

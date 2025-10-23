@@ -7,6 +7,7 @@
                  "components/http-client/test"
                  "components/http-server/test"
                  "components/in-memory-transport/test"
+                 "components/json/test"
                  "components/json-rpc/test"
                  "components/log/test"
                  "components/mcp-client/test"
@@ -20,6 +21,7 @@
     poly/http-server {:local/root "components/http-server"}
     poly/in-memory-transport {:local/root "components/in-memory-transport"}
     poly/interop {:local/root "components/interop"}
+    poly/json {:local/root "components/json"}
     poly/json-rpc {:local/root "components/json-rpc"}
     poly/log {:local/root "components/log"}
     poly/mcp-client {:local/root "components/mcp-client"}
@@ -40,6 +42,7 @@
                        "components/http-client/test"
                        "components/http-server/test"
                        "components/in-memory-transport/test"
+                       "components/json/test"
                        "components/json-rpc/test"
                        "components/log/test"
                        "components/mcp-client/test"
@@ -68,6 +71,7 @@
             poly/client-transport {:local/root "components/client-transport"}
             poly/in-memory-transport {:local/root "components/in-memory-transport"}
             poly/interop {:local/root "components/interop"}
+            poly/json {:local/root "components/json"}
             poly/server-transport {:local/root "components/server-transport"}
             poly/versions {:local/root "components/versions"}
             hato/hato {:mvn/version "1.0.0"}

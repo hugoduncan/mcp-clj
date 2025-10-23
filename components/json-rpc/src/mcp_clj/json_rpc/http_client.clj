@@ -1,9 +1,9 @@
 (ns mcp-clj.json-rpc.http-client
   "JSON-RPC client for HTTP transport with SSE support"
   (:require
-    [cheshire.core :as json]
     [clojure.string :as str]
     [mcp-clj.http-client.core :as http-client]
+    [mcp-clj.json :as json]
     [mcp-clj.json-rpc.executor :as executor]
     [mcp-clj.json-rpc.protocols :as protocols]
     [mcp-clj.log :as log])
@@ -204,7 +204,7 @@
                 headers (make-headers client)
                 response (http-client/http-post url
                                                 {:headers headers
-                                                 :body (json/generate-string request)
+                                                 :body (json/write request)
                                                  :content-type :json
                                                  :accept :json
                                                  :as :json
@@ -273,7 +273,7 @@
                               response (http-client/http-post
                                          url
                                          {:headers headers
-                                          :body (json/generate-string notification)
+                                          :body (json/write notification)
                                           :content-type :json
                                           :throw-exceptions false})]
                           (when (not= 200 (:status response))

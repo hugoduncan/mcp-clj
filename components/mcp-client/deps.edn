@@ -1,4 +1,5 @@
 {:deps {poly/client-transport {:local/root "../client-transport"}
+        poly/json             {:local/root "../json"}
         poly/json-rpc         {:local/root "../json-rpc"}
         poly/log              {:local/root "../log"}
         poly/versions         {:local/root "../versions"}}

@@ -1,7 +1,7 @@
 {:paths ["src"]
  :deps {org.clojure/clojure {:mvn/version "1.12.0"}
-        cheshire/cheshire {:mvn/version "5.13.0"}
-        poly/http-client {:local/root "../http-client"}}
+        poly/http-client {:local/root "../http-client"}
+        poly/json {:local/root "../json"}}
  :aliases
  {:dev {:extra-paths ["test"]
         :extra-deps {hato/hato {:mvn/version "1.0.0"}}}

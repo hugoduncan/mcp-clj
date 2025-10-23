@@ -1,9 +1,9 @@
 (ns mcp-clj.json-rpc.sse-server
   "JSON-RPC 2.0 server with Server-Sent Events (SSE) support"
   (:require
-    [cheshire.core :as json]
     [mcp-clj.http :as http]
     [mcp-clj.http-server.adapter :as http-server]
+    [mcp-clj.json :as json]
     [mcp-clj.json-rpc.executor :as executor]
     [mcp-clj.json-rpc.json-protocol :as json-protocol]
     [mcp-clj.json-rpc.protocols :as protocols]
@@ -117,7 +117,7 @@
   [v]
   (if (string? v)
     (pr-str v)
-    (json/generate-string v)))
+    (json/write v)))
 
 (defn- uuid->hex
   [^java.util.UUID uuid]

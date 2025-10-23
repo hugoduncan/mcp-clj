@@ -1,7 +1,7 @@
 (ns mcp-clj.mcp-client.tools
   "Tool calling implementation for MCP client"
   (:require
-    [cheshire.core :as json]
+    [mcp-clj.json :as json]
     [mcp-clj.log :as log]
     [mcp-clj.mcp-client.session :as session]
     [mcp-clj.mcp-client.subscriptions :as subscriptions]
