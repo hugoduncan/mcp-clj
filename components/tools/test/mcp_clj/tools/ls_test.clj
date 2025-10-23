@@ -1,6 +1,6 @@
 (ns mcp-clj.tools.ls-test
   (:require
-    [clojure.data.json :as json]
+    [cheshire.core :as json]
     [clojure.java.io :as io]
     [clojure.string :as str]
     [clojure.test :refer [deftest is testing]]
@@ -57,7 +57,7 @@
         (let [{:keys [implementation]} ls/ls-tool
               result (implementation nil {:path temp-dir})
               response-text (-> result :content first :text)
-              data (json/read-str response-text :key-fn keyword)]
+              data (json/parse-string response-text true)]
 
           (is (false? (:isError result)))
           (is (vector? (:files data)))
@@ -81,9 +81,9 @@
         (let [{:keys [implementation]} ls/ls-tool
               result (implementation nil {:path temp-dir :max-depth 3})
               response-text (-> result :content first :text)
-              data (json/read-str
+              data (json/parse-string
                      response-text
-                     :key-fn keyword)]
+                     true)]
 
           (is (false? (:isError result)))
 
@@ -104,7 +104,7 @@
         (let [{:keys [implementation]} ls/ls-tool
               result (implementation nil {:path temp-dir :max-files 2})
               response-text (-> result :content first :text)
-              data (json/read-str response-text :key-fn keyword)]
+              data (json/parse-string response-text true)]
 
           (is (false? (:isError result)))
           (is (<= (count (:files data)) 2))
@@ -120,7 +120,7 @@
           {:keys [implementation]} ls/ls-tool
           result (implementation nil {:path test-file})
           response-text (-> result :content first :text)
-          data (json/read-str response-text :key-fn keyword)]
+          data (json/parse-string response-text true)]
 
       (is (false? (:isError result)))
       (is (= 1 (count (:files data))))
@@ -135,7 +135,7 @@
         (let [{:keys [implementation]} ls/ls-tool
               result (implementation nil {:path temp-dir})
               response-text (-> result :content first :text)
-              data (json/read-str response-text :key-fn keyword)
+              data (json/parse-string response-text true)
               file-names (map #(.getName (io/file %)) (:files data))]
 
           (is (false? (:isError result)))

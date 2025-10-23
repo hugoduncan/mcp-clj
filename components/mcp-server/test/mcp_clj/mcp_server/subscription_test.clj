@@ -1,7 +1,7 @@
 (ns mcp-clj.mcp-server.subscription-test
   "Integration tests for resource subscription functionality"
   (:require
-    [clojure.data.json :as json]
+    [cheshire.core :as json]
     [clojure.java.io :as io]
     [clojure.string :as str]
     [clojure.test :refer [deftest is testing use-fixtures]]
@@ -68,14 +68,14 @@
               (recur
                 (assoc resp (keyword k)
                        (if (= "message" (:event resp))
-                         (json/read-str v :key-fn keyword)
+                         (json/parse-string v true)
                          v))))))))))
 
 (defn send-request
   [url request]
   (hato/post url
              {:headers {"Content-Type" "application/json"}
-              :body (json/write-str request)}))
+              :body (json/generate-string request)}))
 
 (defn port
   []

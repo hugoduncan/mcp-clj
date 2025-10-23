@@ -1,6 +1,6 @@
 (ns mcp-clj.json-rpc.sse-server-test
   (:require
-    [clojure.data.json :as json]
+    [cheshire.core :as json]
     [clojure.string :as str]
     [clojure.test :refer [deftest is testing use-fixtures]]
     [hato.client :as hato]
@@ -35,7 +35,7 @@
             (recur
               (assoc resp (keyword k)
                      (if (= "message" (:event resp))
-                       (json/read-str v :key-fn keyword)
+                       (json/parse-string v true)
                        v)))))))))
 
 (defn- parse-sse-message
@@ -54,16 +54,16 @@
 (defn- establish-sse-connection
   "Establish an SSE connection and return session information"
   [port]
-  (let [sse-url  (format "http://localhost:%d/sse" port)
+  (let [sse-url (format "http://localhost:%d/sse" port)
         response (hato/get sse-url
                            {:headers {"Accept" "text/event-stream"}
-                            :as      :stream})
-        reader   (java.io.BufferedReader.
-                   (java.io.InputStreamReader.
-                     (:body response)))]
+                            :as :stream})
+        reader (java.io.BufferedReader.
+                 (java.io.InputStreamReader.
+                   (:body response)))]
     (when (= http/Ok (:status response))
       (when-let [endpoint (wait-for-endpoint reader)]
-        {:reader   reader
+        {:reader reader
          :response response
          :endpoint endpoint}))))
 
@@ -95,7 +95,7 @@
     (let [url (str "http://localhost:" (:port *server*) endpoint)]
       (hato/post url
                  {:headers {"Content-Type" "application/json"}
-                  :body (json/write-str request)
+                  :body (json/generate-string request)
                   :middleware middleware}))))
 
 (defn- make-request
@@ -112,7 +112,7 @@
   (try
     (some-> response
             :body
-            (json/read-str :key-fn keyword))
+            (json/parse-string true))
     (catch Exception _
       {:jsonrpc "2.0"
        :error {:code -32700
