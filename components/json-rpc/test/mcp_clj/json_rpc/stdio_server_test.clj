@@ -1,6 +1,6 @@
 (ns mcp-clj.json-rpc.stdio-server-test
   (:require
-    [clojure.data.json :as json]
+    [cheshire.core :as json]
     [clojure.java.io :as io]
     [clojure.string :as str]
     [clojure.test :refer [deftest is testing]]
@@ -32,7 +32,7 @@
       (is (nil? (#'stdio-server/read-json reader)))))
 
   (testing "handles malformed JSON"
-    (let [reader         (BufferedReader. (StringReader. "{invalid json}"))
+    (let [reader (BufferedReader. (StringReader. "{invalid json}"))
           [result error] (#'stdio-server/read-json reader)]
       (is (= :error result))
       (is (instance? Exception error)))))
@@ -64,7 +64,7 @@
           response (with-out-str
                      (#'stdio-server/handle-json-rpc handler request))]
       (is (= {:jsonrpc "2.0" :result {:result "success"} :id 1}
-             (json/read-str response :key-fn keyword)))))
+             (json/parse-string response true)))))
 
   (testing "returns nil for handler returning nil"
     (let [handler (fn [_method _params] nil)
@@ -91,7 +91,7 @@
                      @(#'stdio-server/dispatch-rpc-call
                        (:executor server) handler request))]
       (is (= {:jsonrpc "2.0" :result {:sum 3} :id 1}
-             (json/read-str response :key-fn keyword)))
+             (json/parse-string response true)))
       (stdio-server/stop! server)))
 
   (testing "handles handler exceptions"
@@ -105,7 +105,7 @@
       (is (= {:jsonrpc "2.0"
               :error {:code -32603, :message "Handler error"}
               :id 1}
-             (json/read-str response :key-fn keyword)))
+             (json/parse-string response true)))
       (stdio-server/stop! server))))
 
 (deftest ^:integ test-handle-request
@@ -132,7 +132,7 @@
                     (:executor server)
                     handlers
                     request))
-          response (json/read-str output :key-fn keyword)]
+          response (json/parse-string output true)]
       (is (= -32601 (-> response :error :code)))
       (is (str/includes? (-> response :error :message) "Method not found"))
       (stdio-server/stop! server)))
@@ -146,7 +146,7 @@
                     (:executor server)
                     handlers
                     request))
-          response (json/read-str output :key-fn keyword)]
+          response (json/parse-string output true)]
       (is (= -32600 (-> response :error :code)))
       (stdio-server/stop! server)))
 
@@ -160,7 +160,7 @@
                       (:executor server)
                       handlers
                       request))
-            response (json/read-str output :key-fn keyword)]
+            response (json/parse-string output true)]
         (is (= -32000 (-> response :error :code)))
         (is (str/includes? (-> response :error :message) "overloaded"))))))
 
@@ -198,30 +198,30 @@
 
 (deftest ^:integ test-integration
   (testing "full request-response cycle"
-    (let [requests   [{:jsonrpc "2.0"
-                       :method  "add"
-                       :params  [1 2]
-                       :id      1}
-                      {:jsonrpc "2.0"
-                       :method  "echo"
-                       :params  {:message "hello"}
-                       :id      2}]
+    (let [requests [{:jsonrpc "2.0"
+                     :method "add"
+                     :params [1 2]
+                     :id 1}
+                    {:jsonrpc "2.0"
+                     :method "echo"
+                     :params {:message "hello"}
+                     :id 2}]
           ;; Convert to JSON strings, one per line
           json-input (str/join
-                       (mapv (comp #(str % "\n") json/write-str) requests))
+                       (mapv (comp #(str % "\n") json/generate-string) requests))
           response
           (with-out-str
             (with-redefs [mcp-clj.json-rpc.stdio-server/input-reader
                           (constantly
                             (BufferedReader.
                               (StringReader. json-input)))]
-              (let [handlers {"add"  (fn [_method params]
-                                       {:sum
-                                        (+ (first params) (second params))})
+              (let [handlers {"add" (fn [_method params]
+                                      {:sum
+                                       (+ (first params) (second params))})
                               "echo" (fn [_method params]
                                        params)}
-                    server   (stdio-server/create-server
-                               {:handlers handlers})]
+                    server (stdio-server/create-server
+                             {:handlers handlers})]
                 ;; server will EOF on input
                 @(:server-future server))))]
       (is (str/includes? response "\"sum\":3"))
@@ -229,9 +229,9 @@
 
 (deftest ^:integ test-error-handling
   (testing "handles malformed JSON gracefully"
-    (let [server         (stdio-server/create-server {})
+    (let [server (stdio-server/create-server {})
           malformed-json "{invalid: json}"
-          reader         (BufferedReader. (StringReader. malformed-json))]
+          reader (BufferedReader. (StringReader. malformed-json))]
 
       (let [[result error] (#'stdio-server/read-json reader)]
         (is (= :error result))
@@ -241,9 +241,9 @@
 
   ;; TODO flakey test
   #_(testing "handles notification requests (no id)"
-      (let [server   (stdio-server/create-server {})
+      (let [server (stdio-server/create-server {})
             handlers {"notify" (fn [method params] "notified")}
-            request  {:jsonrpc "2.0" :method "notify" :params []}] ; no id field
+            request {:jsonrpc "2.0" :method "notify" :params []}] ; no id field
 
         (stdio-server/set-handlers! server handlers)
 

@@ -1,7 +1,7 @@
 (ns mcp-clj.json-rpc.stdio
   "Unified JSON I/O functions for stdio communication"
   (:require
-    [clojure.data.json :as json])
+    [cheshire.core :as json])
   (:import
     (java.io
       BufferedReader
@@ -16,7 +16,7 @@
   [^BufferedReader reader]
   (try
     (when-let [line (.readLine reader)]
-      (let [json-data (json/read-str line :key-fn keyword)]
+      (let [json-data (json/parse-string line true)]
         [json-data nil]))
     (catch java.io.EOFException _
       nil)
@@ -26,7 +26,7 @@
 (defn write-json!
   "Write JSON message to a writer"
   [^BufferedWriter writer message]
-  (let [json-str (json/write-str message)]
+  (let [json-str (json/generate-string message)]
     (.write writer json-str)
     (.newLine writer)
     (.flush writer)))

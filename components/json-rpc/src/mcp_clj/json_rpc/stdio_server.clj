@@ -1,7 +1,7 @@
 (ns mcp-clj.json-rpc.stdio-server
   "JSON-RPC 2.0 server over stdio"
   (:require
-    [clojure.data.json :as json]
+    [cheshire.core :as json]
     [mcp-clj.json-rpc.executor :as executor]
     [mcp-clj.json-rpc.json-protocol :as json-protocol]
     [mcp-clj.json-rpc.protocols :as protocols]
@@ -32,7 +32,7 @@
     (locking output-stream
       (binding [*out* output-stream]
         ;; Use the original approach that worked with PrintWriter/*out*
-        (let [json-str (json/write-str response)]
+        (let [json-str (json/generate-string response)]
           (println json-str)
           (flush))))
     (catch Exception e
