@@ -228,6 +228,9 @@
       (is (str/includes? response "\"message\":\"hello\"")))))
 
 (deftest ^:integ test-error-handling
+  ;; Test comprehensive error handling for JSON parse failures in stdio transport.
+  ;; Note: stdio transport currently logs parse errors to stderr and continues
+  ;; processing, which differs from HTTP/SSE that return error responses.
   (testing "handles malformed JSON gracefully"
     (let [server (stdio-server/create-server {})
           malformed-json "{invalid: json}"
@@ -239,23 +242,39 @@
 
       (stdio-server/stop! server)))
 
-  ;; TODO flakey test
-  #_(testing "handles notification requests (no id)"
-      (let [server (stdio-server/create-server {})
-            handlers {"notify" (fn [method params] "notified")}
-            request {:jsonrpc "2.0" :method "notify" :params []}] ; no id field
+  (testing "handles various malformed JSON inputs"
+    (let [test-cases ["{invalid json}"
+                      "{\"a\":}"
+                      "[unclosed"
+                      ""
+                      "not json"]]
+      (doseq [malformed test-cases]
+        (let [reader (BufferedReader. (StringReader. malformed))
+              [result error] (#'stdio-server/read-json reader)]
+          (is (= :error result)
+              (str "Should return :error for: " malformed))
+          (is (instance? Exception error)
+              (str "Should return exception for: " malformed))))))
 
-        (stdio-server/set-handlers! server handlers)
+  (testing "continues processing after parse errors"
+    (let [server (stdio-server/create-server {})
+          handlers {"test" (fn [_method _params] {:result "ok"})}
+          valid-request {:jsonrpc "2.0" :method "test" :params {} :id 1}
+          input (str "{invalid json}\n"
+                     (json/generate-string valid-request) "\n")
+          reader (BufferedReader. (StringReader. input))]
 
-        (let [output (capture-output
-                      #(#'stdio-server/handle-request
-                        (:executor server)
-                        @(:handlers server)
-                        request))]
-          ;; Should not produce any output for notifications
-          (is (empty? (str/trim output))))
+      (stdio-server/set-handlers! server handlers)
 
-        (stdio-server/stop! server))))
+      (let [[result1 error1] (#'stdio-server/read-json reader)]
+        (is (= :error result1))
+        (is (instance? Exception error1)))
+
+      (let [[result2 error2] (#'stdio-server/read-json reader)]
+        (is (nil? error2))
+        (is (= valid-request result2)))
+
+      (stdio-server/stop! server))))
 
 (deftest ^:integ test-protocol-implementation
   (testing "JsonRpcServer protocol implementation"

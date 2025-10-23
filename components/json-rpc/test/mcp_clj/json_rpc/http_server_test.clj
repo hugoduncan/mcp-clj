@@ -138,6 +138,48 @@
             (finally
               ((:stop unready-server)))))))))
 
+(deftest ^:integ json-parse-error-handling-test
+  ;; Test comprehensive JSON parse error handling in HTTP transport
+  ;; Validates that malformed JSON returns proper HTTP 400 and error details
+  (testing "JSON parse errors in HTTP transport"
+    (let [handlers {"test" (fn [_ _] {:result "ok"})}]
+      (http-server/set-handlers! *server* handlers)
+
+      (testing "returns 400 for malformed JSON"
+        (let [response (http-post (str "http://localhost:" (:port *server*) "/")
+                                  "{invalid json}")]
+          (is (= 400 (:status response)))))
+
+      (testing "returns 400 for unclosed JSON structures"
+        (let [response (http-post (str "http://localhost:" (:port *server*) "/")
+                                  "{\"jsonrpc\":\"2.0\",\"method\":\"test\"")]
+          (is (= 400 (:status response)))))
+
+      (testing "returns 400 for invalid JSON syntax"
+        (let [response (http-post (str "http://localhost:" (:port *server*) "/")
+                                  "{\"jsonrpc\":\"2.0\",\"method\":}")]
+          (is (= 400 (:status response)))))
+
+      (testing "returns 400 for empty body"
+        (let [response (http-post (str "http://localhost:" (:port *server*) "/")
+                                  "")]
+          (is (= 400 (:status response)))))
+
+      (testing "returns 400 for non-JSON content"
+        (let [response (http-post (str "http://localhost:" (:port *server*) "/")
+                                  "not json at all")]
+          (is (= 400 (:status response)))))
+
+      (testing "handles valid JSON after parse errors"
+        (http-post (str "http://localhost:" (:port *server*) "/")
+                   "{invalid}")
+        (let [request (make-request "test" {} 1)
+              response (http-post (str "http://localhost:" (:port *server*) "/")
+                                  (json/write request))]
+          (is (= 200 (:status response)))
+          (let [body (json/parse (:body response))]
+            (is (= "ok" (:result body)))))))))
+
 (deftest ^:integ origin-validation-test
   ;; Test origin header validation for security
   (testing "origin validation"

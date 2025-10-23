@@ -182,6 +182,69 @@
         (is (-> result :error :message))
         (is (= -32601 (get-in result [:error :code])))))))
 
+(deftest ^:integ json-parse-error-handling-test
+  ;; Test comprehensive JSON parse error handling in SSE transport
+  ;; Validates that malformed JSON returns proper error responses
+  (testing "JSON parse errors in SSE transport"
+    (testing "handles malformed JSON gracefully"
+      (when-let [{:keys [endpoint]} *client-session*]
+        (let [url (str "http://localhost:" (:port *server*) endpoint)
+              response (hato/post url
+                                  {:headers {"Content-Type" "application/json"}
+                                   :body "{invalid json}"
+                                   :middleware middleware})]
+          (is (= http/BadRequest (:status response))))))
+
+    (testing "handles unclosed JSON structures"
+      (when-let [{:keys [endpoint]} *client-session*]
+        (let [url (str "http://localhost:" (:port *server*) endpoint)
+              response (hato/post url
+                                  {:headers {"Content-Type" "application/json"}
+                                   :body "{\"jsonrpc\":\"2.0\",\"method\":\"test\""
+                                   :middleware middleware})]
+          (is (= http/BadRequest (:status response))))))
+
+    (testing "handles invalid JSON syntax"
+      (when-let [{:keys [endpoint]} *client-session*]
+        (let [url (str "http://localhost:" (:port *server*) endpoint)
+              response (hato/post url
+                                  {:headers {"Content-Type" "application/json"}
+                                   :body "{\"jsonrpc\":\"2.0\",\"method\":}"
+                                   :middleware middleware})]
+          (is (= http/BadRequest (:status response))))))
+
+    (testing "handles empty body"
+      (when-let [{:keys [endpoint]} *client-session*]
+        (let [url (str "http://localhost:" (:port *server*) endpoint)
+              response (hato/post url
+                                  {:headers {"Content-Type" "application/json"}
+                                   :body ""
+                                   :middleware middleware})]
+          (is (= http/BadRequest (:status response))))))
+
+    (testing "handles non-JSON content"
+      (when-let [{:keys [endpoint]} *client-session*]
+        (let [url (str "http://localhost:" (:port *server*) endpoint)
+              response (hato/post url
+                                  {:headers {"Content-Type" "application/json"}
+                                   :body "not json at all"
+                                   :middleware middleware})]
+          (is (= http/BadRequest (:status response))))))
+
+    (testing "recovers and handles valid JSON after parse errors"
+      (when-let [{:keys [endpoint]} *client-session*]
+        (let [url (str "http://localhost:" (:port *server*) endpoint)]
+          (hato/post url
+                     {:headers {"Content-Type" "application/json"}
+                      :body "{invalid}"
+                      :middleware middleware})
+          (let [test-data {:recovery "test"}
+                response (send-request (make-request "echo" test-data 2))
+                _ (is (= http/Accepted (:status response)))
+                reader (:reader *client-session*)
+                message (parse-sse-message reader)]
+            (is (= test-data (:result message)))))))))
+
 (deftest ^:integ server-handlers-test
   (testing "Handler management"
     (let [test-handler (fn [_ params] {:processed params})]

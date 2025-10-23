@@ -42,6 +42,50 @@
       (is (thrown? Exception (json/parse "{")))
       (is (thrown? Exception (json/parse "{invalid}"))))))
 
+(deftest parse-error-test
+  ;; Test comprehensive error handling for invalid JSON inputs.
+  ;; Validates that parse errors are thrown with informative messages.
+  (testing "parse errors"
+    (testing "throws on unclosed structures"
+      (is (thrown? Exception (json/parse "{")))
+      (is (thrown? Exception (json/parse "[")))
+      (is (thrown? Exception (json/parse "{\"a\":1")))
+      (is (thrown? Exception (json/parse "[1,2"))))
+
+    (testing "throws on invalid syntax"
+      (is (thrown? Exception (json/parse "{invalid}")))
+      (is (thrown? Exception (json/parse "{\"a\":}")))
+      (is (thrown? Exception (json/parse "{\"a\":,}")))
+      (is (thrown? Exception (json/parse "[,1,2]"))))
+
+    (testing "throws on trailing commas"
+      (is (thrown? Exception (json/parse "{\"a\":1,}")))
+      (is (thrown? Exception (json/parse "[1,2,]"))))
+
+    (testing "throws on unclosed strings"
+      (is (thrown? Exception (json/parse "{\"a\":\"unclosed")))
+      (is (thrown? Exception (json/parse "[\"unclosed]"))))
+
+    (testing "throws on invalid escape sequences"
+      (is (thrown? Exception (json/parse "{\"a\":\"\\x\"}")))
+      (is (thrown? Exception (json/parse "{\"a\":\"\\u12\"}"))))
+
+    (testing "throws on invalid numbers"
+      (is (thrown? Exception (json/parse "{\"a\":1.}")))
+      (is (thrown? Exception (json/parse "{\"a\":.5}")))
+      (is (thrown? Exception (json/parse "{\"a\":1e}")))
+      (is (thrown? Exception (json/parse "{\"a\":01}"))))
+
+    (testing "throws on invalid keywords"
+      (is (thrown? Exception (json/parse "{\"a\":TRUE}")))
+      (is (thrown? Exception (json/parse "{\"a\":False}")))
+      (is (thrown? Exception (json/parse "{\"a\":NULL}"))))
+
+    (testing "throws on non-JSON input"
+      (is (thrown? Exception (json/parse "not json")))
+      (is (thrown? Exception (json/parse "123abc")))
+      (is (thrown? Exception (json/parse "abc123"))))))
+
 (deftest write-test
   ;; Test EDN to JSON conversion with keyword key conversion.
   ;; Validates correct handling of primitives, nested structures, and edge cases.
