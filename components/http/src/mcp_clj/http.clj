@@ -1,13 +1,13 @@
 (ns mcp-clj.http
   (:require
-    [clojure.data.json :as json]))
+    [cheshire.core :as json]))
 
 (defn response
   "Return a minimal status 200 response map with the given body."
   [body]
-  {:status  200
+  {:status 200
    :headers {}
-   :body    body})
+   :body body})
 
 (defn status
   "Returns an updated response map with the given status."
@@ -27,7 +27,7 @@
 (defn json-response
   "Create a JSON response with given status"
   [data status-code]
-  (-> (response (json/write-str data))
+  (-> (response (json/generate-string data))
       (status status-code)
       (content-type "application/json")))
 

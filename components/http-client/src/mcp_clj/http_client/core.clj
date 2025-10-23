@@ -1,7 +1,7 @@
 (ns mcp-clj.http-client.core
   "HTTP client implementation using JDK HttpClient"
   (:require
-    [clojure.data.json :as json]
+    [cheshire.core :as json]
     [clojure.string :as str])
   (:import
     (java.net
@@ -98,7 +98,7 @@
      :headers headers
      :body (case as
              :json (when (and body (not (str/blank? body)))
-                     (json/read-str body :key-fn keyword))
+                     (json/parse-string body true))
              :stream body
              :string body
              body)}))
