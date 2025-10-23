@@ -1,7 +1,7 @@
 (ns mcp-clj.json-rpc.json-protocol
   "JSON-RPC 2.0 protocol constants and utilities"
   (:require
-    [clojure.data.json :as json]))
+    [cheshire.core :as json]))
 
 ;; Protocol version
 (def ^:const version "2.0")
@@ -86,13 +86,13 @@
 
 (def read-json-options
   "Options for reading JSON"
-  {:key-fn keyword}) ; Convert strings to keywords
+  true) ; Convert strings to keywords
 
 (defn parse-json
   "Parse JSON string to EDN, with error handling"
   [s]
   (try
-    [(json/read-str s read-json-options) nil]
+    [(json/parse-string s read-json-options) nil]
     (catch Exception e
       [nil (error-response (:parse-error error-codes)
                            "Invalid JSON")])))
@@ -101,7 +101,7 @@
   "Convert EDN to JSON string, with error handling"
   [data]
   (try
-    [(json/write-str data write-json-options) nil]
+    [(json/generate-string data write-json-options) nil]
     (catch Exception e
       [nil (error-response (:internal-error error-codes)
                            "JSON conversion error")])))
