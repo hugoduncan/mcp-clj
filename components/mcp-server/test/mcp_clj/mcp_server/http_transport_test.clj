@@ -1,8 +1,8 @@
 (ns mcp-clj.mcp-server.http-transport-test
   (:require
-    [cheshire.core :as json]
     [clojure.test :refer [deftest is testing]]
     [hato.client :as hato]
+    [mcp-clj.json :as json]
     [mcp-clj.mcp-server.core :as mcp-core]))
 
 ;; Test Helpers
@@ -62,7 +62,7 @@
     (testing "GET /mcp endpoint"
       (let [response (http-get (str "http://localhost:" (get-server-port server) "/"))]
         (is (= 200 (:status response)))
-        (let [body (json/parse-string (:body response) true)]
+        (let [body (json/parse (:body response))]
           (is (= "streamable-http" (:transport body)))
           (is (= "2025-03-26" (:version body)))
           (is (:sse (:capabilities body)))
@@ -81,9 +81,9 @@
                                                               :version "1.0.0"}}
                                                 1)
             response (http-post (str "http://localhost:" port "/")
-                                (json/generate-string init-request))]
+                                (json/write init-request))]
         (is (= 200 (:status response)))
-        (let [body (json/parse-string (:body response) true)]
+        (let [body (json/parse (:body response))]
           (is (= "2.0" (:jsonrpc body)))
           (is (= 1 (:id body)))
           (is (some? (:result body)))
@@ -97,9 +97,9 @@
       (let [port (get-server-port server)
             ping-request (make-json-rpc-request "ping" {} 2)
             response (http-post (str "http://localhost:" port "/")
-                                (json/generate-string ping-request))]
+                                (json/write ping-request))]
         (is (= 200 (:status response)))
-        (let [body (json/parse-string (:body response) true)]
+        (let [body (json/parse (:body response))]
           (is (= "2.0" (:jsonrpc body)))
           (is (= 2 (:id body)))
           (is (= {} (:result body))))))))
@@ -111,9 +111,9 @@
       (let [port (get-server-port server)
             list-tools-request (make-json-rpc-request "tools/list" {} 3)
             response (http-post (str "http://localhost:" port "/")
-                                (json/generate-string list-tools-request))]
+                                (json/write list-tools-request))]
         (is (= 200 (:status response)))
-        (let [body (json/parse-string (:body response) true)]
+        (let [body (json/parse (:body response))]
           (is (= "2.0" (:jsonrpc body)))
           (is (= 3 (:id body)))
           (is (some? (:result body)))
@@ -127,9 +127,9 @@
             batch-request [(make-json-rpc-request "ping" {} 1)
                            (make-json-rpc-request "tools/list" {} 2)]
             response (http-post (str "http://localhost:" port "/")
-                                (json/generate-string batch-request))]
+                                (json/write batch-request))]
         (is (= 200 (:status response)))
-        (let [body (json/parse-string (:body response) true)]
+        (let [body (json/parse (:body response))]
           (is (vector? body))
           (is (= 2 (count body)))
           (is (every? #(= "2.0" (:jsonrpc %)) body))
@@ -144,17 +144,17 @@
 
         (testing "allows requests from allowed origins"
           (let [response (http-post (str "http://localhost:" port "/")
-                                    (json/generate-string ping-request)
+                                    (json/write ping-request)
                                     {"Origin" "https://example.com"})]
             (is (= 200 (:status response)))))
 
         (testing "blocks requests from disallowed origins"
           (let [response (http-post (str "http://localhost:" port "/")
-                                    (json/generate-string ping-request)
+                                    (json/write ping-request)
                                     {"Origin" "https://malicious.com"})]
             (is (= 400 (:status response)))))
 
         (testing "allows requests without origin header"
           (let [response (http-post (str "http://localhost:" port "/")
-                                    (json/generate-string ping-request))]
+                                    (json/write ping-request))]
             (is (= 200 (:status response)))))))))

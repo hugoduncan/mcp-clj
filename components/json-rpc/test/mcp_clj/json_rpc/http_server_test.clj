@@ -1,8 +1,8 @@
 (ns mcp-clj.json-rpc.http-server-test
   (:require
-    [cheshire.core :as json]
     [clojure.test :refer [deftest is testing use-fixtures]]
     [hato.client :as hato]
+    [mcp-clj.json :as json]
     [mcp-clj.json-rpc.http-server :as http-server]
     [mcp-clj.json-rpc.protocols :as protocols]))
 
@@ -77,7 +77,7 @@
     (let [response (http-get (str "http://localhost:" (:port *server*) "/"))]
       (is (= 200 (:status response)))
       (is (= "application/json" (get (:headers response) "content-type")))
-      (let [body (json/parse-string (:body response) true)]
+      (let [body (json/parse (:body response))]
         (is (= "streamable-http" (:transport body)))
         (is (= "2025-03-26" (:version body)))
         (is (:sse (:capabilities body)))
@@ -94,9 +94,9 @@
       (testing "handles valid JSON-RPC request"
         (let [request (make-request "echo" {:message "hello"} 1)
               response (http-post (str "http://localhost:" (:port *server*) "/")
-                                  (json/generate-string request))]
+                                  (json/write request))]
           (is (= 200 (:status response)))
-          (let [body (json/parse-string (:body response) true)]
+          (let [body (json/parse (:body response))]
             (is (= "2.0" (:jsonrpc body)))
             (is (= {:message "hello"} (:result body)))
             (is (= 1 (:id body))))))
@@ -105,9 +105,9 @@
         (let [batch-request [(make-request "add" {:a 1 :b 2} 1)
                              (make-request "echo" {:test "batch"} 2)]
               response (http-post (str "http://localhost:" (:port *server*) "/")
-                                  (json/generate-string batch-request))]
+                                  (json/write batch-request))]
           (is (= 200 (:status response)))
-          (let [body (json/parse-string (:body response) true)]
+          (let [body (json/parse (:body response))]
             (is (vector? body))
             (is (= 2 (count body)))
             (is (= 3 (:result (first body))))
@@ -116,9 +116,9 @@
       (testing "returns method not found error"
         (let [request (make-request "unknown" {} 1)
               response (http-post (str "http://localhost:" (:port *server*) "/")
-                                  (json/generate-string request))]
+                                  (json/write request))]
           (is (= 200 (:status response)))
-          (let [body (json/parse-string (:body response) true)]
+          (let [body (json/parse (:body response))]
             (is (= "2.0" (:jsonrpc body)))
             (is (:error body))
             (is (= -32601 (:code (:error body)))))))
@@ -133,7 +133,7 @@
           (try
             (let [request (make-request "test" {} 1)
                   response (http-post (str "http://localhost:" (:port unready-server) "/")
-                                      (json/generate-string request))]
+                                      (json/write request))]
               (is (= 503 (:status response))))
             (finally
               ((:stop unready-server)))))))))
@@ -150,21 +150,21 @@
         (testing "allows requests from allowed origins"
           (let [request (make-request "test" {} 1)
                 response (http-post (str "http://localhost:" (:port server) "/")
-                                    (json/generate-string request)
+                                    (json/write request)
                                     {"Origin" "https://example.com"})]
             (is (= 200 (:status response)))))
 
         (testing "blocks requests from disallowed origins"
           (let [request (make-request "test" {} 1)
                 response (http-post (str "http://localhost:" (:port server) "/")
-                                    (json/generate-string request)
+                                    (json/write request)
                                     {"Origin" "https://malicious.com"})]
             (is (= 400 (:status response)))))
 
         (testing "allows requests without origin header"
           (let [request (make-request "test" {} 1)
                 response (http-post (str "http://localhost:" (:port server) "/")
-                                    (json/generate-string request))]
+                                    (json/write request))]
             (is (= 200 (:status response)))))
         (finally
           ((:stop server)))))))
@@ -179,7 +179,7 @@
         (let [session-id "test-session-123"
               request (make-request "test" {} 1)
               response (http-post (str "http://localhost:" (:port *server*) "/")
-                                  (json/generate-string request)
+                                  (json/write request)
                                   {"X-Session-ID" session-id})]
           (is (= 200 (:status response)))))
 
@@ -187,7 +187,7 @@
         (let [session-id "test-session-456"
               request (make-request "test" {} 1)
               response (http-post (str "http://localhost:" (:port *server*) "/?session_id=" session-id)
-                                  (json/generate-string request))]
+                                  (json/write request))]
           (is (= 200 (:status response))))))))
 
 (deftest ^:integ notification-test
