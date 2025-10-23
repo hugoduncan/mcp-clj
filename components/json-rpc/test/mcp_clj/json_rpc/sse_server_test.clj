@@ -1,6 +1,6 @@
 (ns mcp-clj.json-rpc.sse-server-test
   (:require
-    [clojure.data.json :as json]
+    [cheshire.core :as json]
     [clojure.string :as str]
     [clojure.test :refer [deftest is testing use-fixtures]]
     [hato.client :as hato]
@@ -35,7 +35,7 @@
             (recur
               (assoc resp (keyword k)
                      (if (= "message" (:event resp))
-                       (json/read-str v :key-fn keyword)
+                       (json/parse-string v true)
                        v)))))))))
 
 (defn- parse-sse-message
@@ -54,16 +54,16 @@
 (defn- establish-sse-connection
   "Establish an SSE connection and return session information"
   [port]
-  (let [sse-url  (format "http://localhost:%d/sse" port)
+  (let [sse-url (format "http://localhost:%d/sse" port)
         response (hato/get sse-url
                            {:headers {"Accept" "text/event-stream"}
-                            :as      :stream})
-        reader   (java.io.BufferedReader.
-                   (java.io.InputStreamReader.
-                     (:body response)))]
+                            :as :stream})
+        reader (java.io.BufferedReader.
+                 (java.io.InputStreamReader.
+                   (:body response)))]
     (when (= http/Ok (:status response))
       (when-let [endpoint (wait-for-endpoint reader)]
-        {:reader   reader
+        {:reader reader
          :response response
          :endpoint endpoint}))))
 
@@ -95,7 +95,7 @@
     (let [url (str "http://localhost:" (:port *server*) endpoint)]
       (hato/post url
                  {:headers {"Content-Type" "application/json"}
-                  :body (json/write-str request)
+                  :body (json/generate-string request)
                   :middleware middleware}))))
 
 (defn- make-request
@@ -112,7 +112,7 @@
   (try
     (some-> response
             :body
-            (json/read-str :key-fn keyword))
+            (json/parse-string true))
     (catch Exception _
       {:jsonrpc "2.0"
        :error {:code -32700
@@ -181,6 +181,69 @@
         (is (= http/BadRequest (:status response)))
         (is (-> result :error :message))
         (is (= -32601 (get-in result [:error :code])))))))
+
+(deftest ^:integ json-parse-error-handling-test
+  ;; Test comprehensive JSON parse error handling in SSE transport
+  ;; Validates that malformed JSON returns proper error responses
+  (testing "JSON parse errors in SSE transport"
+    (testing "handles malformed JSON gracefully"
+      (when-let [{:keys [endpoint]} *client-session*]
+        (let [url (str "http://localhost:" (:port *server*) endpoint)
+              response (hato/post url
+                                  {:headers {"Content-Type" "application/json"}
+                                   :body "{invalid json}"
+                                   :middleware middleware})]
+          (is (= http/BadRequest (:status response))))))
+
+    (testing "handles unclosed JSON structures"
+      (when-let [{:keys [endpoint]} *client-session*]
+        (let [url (str "http://localhost:" (:port *server*) endpoint)
+              response (hato/post url
+                                  {:headers {"Content-Type" "application/json"}
+                                   :body "{\"jsonrpc\":\"2.0\",\"method\":\"test\""
+                                   :middleware middleware})]
+          (is (= http/BadRequest (:status response))))))
+
+    (testing "handles invalid JSON syntax"
+      (when-let [{:keys [endpoint]} *client-session*]
+        (let [url (str "http://localhost:" (:port *server*) endpoint)
+              response (hato/post url
+                                  {:headers {"Content-Type" "application/json"}
+                                   :body "{\"jsonrpc\":\"2.0\",\"method\":}"
+                                   :middleware middleware})]
+          (is (= http/BadRequest (:status response))))))
+
+    (testing "handles empty body"
+      (when-let [{:keys [endpoint]} *client-session*]
+        (let [url (str "http://localhost:" (:port *server*) endpoint)
+              response (hato/post url
+                                  {:headers {"Content-Type" "application/json"}
+                                   :body ""
+                                   :middleware middleware})]
+          (is (= http/BadRequest (:status response))))))
+
+    (testing "handles non-JSON content"
+      (when-let [{:keys [endpoint]} *client-session*]
+        (let [url (str "http://localhost:" (:port *server*) endpoint)
+              response (hato/post url
+                                  {:headers {"Content-Type" "application/json"}
+                                   :body "not json at all"
+                                   :middleware middleware})]
+          (is (= http/BadRequest (:status response))))))
+
+    (testing "recovers and handles valid JSON after parse errors"
+      (when-let [{:keys [endpoint]} *client-session*]
+        (let [url (str "http://localhost:" (:port *server*) endpoint)]
+          (hato/post url
+                     {:headers {"Content-Type" "application/json"}
+                      :body "{invalid}"
+                      :middleware middleware})
+          (let [test-data {:recovery "test"}
+                response (send-request (make-request "echo" test-data 2))
+                _ (is (= http/Accepted (:status response)))
+                reader (:reader *client-session*)
+                message (parse-sse-message reader)]
+            (is (= test-data (:result message)))))))))
 
 (deftest ^:integ server-handlers-test
   (testing "Handler management"

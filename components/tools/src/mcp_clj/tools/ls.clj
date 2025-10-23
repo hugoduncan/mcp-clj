@@ -1,9 +1,9 @@
 (ns mcp-clj.tools.ls
   "File listing tool for MCP servers"
   (:require
-    [clojure.data.json :as json]
     [clojure.java.io :as io]
     [clojure.string :as str]
+    [mcp-clj.json :as json]
     [mcp-clj.log :as log])
   (:import
     (java.io
@@ -132,17 +132,17 @@
 
         (.isFile path-file)
         {:content [{:type "text"
-                    :text (json/write-str {:files [normalized-path]
-                                           :truncated false
-                                           :total-files 1
-                                           :max-depth-reached false
-                                           :max-files-reached false})}]
+                    :text (json/write {:files [normalized-path]
+                                       :truncated false
+                                       :total-files 1
+                                       :max-depth-reached false
+                                       :max-files-reached false})}]
          :isError false}
 
         (.isDirectory path-file)
         (let [result (collect-files normalized-path max-depth max-files)]
           {:content [{:type "text"
-                      :text (json/write-str result)}]
+                      :text (json/write result)}]
            :isError false})
 
         :else

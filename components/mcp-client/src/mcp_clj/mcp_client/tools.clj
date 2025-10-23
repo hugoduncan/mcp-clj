@@ -1,7 +1,7 @@
 (ns mcp-clj.mcp-client.tools
   "Tool calling implementation for MCP client"
   (:require
-    [clojure.data.json :as json]
+    [mcp-clj.json :as json]
     [mcp-clj.log :as log]
     [mcp-clj.mcp-client.session :as session]
     [mcp-clj.mcp-client.subscriptions :as subscriptions]
@@ -77,7 +77,7 @@
                      (string? (:text item)))
               (try
                 ;; Try to parse as JSON
-                (let [parsed (json/read-str (:text item) :key-fn keyword)]
+                (let [parsed (json/parse (:text item))]
                   ;; If it parses successfully and looks like structured data,
                   ;; replace the text content with the parsed data
                   (if (or (map? parsed) (vector? parsed))

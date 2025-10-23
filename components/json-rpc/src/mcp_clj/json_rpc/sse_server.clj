@@ -1,9 +1,9 @@
 (ns mcp-clj.json-rpc.sse-server
   "JSON-RPC 2.0 server with Server-Sent Events (SSE) support"
   (:require
-    [clojure.data.json :as json]
     [mcp-clj.http :as http]
     [mcp-clj.http-server.adapter :as http-server]
+    [mcp-clj.json :as json]
     [mcp-clj.json-rpc.executor :as executor]
     [mcp-clj.json-rpc.json-protocol :as json-protocol]
     [mcp-clj.json-rpc.protocols :as protocols]
@@ -79,7 +79,7 @@
     (let [session-id (request-session-id request)
           session (session-id->session session-id)
           reply!-fn (:reply!-fn session)
-          rpc-call (json/read-str (slurp (:body request)) :key-fn keyword)]
+          rpc-call (json/parse (slurp (:body request)))]
       (log/info :rpc/json-request
                 {:json-request rpc-call
                  :session-id session-id})
@@ -99,6 +99,23 @@
               (str "Method not found: " (:method rpc-call))
               (:id rpc-call))
             http/BadRequest))))
+    (catch com.fasterxml.jackson.core.JsonParseException e
+      (log/warn :rpc/json-parse-error {:error (.getMessage e)})
+      (http/json-response
+        (json-protocol/json-rpc-error
+          :parse-error
+          (str "Invalid JSON: " (.getMessage e)))
+        http/BadRequest))
+    (catch clojure.lang.ExceptionInfo e
+      (if (= :parse-error (:type (ex-data e)))
+        (do
+          (log/warn :rpc/json-parse-error {:error (.getMessage e)})
+          (http/json-response
+            (json-protocol/json-rpc-error
+              :parse-error
+              (.getMessage e))
+            http/BadRequest))
+        (throw e)))
     (catch RejectedExecutionException _
       (log/warn :rpc/overload-rejection)
       (http/json-response
@@ -117,7 +134,7 @@
   [v]
   (if (string? v)
     (pr-str v)
-    (json/write-str v)))
+    (json/write v)))
 
 (defn- uuid->hex
   [^java.util.UUID uuid]

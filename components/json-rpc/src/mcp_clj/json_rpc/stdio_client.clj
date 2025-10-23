@@ -85,11 +85,13 @@
 (defn handle-response
   "Handle JSON-RPC response by completing the corresponding future"
   [json-rpc-client {:keys [id result error] :as response}]
-  (if-let [future (.remove ^ConcurrentHashMap (:pending-requests json-rpc-client) id)]
-    (if error
-      (.completeExceptionally ^CompletableFuture future (ex-info "JSON-RPC error" error))
-      (.complete ^CompletableFuture future result))
-    (log/warn :rpc/orphan-response {:response response})))
+  ;; Normalize ID to Long to handle Integer/Long mismatch from JSON parsing
+  (let [normalized-id (long id)]
+    (if-let [future (.remove ^ConcurrentHashMap (:pending-requests json-rpc-client) normalized-id)]
+      (if error
+        (.completeExceptionally ^CompletableFuture future (ex-info "JSON-RPC error" error))
+        (.complete ^CompletableFuture future result))
+      (log/warn :rpc/orphan-response {:response response}))))
 
 (defn handle-notification
   "Handle JSON-RPC notification (no response expected)"
