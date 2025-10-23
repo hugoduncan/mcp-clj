@@ -1,7 +1,11 @@
 (ns mcp-clj.json
   "JSON parsing and writing functionality.
 
-  Encapsulates the use of cheshire for JSON operations."
+  Encapsulates the use of cheshire for JSON operations.
+  
+  This component provides a centralized JSON API with automatic normalization
+  to ensure consistent behavior across the codebase. See ADR 002 
+  (doc/adr/002-cheshire-json-library.md) for migration rationale."
   (:require
     [cheshire.core :as json]
     [clojure.walk :as walk]))
@@ -9,13 +13,28 @@
 (defn- normalize-parsed-json
   "Normalize cheshire parsed data for consistent behavior.
    
-   Cheshire has two incompatibilities with the expected JSON parsing behavior:
-   1. Parses JSON integers as java.lang.Integer (expected: Long)
-   2. Parses JSON arrays as LazySeq (expected: PersistentVector)
+   Cheshire has two behavioral differences from expected JSON parsing:
    
-   These differences cause issues with:
-   - ConcurrentHashMap lookups (Integer vs Long keys)
-   - Code expecting vectors (vector? checks, indexed access)"
+   1. Integer vs Long: Cheshire parses JSON integers as java.lang.Integer,
+      but the codebase expects java.lang.Long. This causes ConcurrentHashMap
+      lookup failures when Integer keys don't match Long keys (e.g., JSON-RPC
+      request IDs used as map keys).
+   
+   2. LazySeq vs Vector: Cheshire parses JSON arrays as LazySeq, but the
+      codebase expects PersistentVector. This breaks code using vector? checks
+      and indexed access patterns.
+   
+   This normalization layer walks the entire data structure to convert:
+   - All Integer instances → Long (for Java interop compatibility)
+   - All lazy sequences → Vector (for consistent collection behavior)
+   - Maps and other collections are preserved unchanged
+   
+   Trade-offs:
+   - Performance: Adds overhead of walking entire data structure
+   - Memory: Converts lazy sequences to vectors, losing laziness benefits
+   - Simplicity: Enables transparent migration without changing call sites
+   
+   See ADR 002 (doc/adr/002-cheshire-json-library.md) for full rationale."
   [data]
   (walk/postwalk
     (fn [x]
