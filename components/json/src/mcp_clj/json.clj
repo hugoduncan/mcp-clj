@@ -28,11 +28,7 @@
   (when (or (nil? s) (and (string? s) (empty? s)))
     (throw (ex-info "Cannot parse empty or nil JSON string"
                     {:type :parse-error :input s})))
-  (let [result (json/parse-string-strict s true (fn [_] []))]
-    (when (nil? result)
-      (throw (ex-info "JSON parsing returned nil"
-                      {:type :parse-error :input s})))
-    result))
+  (json/parse-string-strict s true (fn [_] [])))
 
 (defn write
   "Convert EDN data to JSON string.

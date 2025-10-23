@@ -99,6 +99,23 @@
               (str "Method not found: " (:method rpc-call))
               (:id rpc-call))
             http/BadRequest))))
+    (catch com.fasterxml.jackson.core.JsonParseException e
+      (log/warn :rpc/json-parse-error {:error (.getMessage e)})
+      (http/json-response
+        (json-protocol/json-rpc-error
+          :parse-error
+          (str "Invalid JSON: " (.getMessage e)))
+        http/BadRequest))
+    (catch clojure.lang.ExceptionInfo e
+      (if (= :parse-error (:type (ex-data e)))
+        (do
+          (log/warn :rpc/json-parse-error {:error (.getMessage e)})
+          (http/json-response
+            (json-protocol/json-rpc-error
+              :parse-error
+              (.getMessage e))
+            http/BadRequest))
+        (throw e)))
     (catch RejectedExecutionException _
       (log/warn :rpc/overload-rejection)
       (http/json-response

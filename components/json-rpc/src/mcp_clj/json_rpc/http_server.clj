@@ -111,13 +111,36 @@
                              :internal-error
                              (.getMessage e))))]
             (http/json-response result http/Ok)))))
+    (catch com.fasterxml.jackson.core.JsonParseException e
+      (log/warn :rpc/json-parse-error {:error (.getMessage e)})
+      (http/json-response
+        (json-protocol/json-rpc-error
+          :parse-error
+          (str "Invalid JSON: " (.getMessage e)))
+        http/BadRequest))
+    (catch clojure.lang.ExceptionInfo e
+      (if (= :parse-error (:type (ex-data e)))
+        (do
+          (log/warn :rpc/json-parse-error {:error (.getMessage e)})
+          (http/json-response
+            (json-protocol/json-rpc-error
+              :parse-error
+              (.getMessage e))
+            http/BadRequest))
+        (do
+          (log/error :rpc/post-error {:error (.getMessage e)})
+          (http/json-response
+            (json-protocol/json-rpc-error
+              :internal-error
+              (.getMessage e))
+            http/InternalServerError))))
     (catch Exception e
       (log/error :rpc/post-error {:error (.getMessage e)})
       (http/json-response
         (json-protocol/json-rpc-error
-          :parse-error
-          "Invalid JSON")
-        http/BadRequest))))
+          :internal-error
+          (.getMessage e))
+        http/InternalServerError))))
 
 (defn- handle-sse-get
   "Handle SSE stream setup via GET"
