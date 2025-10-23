@@ -122,7 +122,7 @@
             ;; Empty line signals end of event
             (when-let [event (parse-sse-event event-lines)]
               (try
-                (let [data (json/parse-string (:data event) true)]
+                (let [data (json/parse (:data event))]
                   (log/debug :sse/event {:event event :data data})
                   (handle-response client data))
                 (catch Exception e

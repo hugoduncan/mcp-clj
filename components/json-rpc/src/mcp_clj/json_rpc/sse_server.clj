@@ -79,7 +79,7 @@
     (let [session-id (request-session-id request)
           session (session-id->session session-id)
           reply!-fn (:reply!-fn session)
-          rpc-call (json/parse-string (slurp (:body request)) true)]
+          rpc-call (json/parse (slurp (:body request)))]
       (log/info :rpc/json-request
                 {:json-request rpc-call
                  :session-id session-id})

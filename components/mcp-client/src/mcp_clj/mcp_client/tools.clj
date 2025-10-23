@@ -77,7 +77,7 @@
                      (string? (:text item)))
               (try
                 ;; Try to parse as JSON
-                (let [parsed (json/parse-string (:text item) true)]
+                (let [parsed (json/parse (:text item))]
                   ;; If it parses successfully and looks like structured data,
                   ;; replace the text content with the parsed data
                   (if (or (map? parsed) (vector? parsed))
