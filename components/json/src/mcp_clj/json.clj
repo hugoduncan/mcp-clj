@@ -2,9 +2,9 @@
   "JSON parsing and writing functionality.
 
   Encapsulates the use of cheshire for JSON operations.
-  
+
   This component provides a centralized JSON API with automatic normalization
-  to ensure consistent behavior across the codebase. See ADR 002 
+  to ensure consistent behavior across the codebase. See ADR 002
   (doc/adr/002-cheshire-json-library.md) for migration rationale."
   (:require
     [cheshire.core :as json]
@@ -12,28 +12,28 @@
 
 (defn- normalize-parsed-json
   "Normalize cheshire parsed data for consistent behavior.
-   
+
    Cheshire has two behavioral differences from expected JSON parsing:
-   
+
    1. Integer vs Long: Cheshire parses JSON integers as java.lang.Integer,
       but the codebase expects java.lang.Long. This causes ConcurrentHashMap
       lookup failures when Integer keys don't match Long keys (e.g., JSON-RPC
       request IDs used as map keys).
-   
+
    2. LazySeq vs Vector: Cheshire parses JSON arrays as LazySeq, but the
       codebase expects PersistentVector. This breaks code using vector? checks
       and indexed access patterns.
-   
+
    This normalization layer walks the entire data structure to convert:
    - All Integer instances → Long (for Java interop compatibility)
    - All lazy sequences → Vector (for consistent collection behavior)
    - Maps and other collections are preserved unchanged
-   
+
    Trade-offs:
    - Performance: Adds overhead of walking entire data structure
    - Memory: Converts lazy sequences to vectors, losing laziness benefits
    - Simplicity: Enables transparent migration without changing call sites
-   
+
    See ADR 002 (doc/adr/002-cheshire-json-library.md) for full rationale."
   [data]
   (walk/postwalk
@@ -79,5 +79,5 @@
   Returns JSON string.
 
   Throws exception on conversion error."
-  [data]
+  ^String [data]
   (json/generate-string data {:key-fn name}))

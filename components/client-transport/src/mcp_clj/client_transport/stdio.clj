@@ -80,7 +80,7 @@
     (let [^Process process (:process process-info)]
       (try
         (.destroy process)
-        (when-not (.waitFor process 5000 TimeUnit/MILLISECONDS)
+        (when-not (.waitFor process (long 5000) TimeUnit/MILLISECONDS)
           (log/warn :client/process-force-kill))
         (catch Exception e
           (log/error :client/process-close-error {:error e})))))
