@@ -142,7 +142,7 @@
   ;; Test comprehensive JSON parse error handling in HTTP transport
   ;; Validates that malformed JSON returns proper HTTP 400 and error details
   (testing "JSON parse errors in HTTP transport"
-    (let [handlers {"test" (fn [_ _] {:result "ok"})}]
+    (let [handlers {"test" (fn [_ _] "ok")}]
       (http-server/set-handlers! *server* handlers)
 
       (testing "returns 400 for malformed JSON"

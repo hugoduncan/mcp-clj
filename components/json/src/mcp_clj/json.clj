@@ -23,9 +23,16 @@
   values as HashMap keys (like JSON-RPC request IDs) must coerce to Long
   at the point of use: (long id)
 
-  Throws exception on invalid JSON."
+  Throws exception on invalid JSON or empty input."
   [s]
-  (json/parse-string-strict s true (fn [_] [])))
+  (when (or (nil? s) (and (string? s) (empty? s)))
+    (throw (ex-info "Cannot parse empty or nil JSON string"
+                    {:type :parse-error :input s})))
+  (let [result (json/parse-string-strict s true (fn [_] []))]
+    (when (nil? result)
+      (throw (ex-info "JSON parsing returned nil"
+                      {:type :parse-error :input s})))
+    result))
 
 (defn write
   "Convert EDN data to JSON string.
