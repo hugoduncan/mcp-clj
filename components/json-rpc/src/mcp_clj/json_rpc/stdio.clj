@@ -9,11 +9,11 @@
       BufferedWriter)))
 
 (defn normalize-parsed-json
-  "Normalize cheshire parsed data to match clojure.data.json behavior.
+  "Normalize cheshire parsed data for consistent behavior.
    
-   Cheshire has two incompatibilities with clojure.data.json:
-   1. Parses JSON integers as java.lang.Integer (clojure.data.json uses Long)
-   2. Parses JSON arrays as LazySeq (clojure.data.json uses PersistentVector)
+   Cheshire has two incompatibilities with the expected JSON parsing behavior:
+   1. Parses JSON integers as java.lang.Integer (expected: Long)
+   2. Parses JSON arrays as LazySeq (expected: PersistentVector)
    
    These differences cause issues with:
    - ConcurrentHashMap lookups (Integer vs Long keys)
@@ -26,7 +26,7 @@
         (instance? Integer x)
         (long x)
 
-        ;; Convert sequences (LazySeq) to vectors to match clojure.data.json
+        ;; Convert sequences (LazySeq) to vectors for consistent behavior
         ;; But preserve maps and other collection types
         (and (seq? x) (not (map? x)))
         (vec x)
@@ -45,7 +45,7 @@
   (try
     (when-let [line (.readLine reader)]
       (let [json-data (json/parse-string line true)
-            ;; Normalize to match clojure.data.json behavior
+            ;; Normalize for consistent behavior
             normalized-data (normalize-parsed-json json-data)]
         [normalized-data nil]))
     (catch java.io.EOFException _

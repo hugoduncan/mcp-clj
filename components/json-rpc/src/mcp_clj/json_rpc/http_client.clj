@@ -1,7 +1,7 @@
 (ns mcp-clj.json-rpc.http-client
   "JSON-RPC client for HTTP transport with SSE support"
   (:require
-    [clojure.data.json :as json]
+    [cheshire.core :as json]
     [clojure.string :as str]
     [mcp-clj.http-client.core :as http-client]
     [mcp-clj.json-rpc.executor :as executor]
@@ -122,7 +122,7 @@
             ;; Empty line signals end of event
             (when-let [event (parse-sse-event event-lines)]
               (try
-                (let [data (json/read-str (:data event) :key-fn keyword)]
+                (let [data (json/parse-string (:data event) true)]
                   (log/debug :sse/event {:event event :data data})
                   (handle-response client data))
                 (catch Exception e
@@ -185,11 +185,11 @@
   "Send JSON-RPC request and return CompletableFuture with response"
   [client method params timeout-ms]
   (let [request-id (generate-request-id client)
-        request    {:jsonrpc "2.0"
-                    :id      request-id
-                    :method  method
-                    :params  params}
-        future     (CompletableFuture.)]
+        request {:jsonrpc "2.0"
+                 :id request-id
+                 :method method
+                 :params params}
+        future (CompletableFuture.)]
 
     ;; Store the future for this request
     (.put ^ConcurrentHashMap (:pending-requests client) request-id future)
@@ -200,17 +200,17 @@
       (fn []
         (try
           (log/debug :client/send "Send request" {:method method})
-          (let [url      (str (:base-url client) "/")
-                headers  (make-headers client)
+          (let [url (str (:base-url client) "/")
+                headers (make-headers client)
                 response (http-client/http-post url
-                                                {:headers          headers
-                                                 :body             (json/write-str request)
-                                                 :content-type     :json
-                                                 :accept           :json
-                                                 :as               :json
+                                                {:headers headers
+                                                 :body (json/generate-string request)
+                                                 :content-type :json
+                                                 :accept :json
+                                                 :as :json
                                                  :throw-exceptions false})]
             (log/debug :client/send
-                       {:msg      "Receive response"
+                       {:msg "Receive response"
                         :response response})
             (if (= 200 (:status response))
               (do
@@ -239,13 +239,13 @@
                 (log/error
                   :http/request-failed
                   {:status (:status response)
-                   :body   (:body response)})
+                   :body (:body response)})
                 (.completeExceptionally
                   future
                   (ex-info
                     error-msg
                     {:status (:status response)
-                     :body   (:body response)})))))
+                     :body (:body response)})))))
           (catch Exception e
             (log/error :http/request-error {:error e :method method})
             (.completeExceptionally future e)))))
@@ -273,7 +273,7 @@
                               response (http-client/http-post
                                          url
                                          {:headers headers
-                                          :body (json/write-str notification)
+                                          :body (json/generate-string notification)
                                           :content-type :json
                                           :throw-exceptions false})]
                           (when (not= 200 (:status response))

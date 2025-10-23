@@ -1,7 +1,7 @@
 (ns mcp-clj.json-rpc.sse-server
   "JSON-RPC 2.0 server with Server-Sent Events (SSE) support"
   (:require
-    [clojure.data.json :as json]
+    [cheshire.core :as json]
     [mcp-clj.http :as http]
     [mcp-clj.http-server.adapter :as http-server]
     [mcp-clj.json-rpc.executor :as executor]
@@ -79,7 +79,7 @@
     (let [session-id (request-session-id request)
           session (session-id->session session-id)
           reply!-fn (:reply!-fn session)
-          rpc-call (json/read-str (slurp (:body request)) :key-fn keyword)]
+          rpc-call (json/parse-string (slurp (:body request)) true)]
       (log/info :rpc/json-request
                 {:json-request rpc-call
                  :session-id session-id})
@@ -117,7 +117,7 @@
   [v]
   (if (string? v)
     (pr-str v)
-    (json/write-str v)))
+    (json/generate-string v)))
 
 (defn- uuid->hex
   [^java.util.UUID uuid]

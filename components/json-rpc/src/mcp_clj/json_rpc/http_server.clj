@@ -1,7 +1,7 @@
 (ns mcp-clj.json-rpc.http-server
   "JSON-RPC 2.0 server with MCP Streamable HTTP transport (2025-03-26 spec)"
   (:require
-    [clojure.data.json :as json]
+    [cheshire.core :as json]
     [clojure.string :as str]
     [mcp-clj.http :as http]
     [mcp-clj.http-server.adapter :as http-server]
@@ -91,7 +91,7 @@
       (let [session-id (extract-session-id request)
             session (get @session-id->session session-id)
             body-str (slurp (:body request))
-            rpc-data (json/read-str body-str :key-fn keyword)]
+            rpc-data (json/parse-string body-str true)]
         (log/info :rpc/http-post
                   {:session-id session-id
                    :has-session (some? session)
@@ -135,7 +135,7 @@
                       session-id
                       (fn [message]
                         (let [event-id (.incrementAndGet event-counter)]
-                          (reply! (assoc (sse/message (json/write-str message))
+                          (reply! (assoc (sse/message (json/generate-string message))
                                          :id (str event-id)))))
                       (fn []
                         (log/info :http/sse-close {:session-id session-id})
@@ -176,19 +176,19 @@
     (if (str/includes? (get (:headers request) "accept" "") "text/event-stream")
       (handle-sse-get session-id->session allowed-origins request)
       (http/json-response
-        {"transport"    "streamable-http"
-         "version"      "2025-03-26"
-         "capabilities" {"sse"       true
-                         "batch"     true
+        {"transport" "streamable-http"
+         "version" "2025-03-26"
+         "capabilities" {"sse" true
+                         "batch" true
                          "resumable" true}}
         http/Ok))
 
     ;; 404 for unknown endpoints
     (do
       (log/warn :http/not-found
-                {:method   request-method
-                 :uri      uri
-                 :request  request
+                {:method request-method
+                 :uri uri
+                 :request request
                  :handlers handlers})
       (http/text-response "Not Found" http/NotFound))))
 
@@ -201,20 +201,20 @@
            allowed-origins
            on-connect
            on-disconnect]
-    :or   {num-threads     (* 2 (.availableProcessors (Runtime/getRuntime)))
-           port            0
-           allowed-origins []
-           on-connect      (fn [& _])
-           on-disconnect   (fn [& _])}}]
+    :or {num-threads (* 2 (.availableProcessors (Runtime/getRuntime)))
+         port 0
+         allowed-origins []
+         on-connect (fn [& _])
+         on-disconnect (fn [& _])}}]
   {:pre [(ifn? on-connect) (ifn? on-disconnect) (coll? allowed-origins)]}
-  (let [executor                   (executor/create-executor num-threads)
-        session-id->session        (atom {})
-        handlers                   (atom nil)
-        handler                    (partial handle-request
-                                            executor
-                                            session-id->session
-                                            handlers
-                                            allowed-origins)
+  (let [executor (executor/create-executor num-threads)
+        session-id->session (atom {})
+        handlers (atom nil)
+        handler (partial handle-request
+                         executor
+                         session-id->session
+                         handlers
+                         allowed-origins)
         {:keys [server port stop]} (http-server/run-server
                                      handler
                                      {:executor executor :port port})]
@@ -222,14 +222,14 @@
     (log/info :http/server-created
               {:port port :allowed-origins allowed-origins})
 
-    {:server              server
-     :port                port
-     :handlers            handlers
+    {:server server
+     :port port
+     :handlers handlers
      :session-id->session session-id->session
-     :stop                (fn []
-                            (log/info :http/server-stopping)
-                            (stop)
-                            (executor/shutdown-executor executor))}))
+     :stop (fn []
+             (log/info :http/server-stopping)
+             (stop)
+             (executor/shutdown-executor executor))}))
 
 ;; Server Operations
 
