@@ -270,8 +270,10 @@
         (catch Throwable e
           {:content [(text-map (str "Error: " (.getMessage e)))]
            :isError true}))
-      {:content [(text-map (str "Tool not found: " name))]
-       :isError true})))
+      (throw (ex-info "Unknown tool"
+                      {:code -32602
+                       :message (str "Unknown tool: " name)
+                       :data {:name name}})))))
 
 (defn- version-aware-handle-call-tool
   "Version-aware wrapper for handle-call-tool"
