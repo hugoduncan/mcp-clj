@@ -13,7 +13,7 @@
                            :capabilities {:roots {:listChanged true}}
                            :clientInfo {:name "test-client"
                                         :version "1.0.0"}}
-            result (#'mcp-server/negotiate-initialization server-capabilities client-params)
+            result (#'mcp-server/negotiate-initialization server-capabilities nil client-params)
             response (:response result)
             capabilities (get-in response [:capabilities :resources])]
         (is (true? (:subscribe capabilities))
@@ -29,7 +29,7 @@
                                :capabilities {:roots {:listChanged true}}
                                :clientInfo {:name "test-client"
                                             :version "1.0.0"}}
-                result (#'mcp-server/negotiate-initialization server-capabilities client-params)
+                result (#'mcp-server/negotiate-initialization server-capabilities nil client-params)
                 response (:response result)
                 capabilities (get-in response [:capabilities :resources])]
             (is (true? (:subscribe capabilities))
@@ -43,7 +43,7 @@
                            :capabilities {}
                            :clientInfo {:name "test-client"
                                         :version "1.0.0"}}
-            result (#'mcp-server/negotiate-initialization server-capabilities client-params)
+            result (#'mcp-server/negotiate-initialization server-capabilities nil client-params)
             response (:response result)
             capabilities (:capabilities response)]
         (is (true? (get-in capabilities [:tools :listChanged]))
@@ -57,7 +57,7 @@
                            :capabilities {}
                            :clientInfo {:name "test-client"
                                         :version "1.0.0"}}
-            result (#'mcp-server/negotiate-initialization server-capabilities client-params)
+            result (#'mcp-server/negotiate-initialization server-capabilities nil client-params)
             response (:response result)
             capabilities (:capabilities response)]
         (is (contains? capabilities :logging)

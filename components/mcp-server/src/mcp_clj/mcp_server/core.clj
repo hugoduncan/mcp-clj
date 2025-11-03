@@ -32,7 +32,8 @@
    prompt-registry
    resource-registry
    resource-subscriptions
-   capabilities]
+   capabilities
+   server-info]
 
   AutoCloseable
 
@@ -159,9 +160,10 @@
 
 (defn- negotiate-initialization
   "Negotiate initialization request according to MCP specification.
-  
-  server-capabilities should contain capability configs like {:logging {}}"
-  [server-capabilities {:keys [protocolVersion capabilities clientInfo] :as params}]
+
+  server-capabilities should contain capability configs like {:logging {}}
+  server-info is optional map with :name, :version, :title keys"
+  [server-capabilities server-info {:keys [protocolVersion capabilities clientInfo] :as params}]
   (let [negotiation (version/negotiate-version protocolVersion)
         {:keys [negotiated-version client-was-supported? supported-versions]} negotiation
         warnings (when-not client-was-supported?
@@ -180,10 +182,11 @@
                                negotiated-version
                                :capabilities
                                {:capabilities base-capabilities})
-        ;; Create base server info
-        base-server-info {:name "mcp-clj"
-                          :version "0.1.0"
-                          :title "MCP Clojure Server"}
+        ;; Use provided server-info or default to mcp-clj
+        base-server-info (or server-info
+                             {:name "mcp-clj"
+                              :version "0.1.0"
+                              :title "MCP Clojure Server"})
         ;; Apply version-specific server info formatting
         version-server-info (version/handle-version-specific-behavior
                               negotiated-version
@@ -206,6 +209,7 @@
   (log/info :server/initialize params)
   (let [{:keys [negotiation client-info response]} (negotiate-initialization
                                                      (:capabilities server)
+                                                     (:server-info server)
                                                      params)
         {:keys [negotiated-version]} negotiation]
     (when-not (:client-was-supported? negotiation)
@@ -519,6 +523,7 @@
   - :prompts - Map of prompt name to prompt definition
   - :resources - Map of resource name to resource definition
   - :capabilities - Map of capability configs (e.g., {:logging {}})
+  - :server-info - Optional map with :name, :version, :title keys (defaults to mcp-clj)
 
   Transport configuration:
   - {:type :stdio :num-threads N} - Standard input/output
@@ -530,9 +535,10 @@
                     :tools {...}})
     (create-server {:transport {:type :http :port 3001}
                     :prompts {...}
-                    :capabilities {:logging {}}})"
+                    :capabilities {:logging {}}
+                    :server-info {:name \"my-server\" :version \"1.0.0\"}})"
   ^MCPServer
-  [{:keys [transport tools prompts resources capabilities]
+  [{:keys [transport tools prompts resources capabilities server-info]
     :or {tools tools/default-tools
          prompts prompts/default-prompts
          resources resources/default-resources
@@ -570,7 +576,8 @@
                  prompt-registry
                  resource-registry
                  (atom {})
-                 capabilities)
+                 capabilities
+                 server-info)
         ;; Create handlers before creating the JSON-RPC server to avoid race
         ;; conditions
         handlers (create-handlers server)
