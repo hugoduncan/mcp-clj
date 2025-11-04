@@ -227,6 +227,47 @@
       (is (str/includes? response "\"sum\":3"))
       (is (str/includes? response "\"message\":\"hello\"")))))
 
+(deftest ^:integ test-waits-for-async-handlers
+  ;; Test that server waits for all async handlers to complete before EOF exits.
+  ;; This is a regression test for the race condition where the server future
+  ;; completed before async handlers finished writing their responses.
+  (testing "waits for all async handlers to complete before exiting"
+    (let [handler-started (promise)
+          handler-delay-ms 100
+          requests [{:jsonrpc "2.0"
+                     :method "slow"
+                     :params []
+                     :id 1}
+                    {:jsonrpc "2.0"
+                     :method "fast"
+                     :params []
+                     :id 2}]
+          json-input (str/join
+                       (mapv (comp #(str % "\n") json/generate-string) requests))
+          response
+          (with-out-str
+            (with-redefs [mcp-clj.json-rpc.stdio-server/input-reader
+                          (constantly
+                            (BufferedReader.
+                              (StringReader. json-input)))]
+              (let [handlers {"slow" (fn [_method _params]
+                                       (deliver handler-started true)
+                                       (Thread/sleep handler-delay-ms)
+                                       {:slow-result "done"})
+                              "fast" (fn [_method _params]
+                                       {:fast-result "done"})}
+                    server (stdio-server/create-server
+                             {:handlers handlers})]
+                ;; Wait for slow handler to start
+                (deref handler-started 1000 ::timeout)
+                ;; server will EOF on input and should wait for handlers
+                @(:server-future server))))]
+      ;; Both responses should be present
+      (is (str/includes? response "\"slow-result\":\"done\"")
+          "Slow handler response should be captured")
+      (is (str/includes? response "\"fast-result\":\"done\"")
+          "Fast handler response should be captured"))))
+
 (deftest ^:integ test-error-handling
   ;; Test comprehensive error handling for JSON parse failures in stdio transport.
   ;; Note: stdio transport currently logs parse errors to stderr and continues
