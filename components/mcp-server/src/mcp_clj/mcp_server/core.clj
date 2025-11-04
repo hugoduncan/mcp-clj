@@ -270,6 +270,9 @@
         (catch Throwable e
           {:content [(text-map (str "Error: " (.getMessage e)))]
            :isError true}))
+      ;; Use -32602 (INVALID_PARAMS) per MCP spec for unknown tools.
+      ;; The JSON-RPC method "tools/call" exists, but the tool name parameter is invalid.
+      ;; -32601 (METHOD_NOT_FOUND) would indicate the JSON-RPC method itself doesn't exist.
       (throw (ex-info "Unknown tool"
                       {:code -32602
                        :message (str "Unknown tool: " name)
