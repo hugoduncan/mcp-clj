@@ -127,13 +127,13 @@
       (java-sdk/initialize-client client)
 
       (testing "non-existent tool call over HTTP"
-        (let [result @(java-sdk/call-tool
-                        client
-                        "non-existent-tool"
-                        {:param "value"})]
-          (is (contains? result :content))
-          (when (contains? result :isError)
-            (is (:isError result)))))
+        (is (thrown-with-msg?
+              java.util.concurrent.ExecutionException
+              #"Unknown tool: non-existent-tool"
+              @(java-sdk/call-tool
+                 client
+                 "non-existent-tool"
+                 {:param "value"}))))
 
       (testing "invalid tool arguments for clj-eval over HTTP"
         ;; Try to call clj-eval without required code parameter

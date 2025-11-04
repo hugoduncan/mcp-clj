@@ -162,7 +162,10 @@
                      add-result)))
 
             ;; Test calling non-existent tool
-            (is (:isError @(client/call-tool client "nonexistent" {})))
+            (is (thrown-with-msg?
+                  java.util.concurrent.ExecutionException
+                  #"Server error.*-32602.*Unknown tool: nonexistent"
+                  @(client/call-tool client "nonexistent" {})))
 
             ;; Test calling tool that throws error
             (is (:isError @(client/call-tool client "error-tool" {})))))

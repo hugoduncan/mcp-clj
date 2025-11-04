@@ -60,6 +60,11 @@
       #(try
          (binding [*out* out]
            (handle-json-rpc handler rpc-call))
+         (catch clojure.lang.ExceptionInfo e
+           (log/error :rpc/handler-error {:error e})
+           (write-json!
+             out
+             (json-protocol/exception-info->error-response e (:id rpc-call))))
          (catch Throwable e
            (log/error :rpc/handler-error {:error e})
            (write-json!

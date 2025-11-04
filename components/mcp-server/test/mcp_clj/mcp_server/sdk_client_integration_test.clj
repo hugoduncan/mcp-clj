@@ -98,13 +98,14 @@
       (java-sdk/initialize-client client)
 
       (testing "with non-existent tool call"
-        (let [result @(java-sdk/call-tool
-                        client
-                        "non-existent-tool"
-                        {:param "value"})]
-          (testing "should return an error response"
-            (when (contains? result :isError)
-              (is (:isError result))))))
+        (testing "should throw an error"
+          (is (thrown-with-msg?
+                java.util.concurrent.ExecutionException
+                #"Unknown tool: non-existent-tool"
+                @(java-sdk/call-tool
+                   client
+                   "non-existent-tool"
+                   {:param "value"})))))
 
       (testing "with invalid tool arguments"
         (let [result @(java-sdk/call-tool

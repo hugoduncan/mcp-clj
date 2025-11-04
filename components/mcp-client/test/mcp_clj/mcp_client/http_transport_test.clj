@@ -122,10 +122,10 @@
   (testing "HTTP client error handling"
     (with-http-test-env [server client]
       (testing "handles tool not found"
-        (let [resp @(client/call-tool client "nonexistent-tool" {})]
-          (is (:isError resp))
-          (is (= "Tool not found: nonexistent-tool"
-                 (-> resp :content first :text)))))
+        (is (thrown-with-msg?
+              java.util.concurrent.ExecutionException
+              #"Tool call failed: nonexistent-tool"
+              @(client/call-tool client "nonexistent-tool" {}))))
 
       (testing "handles invalid arguments"
         (let [resp @(client/call-tool

@@ -59,6 +59,27 @@
                    :message message}}
     id (assoc :id id)))
 
+(defn exception-info->error-response
+  "Convert ExceptionInfo to JSON-RPC error response.
+
+  If ex-data contains both :code and :message, uses them for structured error.
+  Otherwise treats as internal error. Remaining ex-data fields are included
+  in error :data field."
+  [exception-info id]
+  (let [data (ex-data exception-info)
+        {:keys [code message]} data]
+    (if (and code message)
+      {:jsonrpc version
+       :id id
+       :error (cond-> {:code (error-codes code code)
+                       :message message}
+                (seq (dissoc data :code :message))
+                (assoc :data (dissoc data :code :message)))}
+      {:jsonrpc version
+       :id id
+       :error {:code (:internal-error error-codes)
+               :message (.getMessage ^clojure.lang.ExceptionInfo exception-info)}})))
+
 ;; Request validation
 
 (defn validate-request
