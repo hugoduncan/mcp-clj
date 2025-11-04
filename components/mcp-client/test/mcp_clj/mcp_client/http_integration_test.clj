@@ -201,10 +201,10 @@
   (with-http-test-env [server client]
     (testing "HTTP error handling integration"
       (testing "tool not found error"
-        (let [resp @(client/call-tool client "nonexistent-tool" {})]
-          (is (:isError resp))
-          (is (= "Tool not found: nonexistent-tool"
-                 (-> resp :content first :text)))))
+        (is (thrown-with-msg?
+              clojure.lang.ExceptionInfo
+              #"JSON-RPC error"
+              @(client/call-tool client "nonexistent-tool" {}))))
 
       (testing "invalid tool arguments"
         (let [resp @(client/call-tool client "add" {:invalid "params"})]
