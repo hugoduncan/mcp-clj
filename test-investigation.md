@@ -70,11 +70,51 @@ Since timing is ruled out, the failure must be due to:
 
 5. **Run on CI with increased parallelism**: Try to reproduce the failure by stressing the CI environment
 
-## Conclusion
+## Root Cause Identified
 
-The test failure is **NOT caused by insufficient poll timeout**. The operations are synchronous and work reliably even with 1ms timeout locally. The root cause is likely:
-- Test interference (less likely given isolated transport creation)
-- Resource contention on CI under load
-- Background threads consuming from queues unexpectedly
+**The test has a race condition with the background message processor thread.**
 
-Further investigation needed to identify the exact mechanism.
+When `client/create-transport` is called, it automatically starts `start-client-message-processor!` (client.clj:95-134), which runs in a background thread and continuously polls from the `server-to-client` queue with 100ms timeout:
+
+```clojure
+;; client.clj:106
+(when-let [message (shared/poll-from-server! shared-transport 100)]
+  ...)
+```
+
+The test does:
+```clojure
+(shared/offer-to-client! shared-transport notification)  ; Line 135
+(shared/poll-from-server! shared-transport poll-timeout-ms)  ; Lines 138-140
+```
+
+**Both the background thread AND the test are polling from the same queue.**
+
+When the notification is offered to the queue, two consumers race to poll it:
+1. Background message processor thread (polling every 100ms)
+2. Test's explicit poll
+
+If the background thread wins the race, it consumes the notification and the test gets `nil` → test fails.
+
+## Why Initial Analysis Was Wrong
+
+The operations ARE synchronous, but that's irrelevant. The issue is **two consumers competing for the same message**, not timing of the offer/poll operations themselves.
+
+## Proper Fix
+
+The test should use the notification handler callback mechanism instead of manually polling:
+
+```clojure
+(let [received (atom nil)
+      notification-handler (fn [msg] (reset! received msg))
+      transport (client/create-transport {:shared shared-transport
+                                          :notification-handler notification-handler})]
+  ;; Offer notification
+  (shared/offer-to-client! shared-transport notification)
+  ;; Wait for handler to be called
+  (Thread/sleep 200)
+  (is (some? @received))
+  ...)
+```
+
+This eliminates the race by having a single consumer (the background thread) with a registered callback.
