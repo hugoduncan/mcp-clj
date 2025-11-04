@@ -33,6 +33,19 @@
                             :result result}]
               (shared/offer-to-client! shared-transport response)
               (log/debug :in-memory/response-sent {:request-id id :method method}))))
+        (catch clojure.lang.ExceptionInfo e
+          (when id
+            (let [data (ex-data e)
+                  error-response {:jsonrpc "2.0"
+                                  :id id
+                                  :error {:code (or (:code data) -32603)
+                                          :message (or (:message data) (.getMessage e))
+                                          :data (dissoc data :code :message)}}]
+              (shared/offer-to-client! shared-transport error-response)
+              (log/error :in-memory/handler-error
+                         {:request-id id
+                          :method method
+                          :error (.getMessage e)}))))
         (catch Exception e
           (when id
             (let [error-response {:jsonrpc "2.0"
