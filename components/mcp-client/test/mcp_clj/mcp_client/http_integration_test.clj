@@ -203,7 +203,7 @@
       (testing "tool not found error"
         (is (thrown-with-msg?
               clojure.lang.ExceptionInfo
-              #"JSON-RPC error"
+              #"Tool call failed: nonexistent-tool"
               @(client/call-tool client "nonexistent-tool" {}))))
 
       (testing "invalid tool arguments"

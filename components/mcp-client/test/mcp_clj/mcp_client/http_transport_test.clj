@@ -124,7 +124,7 @@
       (testing "handles tool not found"
         (is (thrown-with-msg?
               clojure.lang.ExceptionInfo
-              #"JSON-RPC error"
+              #"Tool call failed: nonexistent-tool"
               @(client/call-tool client "nonexistent-tool" {}))))
 
       (testing "handles invalid arguments"
