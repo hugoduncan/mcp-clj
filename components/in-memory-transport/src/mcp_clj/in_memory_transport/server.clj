@@ -3,6 +3,7 @@
   (:require
     [mcp-clj.in-memory-transport.atomic :as atomic]
     [mcp-clj.in-memory-transport.shared :as shared]
+    [mcp-clj.json-rpc.json-protocol :as json-protocol]
     [mcp-clj.json-rpc.protocols :as json-rpc-protocols]
     [mcp-clj.log :as log])
   (:import
@@ -35,12 +36,7 @@
               (log/debug :in-memory/response-sent {:request-id id :method method}))))
         (catch clojure.lang.ExceptionInfo e
           (when id
-            (let [data (ex-data e)
-                  error-response {:jsonrpc "2.0"
-                                  :id id
-                                  :error {:code (or (:code data) -32603)
-                                          :message (or (:message data) (.getMessage e))
-                                          :data (dissoc data :code :message)}}]
+            (let [error-response (json-protocol/exception-info->error-response e id)]
               (shared/offer-to-client! shared-transport error-response)
               (log/error :in-memory/handler-error
                          {:request-id id

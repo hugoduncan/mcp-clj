@@ -43,21 +43,12 @@
       (log/info :server/handler-response response)
       (reply!-fn (json-protocol/json-rpc-result response id)))
     (catch clojure.lang.ExceptionInfo e
-      (let [data (ex-data e)]
+      (let [data (ex-data e)
+            error-response (json-protocol/exception-info->error-response e id)]
         (if (and (:code data) (:message data))
-          (do
-            (log/info :rpc/handler-json-rpc-error {:error data})
-            (reply!-fn (json-protocol/json-rpc-error
-                         (:code data)
-                         (:message data)
-                         id
-                         (:data data))))
-          (do
-            (log/error :rpc/handler-error {:error e})
-            (reply!-fn (json-protocol/json-rpc-error
-                         :internal-error
-                         (.getMessage e)
-                         id))))))
+          (log/info :rpc/handler-json-rpc-error {:error data})
+          (log/error :rpc/handler-error {:error e}))
+        (reply!-fn error-response)))
     (catch Throwable e
       (log/error :rpc/handler-error {:error e})
       (reply!-fn (json-protocol/json-rpc-error
