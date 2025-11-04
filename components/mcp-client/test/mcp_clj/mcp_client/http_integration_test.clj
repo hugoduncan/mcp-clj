@@ -202,7 +202,7 @@
     (testing "HTTP error handling integration"
       (testing "tool not found error"
         (is (thrown-with-msg?
-              clojure.lang.ExceptionInfo
+              java.util.concurrent.ExecutionException
               #"Tool call failed: nonexistent-tool"
               @(client/call-tool client "nonexistent-tool" {}))))
 

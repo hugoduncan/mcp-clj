@@ -123,7 +123,7 @@
     (with-http-test-env [server client]
       (testing "handles tool not found"
         (is (thrown-with-msg?
-              clojure.lang.ExceptionInfo
+              java.util.concurrent.ExecutionException
               #"Tool call failed: nonexistent-tool"
               @(client/call-tool client "nonexistent-tool" {}))))
 
