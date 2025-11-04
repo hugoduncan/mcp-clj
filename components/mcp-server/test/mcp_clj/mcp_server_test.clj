@@ -360,13 +360,11 @@
                                 :data
                                 {:event "message"
                                  :data
-                                 (json-result
-                                   {:content
-                                    [{:type "text"
-                                      :text "Tool not found: unkown"}]
-                                    :isError true}
-                                   nil
-                                   0)}}])
+                                 {:jsonrpc "2.0"
+                                  :id 0
+                                  :error {:code -32602
+                                          :message "Unknown tool: unkown"
+                                          :data {:data {:name "unkown"}}}}}}])
                       [state' result] (run-plan state)
                       _ (testing "tools/call with unknown tool"
                           (is (= :passed result))
