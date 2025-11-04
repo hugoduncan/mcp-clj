@@ -8,6 +8,7 @@
 
   Version-specific behavior is tested using conditional assertions."
   (:require
+    [clojure.string :as str]
     [clojure.test :refer [deftest is testing]]
     [mcp-clj.compliance-test.test-helpers :as helpers]
     [mcp-clj.java-sdk.interop :as java-sdk]
@@ -97,16 +98,40 @@
             (is (true? (:isError result)))
             (is (vector? (:content result)))))
 
-        (testing "non-existent tool"
+        (testing "non-existent tool returns JSON-RPC error"
+          ;; Per MCP spec, errors in _finding_ the tool should be
+          ;; reported as JSON-RPC protocol errors (code -32602),
+          ;; not as tool execution errors with isError: true
           (try
-            (let [result (if (= client-type :clojure)
-                           @(client/call-tool client "nonexistent" {:arg "value"})
-                           @(java-sdk/call-tool client "nonexistent" {:arg "value"}))]
-              ;; Should either throw or return error result
-              (when (map? result)
-                (is (true? (:isError result)))))
+            (if (= client-type :clojure)
+              @(client/call-tool client "nonexistent" {:arg "value"})
+              @(java-sdk/call-tool client "nonexistent" {:arg "value"}))
+            ;; Should not reach here - should throw exception
+            (is false "Expected exception for non-existent tool")
+            (catch java.util.concurrent.ExecutionException e
+              ;; Client wraps the error in ExecutionException
+              (let [cause (.getCause e)
+                    error-data (ex-data cause)]
+                ;; Verify it's a JSON-RPC error response
+                (is (some? (:error error-data))
+                    "Error response should contain :error field")
+                (when-let [error (:error error-data)]
+                  ;; Verify error code is -32602 (INVALID_PARAMS)
+                  (is (= -32602 (:code error))
+                      "Error code should be -32602 for unknown tool")
+                  ;; Verify error message mentions the tool name
+                  (is (str/includes? (:message error) "nonexistent")
+                      "Error message should include tool name"))))
             (catch Exception e
-              (is (instance? Exception e)))))
+              ;; Other transports might throw directly
+              (let [error-data (ex-data e)]
+                (is (some? (:error error-data))
+                    "Error response should contain :error field")
+                (when-let [error (:error error-data)]
+                  (is (= -32602 (:code error))
+                      "Error code should be -32602 for unknown tool")
+                  (is (str/includes? (:message error) "nonexistent")
+                      "Error message should include tool name"))))))
 
         (testing "missing required arguments"
           (let [result (if (= client-type :clojure)
