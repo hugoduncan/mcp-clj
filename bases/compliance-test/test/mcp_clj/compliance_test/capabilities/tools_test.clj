@@ -15,6 +15,20 @@
     [mcp-clj.mcp-client.core :as client]
     [mcp-clj.mcp-server.core :as mcp-server]))
 
+;; Helper Functions
+
+(defn- verify-json-rpc-error
+  "Verifies that error-data contains a valid JSON-RPC error response
+  for unknown tool with code -32602 and tool name in message."
+  [error-data tool-name]
+  (is (some? (:error error-data))
+      "Error response should contain :error field")
+  (when-let [error (:error error-data)]
+    (is (= -32602 (:code error))
+        "Error code should be -32602 for unknown tool")
+    (is (str/includes? (:message error) tool-name)
+        "Error message should include tool name")))
+
 ;; Compliance Tests
 
 (deftest ^:integ tools-list-compliance-test
@@ -112,26 +126,11 @@
               ;; Client wraps the error in ExecutionException
               (let [cause (.getCause e)
                     error-data (ex-data cause)]
-                ;; Verify it's a JSON-RPC error response
-                (is (some? (:error error-data))
-                    "Error response should contain :error field")
-                (when-let [error (:error error-data)]
-                  ;; Verify error code is -32602 (INVALID_PARAMS)
-                  (is (= -32602 (:code error))
-                      "Error code should be -32602 for unknown tool")
-                  ;; Verify error message mentions the tool name
-                  (is (str/includes? (:message error) "nonexistent")
-                      "Error message should include tool name"))))
+                (verify-json-rpc-error error-data "nonexistent")))
             (catch Exception e
               ;; Other transports might throw directly
               (let [error-data (ex-data e)]
-                (is (some? (:error error-data))
-                    "Error response should contain :error field")
-                (when-let [error (:error error-data)]
-                  (is (= -32602 (:code error))
-                      "Error code should be -32602 for unknown tool")
-                  (is (str/includes? (:message error) "nonexistent")
-                      "Error message should include tool name"))))))
+                (verify-json-rpc-error error-data "nonexistent")))))
 
         (testing "missing required arguments"
           (let [result (if (= client-type :clojure)
