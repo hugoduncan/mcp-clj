@@ -78,7 +78,7 @@
       {:jsonrpc version
        :id id
        :error {:code (:internal-error error-codes)
-               :message (.getMessage exception-info)}})))
+               :message (.getMessage ^clojure.lang.ExceptionInfo exception-info)}})))
 
 ;; Request validation
 
