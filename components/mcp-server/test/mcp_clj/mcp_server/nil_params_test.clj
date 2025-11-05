@@ -73,24 +73,24 @@
 ;; Unit Tests
 
 (deftest nil-params-handling-test
-  ;; Test that demonstrates NullPointerException with nil params (before fix)
-  ;; and validates the fix works correctly after applying `(or params {})`
+  ;; Contracts tested:
+  ;; - JSON-RPC 2.0 spec allows params to be omitted or null
+  ;; - Server must attach session metadata to params without throwing
+  ;; - Server must handle both explicit nil params and missing params key
   (testing "MCP server handles nil/missing params in JSON-RPC requests"
     (let [{:keys [client shared-transport] :as test-env} (create-test-env)]
       (try
         (client/wait-for-ready client 5000)
 
         (testing "with explicit nil params"
-          ;; Before fix: NullPointerException at core.clj:385
-          ;; After fix: Should handle gracefully
+          ;; Verifies metadata can be attached to nil params value
           (let [future (send-request-with-params shared-transport nil true)
                 response (.get future 1000 TimeUnit/MILLISECONDS)]
             (is (some? response))
             (is (= {} response))))
 
         (testing "with missing params key"
-          ;; Before fix: NullPointerException at core.clj:385
-          ;; After fix: Should handle gracefully
+          ;; Verifies omitted params key is handled per JSON-RPC 2.0 spec
           (let [future (send-request-with-params shared-transport nil false)
                 response (.get future 1000 TimeUnit/MILLISECONDS)]
             (is (some? response))
