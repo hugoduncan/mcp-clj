@@ -5,7 +5,12 @@
     [clojure.string :as str]
     [clojure.test :refer [deftest is testing use-fixtures]]
     [hato.client :as hato]
-    [mcp-clj.mcp-server.core :as mcp])
+    [mcp-clj.client-transport.factory :as client-transport-factory]
+    [mcp-clj.in-memory-transport.shared :as shared]
+    [mcp-clj.mcp-client.core :as client]
+    [mcp-clj.mcp-client.transport :as client-transport]
+    [mcp-clj.mcp-server.core :as mcp]
+    [mcp-clj.server-transport.factory :as server-transport-factory])
   (:import
     (java.io
       BufferedReader)
@@ -13,6 +18,28 @@
       BlockingQueue
       LinkedBlockingQueue
       TimeUnit)))
+
+(defn ensure-in-memory-transport-registered!
+  "Ensure in-memory transport is registered in both client and server factories"
+  []
+  (client-transport-factory/register-transport!
+    :in-memory
+    (fn [options]
+      (require 'mcp-clj.in-memory-transport.client)
+      (let [create-fn (ns-resolve
+                        'mcp-clj.in-memory-transport.client
+                        'create-transport)]
+        (create-fn options))))
+  (server-transport-factory/register-transport!
+    :in-memory
+    (fn [options handlers]
+      (require 'mcp-clj.in-memory-transport.server)
+      (let [create-server (ns-resolve
+                            'mcp-clj.in-memory-transport.server
+                            'create-in-memory-server)]
+        (create-server options handlers)))))
+
+(ensure-in-memory-transport-registered!)
 
 (def test-tool
   "Test tool for server testing"
@@ -444,6 +471,51 @@
 
         (finally
           ((:stop server)))))))
+
+(deftest nil-params-handling-test
+  ;; Demonstrates the NullPointerException bug when JSON-RPC request has nil params.
+  ;;
+  ;; Background: The MCP server's request-handler (core.clj:385) tries to attach
+  ;; session-id metadata to params using (with-meta params {:session-id ...}).
+  ;; When params is nil, this throws NullPointerException because nil cannot have metadata.
+  ;;
+  ;; This test verifies the bug exists before PR #37 fix, which changes line 385 to:
+  ;;   (with-meta (or params {}) {:session-id session-id})
+  ;;
+  ;; After applying the fix, this test should pass without the NullPointerException.
+  (testing "request-handler with nil params"
+    (ensure-in-memory-transport-registered!)
+    (let [shared-transport (shared/create-shared-transport)
+          test-server (mcp/create-server
+                        {:transport {:type :in-memory :shared shared-transport}})
+          test-client (client/create-client
+                        {:transport {:type :in-memory :shared shared-transport}
+                         :client-info {:name "test-client" :version "1.0.0"}
+                         :capabilities {}})]
+      (try
+        (client/wait-for-ready test-client 5000)
+
+        (testing "throws error due to nil params causing NullPointerException"
+          (let [transport (:transport test-client)
+                result (try
+                         @(client-transport/send-request!
+                            transport "ping" nil 5000)
+                         :no-error
+                         (catch java.util.concurrent.ExecutionException e
+                           (let [cause (ex-cause e)
+                                 ex-data-map (ex-data cause)
+                                 error-obj (:error ex-data-map)
+                                 error-data (:data error-obj)
+                                 error-msg (:error error-data)]
+                             {:caught true
+                              :error-msg error-msg})))]
+            (is (:caught result) "Should throw an exception")
+            (is (str/includes? (:error-msg result) "because \"x\" is null")
+                "Error should indicate nil cannot have metadata")))
+
+        (finally
+          (client/close! test-client)
+          ((:stop test-server)))))))
 
 (deftest ^:integ custom-tools-test
   (testing "server with custom tools"
