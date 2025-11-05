@@ -6,8 +6,8 @@
   (:require
     [clojure.test :refer [deftest is testing]]
     [mcp-clj.client-transport.factory :as client-transport-factory]
-    [mcp-clj.in-memory-transport.client :as transport-client]
     [mcp-clj.in-memory-transport.shared :as shared]
+    [mcp-clj.mcp-client.core :as client]
     [mcp-clj.mcp-server.core :as server]
     [mcp-clj.server-transport.factory :as server-transport-factory])
   (:import
@@ -44,14 +44,17 @@
   (let [shared-transport (shared/create-shared-transport)
         mcp-server (server/create-server
                      {:transport {:type :in-memory :shared shared-transport}})
-        in-memory-client (transport-client/create-transport
-                           {:shared shared-transport})]
+        mcp-client (client/create-client
+                     {:transport {:type :in-memory :shared shared-transport}
+                      :client-info {:name "test-client" :version "1.0.0"}
+                      :capabilities {}})]
     {:server mcp-server
-     :client in-memory-client
+     :client mcp-client
      :shared-transport shared-transport}))
 
 (defn cleanup-test-env
-  [{:keys [server]}]
+  [{:keys [server client]}]
+  (when client (client/close! client))
   (when server ((:stop server))))
 
 (defn send-request-with-params
@@ -69,13 +72,14 @@
 
 ;; Unit Tests
 
-(deftest ^:skip-ci nil-params-handling-test
+(deftest nil-params-handling-test
   ;; Test that demonstrates NullPointerException with nil params (before fix)
   ;; and validates the fix works correctly after applying `(or params {})`
   (testing "MCP server handles nil/missing params in JSON-RPC requests"
-    (let [{:keys [shared-transport] :as test-env} (create-test-env)]
+    (let [{:keys [client shared-transport] :as test-env} (create-test-env)]
       (try
-        (Thread/sleep 100)
+        ;; Wait for client initialization to complete
+        @(:initialization-future client)
 
         (testing "with explicit nil params"
           ;; Before fix: NullPointerException at core.clj:385
