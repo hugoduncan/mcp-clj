@@ -77,19 +77,19 @@
   ;; - JSON-RPC 2.0 spec allows params to be omitted or null
   ;; - Server must attach session metadata to params without throwing
   ;; - Server must handle both explicit nil params and missing params key
-  (testing "MCP server handles nil/missing params in JSON-RPC requests"
+  (testing "request-handler"
     (let [{:keys [client shared-transport] :as test-env} (create-test-env)]
       (try
         (client/wait-for-ready client 5000)
 
-        (testing "with explicit nil params"
+        (testing "handles nil params"
           ;; Verifies metadata can be attached to nil params value
           (let [future (send-request-with-params shared-transport nil true)
                 response (.get future 1000 TimeUnit/MILLISECONDS)]
             (is (some? response))
             (is (= {} response))))
 
-        (testing "with missing params key"
+        (testing "handles missing params key"
           ;; Verifies omitted params key is handled per JSON-RPC 2.0 spec
           (let [future (send-request-with-params shared-transport nil false)
                 response (.get future 1000 TimeUnit/MILLISECONDS)]
