@@ -473,16 +473,16 @@
           ((:stop server)))))))
 
 (deftest nil-params-handling-test
-  ;; Demonstrates the NullPointerException bug when JSON-RPC request has nil params.
+  ;; Verifies the fix for NullPointerException when JSON-RPC request has nil params.
   ;;
-  ;; Background: The MCP server's request-handler (core.clj:385) tries to attach
+  ;; Background: The MCP server's request-handler (core.clj:385) previously tried to attach
   ;; session-id metadata to params using (with-meta params {:session-id ...}).
-  ;; When params is nil, this throws NullPointerException because nil cannot have metadata.
+  ;; When params is nil, this threw NullPointerException because nil cannot have metadata.
   ;;
-  ;; This test verifies the bug exists before PR #37 fix, which changes line 385 to:
+  ;; PR #37 fix changed line 385 to:
   ;;   (with-meta (or params {}) {:session-id session-id})
   ;;
-  ;; After applying the fix, this test should pass without the NullPointerException.
+  ;; This test verifies the fix works and nil params are handled gracefully.
   (testing "request-handler with nil params"
     (ensure-in-memory-transport-registered!)
     (let [shared-transport (shared/create-shared-transport)
@@ -495,23 +495,12 @@
       (try
         (client/wait-for-ready test-client 5000)
 
-        (testing "throws error due to nil params causing NullPointerException"
+        (testing "handles nil params gracefully after fix"
           (let [transport (:transport test-client)
-                result (try
-                         @(client-transport/send-request!
-                            transport "ping" nil 5000)
-                         :no-error
-                         (catch java.util.concurrent.ExecutionException e
-                           (let [cause (ex-cause e)
-                                 ex-data-map (ex-data cause)
-                                 error-obj (:error ex-data-map)
-                                 error-data (:data error-obj)
-                                 error-msg (:error error-data)]
-                             {:caught true
-                              :error-msg error-msg})))]
-            (is (:caught result) "Should throw an exception")
-            (is (str/includes? (:error-msg result) "because \"x\" is null")
-                "Error should indicate nil cannot have metadata")))
+                result @(client-transport/send-request!
+                          transport "ping" nil 5000)]
+            (is (some? result) "Should return a result without error")
+            (is (= {} result) "Ping with nil params should return empty map")))
 
         (finally
           (client/close! test-client)

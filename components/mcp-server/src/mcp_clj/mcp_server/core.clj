@@ -382,7 +382,7 @@
                         new-session)))
         protocol-version (:protocol-version session)
         ;; Add session-id to params metadata for handlers that need it
-        params-with-session (with-meta params {:session-id session-id})
+        params-with-session (with-meta (or params {}) {:session-id session-id})
         ;; Use version-aware handler for tool calls if protocol version is available
         actual-handler (if (and protocol-version (= handler handle-call-tool))
                          #(version-aware-handle-call-tool %1 protocol-version %2)
