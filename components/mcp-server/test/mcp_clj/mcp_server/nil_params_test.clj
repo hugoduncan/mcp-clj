@@ -78,8 +78,7 @@
   (testing "MCP server handles nil/missing params in JSON-RPC requests"
     (let [{:keys [client shared-transport] :as test-env} (create-test-env)]
       (try
-        ;; Wait for client initialization to complete
-        @(:initialization-future client)
+        (client/wait-for-ready client 5000)
 
         (testing "with explicit nil params"
           ;; Before fix: NullPointerException at core.clj:385

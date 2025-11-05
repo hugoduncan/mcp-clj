@@ -108,6 +108,18 @@ clj -M:kaocha:dev:test --plugin kaocha.plugin/cloverage
   - Test cross-process communication
 - Keep unit tests fast and focused on isolated functionality
 
+**MCP Client Test Patterns:**
+- When testing with MCP clients, always wait for initialization to complete
+  before sending requests:
+  ```clojure
+  (let [client (mcp-client/create-client {...})]
+    (mcp-client/wait-for-ready client 5000)  ; Wait up to 5 seconds
+    ;; Now safe to make requests
+    @(mcp-client/call-tool client "tool-name" {...}))
+  ```
+- Do not directly deref `:initialization-future` - use `wait-for-ready`
+  which provides proper error handling and timeout support
+
 ```clojure
 ;; Run tests from REPL after code changes
 (require 'my.test.namespace :reload)
