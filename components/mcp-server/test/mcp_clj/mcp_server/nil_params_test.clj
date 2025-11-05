@@ -85,14 +85,14 @@
         (testing "handles nil params"
           ;; Verifies metadata can be attached to nil params value
           (let [future (send-request-with-params shared-transport nil true)
-                response (.get future 1000 TimeUnit/MILLISECONDS)]
+                response (.get ^java.util.concurrent.Future future 1000 TimeUnit/MILLISECONDS)]
             (is (some? response) (str "Expected response but got: " (pr-str response)))
             (is (= {} response) (str "Expected empty map but got: " (pr-str response)))))
 
         (testing "handles missing params key"
           ;; Verifies omitted params key is handled per JSON-RPC 2.0 spec
           (let [future (send-request-with-params shared-transport nil false)
-                response (.get future 1000 TimeUnit/MILLISECONDS)]
+                response (.get ^java.util.concurrent.Future future 1000 TimeUnit/MILLISECONDS)]
             (is (some? response) (str "Expected response but got: " (pr-str response)))
             (is (= {} response) (str "Expected empty map but got: " (pr-str response)))))
 
