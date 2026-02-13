@@ -246,7 +246,7 @@
                        (mapv (comp #(str % "\n") json/generate-string) requests))
           response
           (with-out-str
-            (with-redefs [mcp-clj.json-rpc.stdio-server/input-reader
+            (with-redefs [mcp-clj.json-rpc-server.stdio/input-reader
                           (constantly
                             (BufferedReader.
                               (StringReader. json-input)))]
