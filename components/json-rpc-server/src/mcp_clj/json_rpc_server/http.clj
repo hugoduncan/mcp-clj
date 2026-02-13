@@ -1,4 +1,4 @@
-(ns mcp-clj.json-rpc.http-server
+(ns mcp-clj.json-rpc-server.http
   "JSON-RPC 2.0 server with MCP Streamable HTTP transport (2025-03-26 spec)"
   (:require
     [clojure.string :as str]

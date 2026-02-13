@@ -1,4 +1,4 @@
-(ns mcp-clj.json-rpc.sse-server
+(ns mcp-clj.json-rpc-server.sse
   "JSON-RPC 2.0 server with Server-Sent Events (SSE) support"
   (:require
     [mcp-clj.http :as http]

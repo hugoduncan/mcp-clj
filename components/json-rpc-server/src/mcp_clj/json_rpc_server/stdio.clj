@@ -1,4 +1,4 @@
-(ns mcp-clj.json-rpc.stdio-server
+(ns mcp-clj.json-rpc-server.stdio
   "JSON-RPC 2.0 server over stdio"
   (:require
     [mcp-clj.json :as json]

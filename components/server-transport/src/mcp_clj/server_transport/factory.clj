@@ -95,9 +95,9 @@
 
 (defn- create-stdio-server
   [options handlers]
-  (require 'mcp-clj.json-rpc.stdio-server)
-  (let [create-server (ns-resolve 'mcp-clj.json-rpc.stdio-server 'create-server)
-        set-handlers! (ns-resolve 'mcp-clj.json-rpc.stdio-server 'set-handlers!)
+  (require 'mcp-clj.json-rpc-server.stdio)
+  (let [create-server (ns-resolve 'mcp-clj.json-rpc-server.stdio 'create-server)
+        set-handlers! (ns-resolve 'mcp-clj.json-rpc-server.stdio 'set-handlers!)
         server-opts (merge {:handlers handlers} (dissoc options :on-sse-connect :on-sse-close))
         server (create-server server-opts)]
     ;; Set handlers immediately after creation
@@ -107,9 +107,9 @@
 
 (defn- create-sse-server
   [{:keys [port on-sse-connect on-sse-close allowed-origins]} handlers]
-  (require 'mcp-clj.json-rpc.sse-server)
-  (let [create-server (ns-resolve 'mcp-clj.json-rpc.sse-server 'create-server)
-        set-handlers! (ns-resolve 'mcp-clj.json-rpc.sse-server 'set-handlers!)
+  (require 'mcp-clj.json-rpc-server.sse)
+  (let [create-server (ns-resolve 'mcp-clj.json-rpc-server.sse 'create-server)
+        set-handlers! (ns-resolve 'mcp-clj.json-rpc-server.sse 'set-handlers!)
         server-opts {:port (or port 3001)
                      :on-sse-connect on-sse-connect
                      :on-sse-close on-sse-close
@@ -122,9 +122,9 @@
 
 (defn- create-http-server
   [{:keys [port num-threads on-connect on-disconnect allowed-origins]} handlers]
-  (require 'mcp-clj.json-rpc.http-server)
-  (let [create-server (ns-resolve 'mcp-clj.json-rpc.http-server 'create-server)
-        set-handlers! (ns-resolve 'mcp-clj.json-rpc.http-server 'set-handlers!)
+  (require 'mcp-clj.json-rpc-server.http)
+  (let [create-server (ns-resolve 'mcp-clj.json-rpc-server.http 'create-server)
+        set-handlers! (ns-resolve 'mcp-clj.json-rpc-server.http 'set-handlers!)
         server-opts {:port (or port 3001)
                      :num-threads (or num-threads 4)
                      :on-connect (or on-connect (fn [& _]))

@@ -1,6 +1,8 @@
 {:deps
- {poly/logging {:local/root "../../components/logging"}
+ {poly/json-rpc-server {:local/root "../../components/json-rpc-server"}
+  poly/logging {:local/root "../../components/logging"}
   poly/mcp-server {:local/root "../../components/mcp-server"}
+  poly/sse {:local/root "../../components/sse"}
   poly/sse-server {:local/root "../../bases/sse-server"}
   poly/stdio-server {:local/root "../../bases/stdio-server"}}
 

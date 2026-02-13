@@ -1,9 +1,9 @@
-(ns mcp-clj.json-rpc.http-server-test
+(ns mcp-clj.json-rpc-server.http-test
   (:require
     [clojure.test :refer [deftest is testing use-fixtures]]
     [hato.client :as hato]
     [mcp-clj.json :as json]
-    [mcp-clj.json-rpc.http-server :as http-server]
+    [mcp-clj.json-rpc-server.http :as http-server]
     [mcp-clj.json-rpc.protocols :as protocols]))
 
 ;; Test Fixtures and Helpers

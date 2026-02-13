@@ -1,10 +1,10 @@
-(ns mcp-clj.json-rpc.protocols-test
+(ns mcp-clj.json-rpc-server.protocols-test
   "Integration tests for polymorphic JSON-RPC server operations"
   (:require
     [clojure.test :refer [deftest is testing]]
-    [mcp-clj.json-rpc.protocols :as protocols]
-    [mcp-clj.json-rpc.sse-server :as sse-server]
-    [mcp-clj.json-rpc.stdio-server :as stdio-server]))
+    [mcp-clj.json-rpc-server.sse :as sse-server]
+    [mcp-clj.json-rpc-server.stdio :as stdio-server]
+    [mcp-clj.json-rpc.protocols :as protocols]))
 
 (defn- test-server-polymorphism
   "Test polymorphic behavior across different server types"

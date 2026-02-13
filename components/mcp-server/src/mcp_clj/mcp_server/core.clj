@@ -496,8 +496,8 @@
     ;; Close individual sessions only for SSE servers
     (when (contains? rpc-server :session-id->session)
       ;; We need to dynamically require sse-server when needed
-      (require 'mcp-clj.json-rpc.sse-server)
-      (let [close! (ns-resolve 'mcp-clj.json-rpc.sse-server 'close!)]
+      (require 'mcp-clj.json-rpc-server.sse)
+      (let [close! (ns-resolve 'mcp-clj.json-rpc-server.sse 'close!)]
         (doseq [session (vals @(:session-id->session server))]
           (close! rpc-server (:session-id session)))))))
 

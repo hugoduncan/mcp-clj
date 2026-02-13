@@ -9,6 +9,7 @@
                  "components/in-memory-transport/test"
                  "components/json/test"
                  "components/json-rpc/test"
+                 "components/json-rpc-server/test"
                  "components/log/test"
                  "components/mcp-client/test"
                  "components/mcp-server/test"
@@ -23,6 +24,7 @@
     poly/interop {:local/root "components/interop"}
     poly/json {:local/root "components/json"}
     poly/json-rpc {:local/root "components/json-rpc"}
+    poly/json-rpc-server {:local/root "components/json-rpc-server"}
     poly/log {:local/root "components/log"}
     poly/mcp-client {:local/root "components/mcp-client"}
     poly/mcp-server {:local/root "components/mcp-server"}
@@ -45,6 +47,7 @@
                        "components/in-memory-transport/test"
                        "components/json/test"
                        "components/json-rpc/test"
+                       "components/json-rpc-server/test"
                        "components/log/test"
                        "components/mcp-client/test"
                        "components/mcp-server/test"
@@ -56,6 +59,7 @@
           poly/client-transport {:local/root "components/client-transport"}
           poly/in-memory-transport {:local/root "components/in-memory-transport"}
           poly/interop {:local/root "components/interop"}
+          poly/json-rpc-server {:local/root "components/json-rpc-server"}
           poly/server-transport {:local/root "components/server-transport"}
           poly/versions {:local/root "components/versions"}
             ;; MCP Java SDK for cross-implementation testing
@@ -73,6 +77,7 @@
             poly/in-memory-transport {:local/root "components/in-memory-transport"}
             poly/interop {:local/root "components/interop"}
             poly/json {:local/root "components/json"}
+            poly/json-rpc-server {:local/root "components/json-rpc-server"}
             poly/server-transport {:local/root "components/server-transport"}
             poly/versions {:local/root "components/versions"}
             hato/hato {:mvn/version "1.0.0"}

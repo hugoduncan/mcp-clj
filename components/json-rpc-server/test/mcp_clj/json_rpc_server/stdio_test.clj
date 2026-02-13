@@ -1,11 +1,11 @@
-(ns mcp-clj.json-rpc.stdio-server-test
+(ns mcp-clj.json-rpc-server.stdio-test
   (:require
     [cheshire.core :as json]
     [clojure.java.io :as io]
     [clojure.string :as str]
     [clojure.test :refer [deftest is testing]]
-    [mcp-clj.json-rpc.protocols :as protocols]
-    [mcp-clj.json-rpc.stdio-server :as stdio-server])
+    [mcp-clj.json-rpc-server.stdio :as stdio-server]
+    [mcp-clj.json-rpc.protocols :as protocols])
   (:import
     (java.io
       BufferedReader
@@ -211,7 +211,7 @@
                        (mapv (comp #(str % "\n") json/generate-string) requests))
           response
           (with-out-str
-            (with-redefs [mcp-clj.json-rpc.stdio-server/input-reader
+            (with-redefs [mcp-clj.json-rpc-server.stdio/input-reader
                           (constantly
                             (BufferedReader.
                               (StringReader. json-input)))]
