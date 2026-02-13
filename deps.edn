@@ -27,6 +27,7 @@
     poly/mcp-client {:local/root "components/mcp-client"}
     poly/mcp-server {:local/root "components/mcp-server"}
     poly/server-transport {:local/root "components/server-transport"}
+    poly/sse {:local/root "components/sse"}
     poly/tools {:local/root "components/tools"}
     poly/versions {:local/root "components/versions"}
     lambdaisland/kaocha {:mvn/version "1.87.1366"}

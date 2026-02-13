@@ -1,0 +1,2 @@
+{:paths ["src"]
+ :deps {poly/log {:local/root "../log"}}}
