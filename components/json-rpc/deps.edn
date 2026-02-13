@@ -5,7 +5,5 @@
         poly/json {:local/root "../json"}
         poly/log {:local/root "../log"}}
  :aliases
- {:dev {:extra-paths ["test"]
-        :extra-deps {hato/hato {:mvn/version "1.0.0"}}}
-  :test {:extra-paths ["test"]
-         :extra-deps {hato/hato {:mvn/version "1.0.0"}}}}}
+ {:dev {:extra-paths ["test"]}
+  :test {:extra-paths ["test"]}}}
