@@ -16,7 +16,7 @@
 
 ;; Configuration
 
-(def ^:private request-timeout-ms 30000)
+(def ^:private request-timeout-ms-default 30000)
 
 ;; JSON I/O
 
@@ -53,7 +53,7 @@
 
 (defn- dispatch-rpc-call
   "Dispatch RPC call with timeout handling"
-  [executor handler rpc-call]
+  [executor handler rpc-call request-timeout-ms]
   (let [out *out*]
     (executor/submit-with-timeout!
       executor
@@ -78,7 +78,7 @@
 (defn- handle-request
   "Handle a JSON-RPC request.
   Returns a future for async handler execution, or nil for sync responses."
-  [executor handlers rpc-call]
+  [executor handlers rpc-call request-timeout-ms]
   (try
     (log/info :rpc/json-request {:json-request rpc-call})
     (if-let [validation-error (json-protocol/validate-request rpc-call)]
@@ -91,7 +91,7 @@
             (:id rpc-call)))
         nil)
       (if-let [handler (get handlers (:method rpc-call))]
-        (dispatch-rpc-call executor handler rpc-call)
+        (dispatch-rpc-call executor handler rpc-call request-timeout-ms)
         (do
           (log/warn :rpc/no-such-method
                     {:method (:method rpc-call)
@@ -159,9 +159,10 @@
 
 (defn create-server
   "Create JSON-RPC server over stdio."
-  [{:keys [num-threads handlers]
+  [{:keys [num-threads handlers request-timeout-ms]
     :or {num-threads (* 2 (.availableProcessors (Runtime/getRuntime)))
-         handlers nil}}]
+         handlers nil
+         request-timeout-ms request-timeout-ms-default}}]
   (log/debug :server/starting {:msg "Starting"})
   (let [executor (executor/create-executor num-threads)
         handlers (atom handlers)
@@ -194,7 +195,7 @@
                             (println "JSON parse error:" (ex-message ex)))
 
                           :else
-                          (let [fut (handle-request executor @handlers rpc-call)]
+                          (let [fut (handle-request executor @handlers rpc-call request-timeout-ms)]
                             (add-pending-future pending-futures fut)
                             fut))]
                     (when (not= ::eof v)

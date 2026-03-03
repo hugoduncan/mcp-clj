@@ -106,14 +106,15 @@
     server))
 
 (defn- create-sse-server
-  [{:keys [port on-sse-connect on-sse-close allowed-origins]} handlers]
+  [{:keys [port on-sse-connect on-sse-close allowed-origins request-timeout-ms]} handlers]
   (require 'mcp-clj.json-rpc-server.sse)
   (let [create-server (ns-resolve 'mcp-clj.json-rpc-server.sse 'create-server)
         set-handlers! (ns-resolve 'mcp-clj.json-rpc-server.sse 'set-handlers!)
-        server-opts {:port (or port 3001)
-                     :on-sse-connect on-sse-connect
-                     :on-sse-close on-sse-close
-                     :allowed-origins (or allowed-origins ["*"])}
+        server-opts (cond-> {:port (or port 3001)
+                             :on-sse-connect on-sse-connect
+                             :on-sse-close on-sse-close
+                             :allowed-origins (or allowed-origins ["*"])}
+                      request-timeout-ms (assoc :request-timeout-ms request-timeout-ms))
         server (create-server server-opts)]
     ;; Set handlers after creation
     (when handlers

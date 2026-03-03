@@ -15,6 +15,10 @@
     (java.lang
       AutoCloseable)))
 
+;; Configuration
+
+(def ^:private request-timeout-ms-default 30000)
+
 (declare stop!)
 
 (defrecord ^:private Session
@@ -33,7 +37,8 @@
    resource-registry
    resource-subscriptions
    capabilities
-   server-info]
+   server-info
+   request-timeout-ms]
 
   AutoCloseable
 
@@ -543,11 +548,12 @@
                     :capabilities {:logging {}}
                     :server-info {:name \"my-server\" :version \"1.0.0\"}})"
   ^MCPServer
-  [{:keys [transport tools prompts resources capabilities server-info]
+  [{:keys [transport tools prompts resources capabilities server-info request-timeout-ms]
     :or {tools tools/default-tools
          prompts prompts/default-prompts
          resources resources/default-resources
-         capabilities {}}
+         capabilities {}
+         request-timeout-ms request-timeout-ms-default}
     :as opts}]
   (when-not transport
     (throw (ex-info "Missing :transport configuration"
@@ -582,14 +588,16 @@
                  resource-registry
                  (atom {})
                  capabilities
-                 server-info)
+                 server-info
+                 request-timeout-ms)
         ;; Create handlers before creating the JSON-RPC server to avoid race
         ;; conditions
         handlers (create-handlers server)
         ;; Add callbacks to transport options
         transport-with-callbacks (merge transport
                                         {:on-sse-connect (partial on-sse-connect server)
-                                         :on-sse-close (partial on-sse-close server)})
+                                         :on-sse-close (partial on-sse-close server)
+                                         :request-timeout-ms request-timeout-ms})
         json-rpc-server (transport-factory/create-transport
                           transport-with-callbacks
                           handlers)

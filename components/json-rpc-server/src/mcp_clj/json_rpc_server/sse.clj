@@ -19,7 +19,7 @@
 
 ;; Configuration
 
-(def ^:private request-timeout-ms 30000)
+(def ^:private request-timeout-ms-default 30000)
 
 (defrecord Session
   [^String session-id
@@ -57,7 +57,7 @@
                    id)))))
 
 (defn- dispatch-rpc-call
-  [executor handler rpc-call request reply!-fn]
+  [executor handler rpc-call request reply!-fn request-timeout-ms]
   (executor/submit-with-timeout!
     executor
     #(handle-json-rpc handler rpc-call request reply!-fn)
@@ -65,7 +65,7 @@
 
 (defn- handle-request
   "Handle a JSON-RPC request"
-  [executor session-id->session handlers request]
+  [executor session-id->session handlers request request-timeout-ms]
   (try
     (let [session-id (request-session-id request)
           session (session-id->session session-id)
@@ -82,7 +82,7 @@
           http/BadRequest)
         (if-let [handler (get handlers (:method rpc-call))]
           (do
-            (dispatch-rpc-call executor handler rpc-call request reply!-fn)
+            (dispatch-rpc-call executor handler rpc-call request reply!-fn request-timeout-ms)
             (http/text-response "Accepted" http/Accepted))
           (http/json-response
             (json-protocol/json-rpc-error
@@ -138,11 +138,13 @@
   [{:keys [num-threads
            port
            on-sse-connect
-           on-sse-close]
+           on-sse-close
+           request-timeout-ms]
     :or {num-threads (* 2 (.availableProcessors (Runtime/getRuntime)))
          port 0
          on-sse-connect (fn [& _])
-         on-sse-close (fn [& _])}}]
+         on-sse-close (fn [& _])
+         request-timeout-ms request-timeout-ms-default}}]
   {:pre [(ifn? on-sse-connect) (ifn? on-sse-close)]}
   (let [executor (executor/create-executor num-threads)
         session-id->session (atom {})
@@ -162,7 +164,8 @@
                         executor
                         @session-id->session
                         @handlers
-                        request))
+                        request
+                        request-timeout-ms))
 
                     [:get "/sse"]
                     (let [id (uuid->hex (random-uuid))
